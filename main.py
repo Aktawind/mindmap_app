@@ -3,7 +3,9 @@ import os
 import json
 import base64
 import logging
+import sys
 
+# Silence complet sur les avertissements pour maximiser les performances de communication
 logging.basicConfig(level=logging.CRITICAL)
 logger = logging.getLogger('pywebview')
 logger.setLevel(logging.CRITICAL)
@@ -11,7 +13,7 @@ logger.setLevel(logging.CRITICAL)
 class MindMapAPI:
     def __init__(self):
         self.window = None
-        self.current_file_path = None  # Mémorise le fichier de travail actif
+        self.current_file_path = None
 
     def set_window(self, window):
         self.window = window
@@ -35,7 +37,6 @@ class MindMapAPI:
                 return f"Erreur d'ouverture : {str(e)}"
         return "Fichier introuvable"
 
-    # --- PERMET DE CHANGER LE TITRE DE LA FENÊTRE DEPUIS LE JS ---
     def update_window_title(self, suffix=None):
         if not self.window: return
         base_title = "MindMap App"
@@ -44,60 +45,51 @@ class MindMapAPI:
         else:
             self.window.set_title(base_title)
 
-    # --- ENREGISTRER DIRECTEMENT OU ENREGISTRER SOUS ---
     def save_project(self, data_json, force_save_as=False):
         if not self.window: return False
-        
         if not self.current_file_path or force_save_as:
             result = self.window.create_file_dialog(
                 webview.SAVE_DIALOG, 
                 file_types=('JSON Files (*.json)', 'All files (*.*)'), 
                 save_filename='ma_mindmap.json'
             )
-            if not result:
-                return "Annulé"
-            
+            if not result: return "Annulé"
             self.current_file_path = result[0] if isinstance(result, tuple) else result
-
         try:
             with open(self.current_file_path, 'w', encoding='utf-8') as f: 
                 f.write(data_json)
-            
-            # Met à jour le titre après un "Enregistrer sous..." réussi
             filename = os.path.basename(self.current_file_path)
             self.update_window_title(filename)
             return True 
         except Exception as e: 
             return f"Erreur d'écriture : {str(e)}"
 
-    # --- CHARGER UN PROJET ET RETENIR SON CHEMIN ---
     def load_project(self):
         if not self.window: return None
         result = self.window.create_file_dialog(webview.OPEN_DIALOG, file_types=('JSON Files (*.json)', 'All files (*.*)'))
         if result:
             file_path = result[0] if isinstance(result, tuple) else result
             try:
-                with open(file_path, 'r', encoding='utf-8') as f: 
-                    content = f.read()
+                with open(file_path, 'r', encoding='utf-8') as f: content = f.read()
                 self.current_file_path = file_path
-                
-                # Extraction du nom du fichier pour l'envoyer au JS
                 filename = os.path.basename(file_path)
                 self.update_window_title(filename)
-                
                 return json.dumps({"content": content, "filename": filename})
             except Exception as e: 
                 return json.dumps({"error": str(e)})
         return None
 
-    # --- RÉINITIALISER LE CHEMIN SI NOUVEAU PROJET ---
     def reset_current_path(self):
         self.current_file_path = None
         self.update_window_title("[Nouveau Projet]")
 
     def load_template(self, template_name):
         safe_name = os.path.basename(template_name)
-        template_path = os.path.join("templates", safe_name)
+        if getattr(sys, 'frozen', False):
+            template_path = os.path.join(sys._MEIPASS, "templates", safe_name)
+        else:
+            template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", safe_name)
+            
         if os.path.exists(template_path):
             try:
                 with open(template_path, 'r', encoding='utf-8') as f: return f.read()
@@ -128,47 +120,39 @@ class MindMapAPI:
         return "Annulé"
 
 
-def on_loaded(window):
-    project_dir = os.path.dirname(os.path.abspath(__file__))
-    js_lib_path = os.path.join(project_dir, "vis-network.min.js")
-    if os.path.exists(js_lib_path):
-        with open(js_lib_path, 'r', encoding='utf-8') as f: window.evaluate_js(f.read())
-            
-    css_path = os.path.join(project_dir, "styles.css")
-    if os.path.exists(css_path):
-        with open(css_path, 'r', encoding='utf-8') as f: window.load_css(f.read())
-            
-    window.evaluate_js("startMindMapEngine();")
-
-
-import sys  # <--- Assure-toi que 'import sys' est bien présent en haut du fichier !
-
 def main():
-    # Optimisation des flags pour l'environnement Windows WebView2
-    os.environ['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = '--disable-renderer-accessibility --disable-features=LayoutNG,AccessibilityObjectModel,LiveCaption --allow-file-access-from-files'
+    # Options Windows WebView2 de bas niveau obligatoires pour stabiliser les threads
+    os.environ['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = (
+        '--disable-renderer-accessibility '
+        '--disable-features=LayoutNG,AccessibilityObjectModel,LiveCaption '
+        '--allow-file-access-from-files '
+        '--disable-web-security'
+    )
     
-    # Détection du mode exécutable (PyInstaller)
     if getattr(sys, 'frozen', False):
         project_dir = sys._MEIPASS
     else:
         project_dir = os.path.dirname(os.path.abspath(__file__))
         
-    html_path = os.path.join(project_dir, "index.html")
-    
-    # --- CHEMIN DE L'ICÔNE DE LA FENÊTRE ---
-    icon_path = os.path.join(project_dir, "icon.png")
-
+    icon_path = os.path.join(project_dir, "icon.ico")
     api = MindMapAPI()
     
-    # Ajout du paramètre icon=icon_path pour habiller la fenêtre
+    # SOLUTION RADICALE : On pointe vers le fichier index.html local, mais...
     window = webview.create_window(
         title="MindMap App",
-        url=html_path,
-        width=1200, height=850, resizable=True, js_api=api,
-        icon=icon_path if os.path.exists(icon_path) else None  # <--- AJOUT ICI
+        url=os.path.join(project_dir, "index.html"),
+        width=1500, height=850, resizable=True, js_api=api
     )
     api.set_window(window)
-    webview.start(on_loaded, window, debug=False)
+    
+    # ... ON FORCE LE MODE SERVEUR HTTP EMBARQUÉ INTÉGRÉ (http_server=True)
+    # Pywebview va automatiquement créer un serveur local sur un port aléatoire libre.
+    # Les requêtes JS <=> Python passent par un tunnel réseau local asynchrone, ce qui supprime le freeze.
+    webview.start(
+        debug=False, 
+        http_server=True,
+        icon=icon_path if os.path.exists(icon_path) else None
+    )
 
 if __name__ == "__main__":
     main()

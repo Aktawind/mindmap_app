@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindMap App</title>
+    
+    <link rel="stylesheet" href="./styles.css">
+    
+    <script type="text/javascript" src="./vis-network.min.js"></script>
+    
     <style>
         body { 
             opacity: 0; 
-            transition: opacity 0.2s ease-in-out; 
+            transition: opacity 0.1s ease-in-out; 
             background-color: #f8f9fa; 
         }
     </style>
@@ -97,6 +102,7 @@
 
     <script type="text/javascript">
         let nodes, edges, network, container;
+        let isEngineStarted = false; // Verrou de sécurité antimulti-lancement
 
         const branchPalettes = [
             { bg: '#FFF3E0', border: '#FFB74D', text: '#333333' },
@@ -107,6 +113,14 @@
         ];
 
         function startMindMapEngine() {
+            if (isEngineStarted) return; // Si déjà lancé par le fallback ou pywebview, on stoppe.
+            isEngineStarted = true;
+
+            if (typeof vis === 'undefined') {
+                console.error("Erreur critique : vis-network.min.js absent.");
+                return;
+            }
+
             nodes = new vis.DataSet([
                 { id: 'root', label: 'Mon Projet Créatif', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }
             ]);
@@ -133,11 +147,10 @@
             setTimeout(() => {
                 network.moveTo({ scale: 0.85 }); 
                 document.body.style.opacity = "1";
-                // Définit le titre initial de la barre de fenêtre
                 if (window.pywebview && window.pywebview.api) {
                     window.pywebview.api.update_window_title("[Nouveau Projet]");
                 }
-            }, 100);
+            }, 50);
         }
 
         const MindMapHistory = {
@@ -378,7 +391,6 @@
                     return node;
                 });
                 const fullData = { nodes: nodesWithPositions, edges: edges.get() };
-                
                 window.pywebview.api.save_project(JSON.stringify(fullData, null, 2), forceSaveAs).then(res => {
                     if (res !== true && res !== "Annulé") alert(res); 
                 });
@@ -388,7 +400,6 @@
                     if (!jsonResponse) return;
                     const data = JSON.parse(jsonResponse);
                     if (data.error) { alert("Erreur: " + data.error); return; }
-                    
                     const importedData = JSON.parse(data.content);
                     nodes.clear(); edges.clear();
                     nodes.add(importedData.nodes); edges.add(importedData.edges);
@@ -411,7 +422,6 @@
                 const currentNodes = nodes.get(); const currentEdges = edges.get();
                 if (currentNodes.length === 0) return;
                 let rootNode = currentNodes.find(n => n.id === 'root') || currentNodes[0];
-
                 let output = "";
                 function buildTreeString(nodeId, depth) {
                     const node = currentNodes.find(n => n.id === nodeId); if (!node) return;
@@ -427,10 +437,7 @@
         };
 
         document.addEventListener('keydown', function(event) {
-            if (event.ctrlKey && event.key.toLowerCase() === 's') {
-                event.preventDefault(); 
-                MindMapApp.saveProject(false); 
-            }
+            if (event.ctrlKey && event.key.toLowerCase() === 's') { event.preventDefault(); MindMapApp.saveProject(false); }
             if (event.ctrlKey && event.key.toLowerCase() === 'z') { event.preventDefault(); MindMapHistory.undo(); }
             if (event.ctrlKey && event.key.toLowerCase() === 'y') { event.preventDefault(); MindMapHistory.redo(); }
             
@@ -473,7 +480,20 @@
             document.getElementById('btn-export-md').disabled = false;
         }
 
-        if (document.readyState === 'complete') { startMindMapEngine(); }
+        // L'UNIQUE DÉCLENCHEUR AUTORISÉ :
+        // Le serveur HTTP asynchrone est prêt, on peut monter le canvas en toute sécurité
+        window.addEventListener('pywebviewready', function() {
+            startMindMapEngine();
+        });
+
+        // CANAL 2 (SÉCURITÉ TEMPO) : Si après 1.5 seconde le moteur n'est toujours pas démarré,
+        // c'est que pywebviewready a loupé le coche. On force l'ouverture manuellement !
+        setTimeout(function() {
+            if (!isEngineStarted) {
+                console.log("Tempo de secours activée : Démarrage forcé de l'application.");
+                startMindMapEngine();
+            }
+        }, 1500);
     </script>
 </body>
 </html>
