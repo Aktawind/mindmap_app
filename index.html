@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindMap App</title>
-
     <style>
         body { 
             opacity: 0; 
@@ -12,7 +11,7 @@
             background-color: #f8f9fa; 
         }
     </style>
-    </head>
+</head>
 <body>
 
     <div id="toolbar">
@@ -31,26 +30,41 @@
         <h3>Commandes :</h3>
         <ul>
             <li><strong>Double-clic vide :</strong> Nouveau nœud</li>
-            <li><strong>Double-clic nœud :</strong> Éditer le texte</li>
+            <li><strong>Double-clic nœud/ligne :</strong> Éditer le texte</li>
             <li><strong>Sélection + Tab :</strong> Ajouter une branche</li>
             <li><strong>Suppr :</strong> Supprimer l'élément</li>
         </ul>
     </div>
 
     <div id="style-bar">
-        <div class="style-section">
-            <span class="style-label">Couleur :</span>
-            <div class="color-dot" style="background: #4A90E2;" onclick="MindMapStyle.changeColor('#4A90E2', '#357ABD', '#ffffff')"></div>
-            <div class="color-dot" style="background: #FFF3E0; border-color: #FFB74D" onclick="MindMapStyle.changeColor('#FFF3E0', '#FFB74D', '#333333')"></div>
-            <div class="color-dot" style="background: #E8F5E9; border-color: #81C784" onclick="MindMapStyle.changeColor('#E8F5E9', '#81C784', '#333333')"></div>
-            <div class="color-dot" style="background: #F3E5F5; border-color: #CE93D8" onclick="MindMapStyle.changeColor('#F3E5F5', '#CE93D8', '#333333')"></div>
-            <div class="color-dot" style="background: #FFEBEE; border-color: #EF9A9A" onclick="MindMapStyle.changeColor('#FFEBEE', '#EF9A9A', '#333333')"></div>
+        <div id="node-style-controls" style="display: flex; align-items: center; gap: 15px;">
+            <div class="style-section">
+                <span class="style-label">Couleur :</span>
+                <div class="color-dot" style="background: #4A90E2;" onclick="MindMapStyle.changeColor('#4A90E2', '#357ABD', '#ffffff')"></div>
+                <div class="color-dot" style="background: #FFF3E0; border-color: #FFB74D" onclick="MindMapStyle.changeColor('#FFF3E0', '#FFB74D', '#333333')"></div>
+                <div class="color-dot" style="background: #E8F5E9; border-color: #81C784" onclick="MindMapStyle.changeColor('#E8F5E9', '#81C784', '#333333')"></div>
+                <div class="color-dot" style="background: #F3E5F5; border-color: #CE93D8" onclick="MindMapStyle.changeColor('#F3E5F5', '#CE93D8', '#333333')"></div>
+                <div class="color-dot" style="background: #FFEBEE; border-color: #EF9A9A" onclick="MindMapStyle.changeColor('#FFEBEE', '#EF9A9A', '#333333')"></div>
+            </div>
+            <div style="border-left: 1px solid #ddd; height: 20px;"></div>
+            <div class="style-section">
+                <span class="style-label">Forme :</span>
+                <button class="shape-btn" onclick="MindMapStyle.changeShape('box')">Rectangle</button>
+                <button class="shape-btn" onclick="MindMapStyle.changeShape('ellipse')">Ovale</button>
+            </div>
+            <div style="border-left: 1px solid #ddd; height: 20px;"></div>
+            <div class="style-section">
+                <span class="style-label">Pièce Jointe :</span>
+                <button class="shape-btn" style="background: #e2e8f0;" onclick="MindMapAttachments.attachFile()">📎 Associer</button>
+                <button id="btn-open-file" class="shape-btn" style="background: #2D3748; color: white;" onclick="MindMapAttachments.openFile()">📂 Ouvrir</button>
+            </div>
         </div>
-        <div style="border-left: 1px solid #ddd; height: 20px;"></div>
-        <div class="style-section">
-            <span class="style-label">Forme :</span>
-            <button class="shape-btn" onclick="MindMapStyle.changeShape('box')">Rectangle</button>
-            <button class="shape-btn" onclick="MindMapStyle.changeShape('ellipse')">Ovale</button>
+        
+        <div id="edge-style-controls" style="display: none; align-items: center; gap: 15px;">
+            <div class="style-section">
+                <span class="style-label">Branche :</span>
+                <button class="shape-btn" onclick="MindMapUI.editSelectedEdge()">📝 Nommer la relation</button>
+            </div>
         </div>
     </div>
 
@@ -59,11 +73,18 @@
     <script type="text/javascript">
         let nodes, edges, network, container;
 
-        // Appelée instantanément par Python dès que le CSS et vis-network.min.js sont injectés
+        // Palette de couleurs pro prédéfinies pour les nouvelles branches principales
+        const branchPalettes = [
+            { bg: '#FFF3E0', border: '#FFB74D', text: '#333333' }, // Orange clair
+            { bg: '#E8F5E9', border: '#81C784', text: '#333333' }, // Vert clair
+            { bg: '#F3E5F5', border: '#CE93D8', text: '#333333' }, // Violet clair
+            { bg: '#FFEBEE', border: '#EF9A9A', text: '#333333' }, // Rouge clair
+            { bg: '#E0F7FA', border: '#4DD0E1', text: '#333333' }  // Cyan clair
+        ];
+
         function startMindMapEngine() {
-            // 1. Initialisation de Vis-Network
             nodes = new vis.DataSet([
-                { id: 'root', label: 'Mon Projet Créatif', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD' }, margin: 12, font: { color: '#ffffff' } }
+                { id: 'root', label: 'Mon Projet Créatif', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }
             ]);
             edges = new vis.DataSet([]);
             container = document.getElementById('network-canvas');
@@ -72,7 +93,9 @@
                 nodes: { shadow: { enabled: true, color: 'rgba(0,0,0,0.05)', size: 4, x: 2, y: 2 } },
                 edges: {
                     smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.6 },
-                    color: { color: '#A0AEC0', highlight: '#4A90E2' }, width: 2
+                    color: { color: '#A0AEC0', highlight: '#4A90E2' }, 
+                    width: 2,
+                    font: { align: 'horizontal', background: '#f8f9fa', size: 11, color: '#4A5568' }
                 },
                 physics: { enabled: false },
                 interaction: { hover: true, dragNodes: true }
@@ -82,48 +105,116 @@
             setupNetworkEvents();
             activateUserInterface();
 
-            // 2. Rendre le body visible de manière fluide UNIQUEMENT quand tout le moteur graphique est prêt
-            // (Placé tout à la fin pour un effet fondu impeccable, sans effet "moche")
             setTimeout(() => {
+                // Point 3 : Démarrage moins zoomé à l'affichage initial
+                network.moveTo({ scale: 0.85 }); 
                 document.body.style.opacity = "1";
-            }, 50);
+            }, 100);
         }
 
         function setupNetworkEvents() {
             network.on("selectNode", function (params) {
+                document.getElementById('edge-style-controls').style.display = 'none';
+                document.getElementById('node-style-controls').style.display = 'flex';
                 document.getElementById('style-bar').classList.add('active');
+                
                 const nodeData = nodes.get(params.nodes[0]);
                 MindMapStyle.updateActiveColorDot((nodeData && nodeData.color) ? nodeData.color.background : '#4A90E2');
+                MindMapAttachments.updateUIForSelectedNode(nodeData);
+            });
+
+            network.on("selectEdge", function (params) {
+                // Si on a cliqué sur une ligne et pas sur un nœud
+                if (params.nodes.length === 0) {
+                    document.getElementById('node-style-controls').style.display = 'none';
+                    document.getElementById('edge-style-controls').style.display = 'flex';
+                    document.getElementById('style-bar').classList.add('active');
+                }
             });
 
             network.on("deselectNode", function () {
                 document.getElementById('style-bar').classList.remove('active');
             });
+            network.on("deselectEdge", function () {
+                document.getElementById('style-bar').classList.remove('active');
+            });
 
             network.on("doubleClick", function (params) {
-                if (params.nodes.length === 0) {
+                if (params.nodes.length > 0) {
+                    MindMapUI.startInlineEditing(params.nodes[0], null, 'node');
+                } else if (params.edges.length > 0) {
+                    MindMapUI.startInlineEditing(null, params.edges[0], 'edge');
+                } else {
                     const pos = params.pointer.canvas;
                     nodes.add({
                         id: 'node_' + Date.now(), label: 'Nouvelle idée', x: pos.x, y: pos.y,
-                        shape: 'box', color: { background: '#FFF3E0', border: '#FFB74D' }, margin: 10, font: { color: '#333333' }
+                        shape: 'box', color: { background: '#FFF3E0', border: '#FFB74D' }, margin: 10, font: { color: '#333333' },
+                        filePath: null
                     });
-                } else {
-                    MindMapUI.startInlineEditing(params.nodes[0], params.pointer.DOM);
                 }
             });
         }
 
+        const MindMapAttachments = {
+            attachFile() {
+                const selected = network.getSelectedNodes();
+                if (selected.length !== 1) return;
+                
+                const nodeId = selected[0];
+                const nodeData = nodes.get(nodeId);
+
+                window.pywebview.api.select_local_file().then(filePath => {
+                    if (filePath) {
+                        let baseLabel = nodeData.label.replace(/\n\s*📄.*/g, '');
+                        // Point 4 : On écrit explicitement "Document joint" au lieu du nom brut du fichier
+                        nodes.update({
+                            id: nodeId,
+                            label: `${baseLabel}\n📄 Document joint`,
+                            filePath: filePath
+                        });
+                        this.updateUIForSelectedNode(nodes.get(nodeId));
+                    }
+                });
+            },
+            openFile() {
+                const selected = network.getSelectedNodes();
+                if (selected.length !== 1) return;
+                const nodeData = nodes.get(selected[0]);
+                if (nodeData && nodeData.filePath) {
+                    window.pywebview.api.open_local_file(nodeData.filePath).then(res => {
+                        if (res !== true) alert(res);
+                    });
+                }
+            },
+            updateUIForSelectedNode(nodeData) {
+                const openBtn = document.getElementById('btn-open-file');
+                if (openBtn) {
+                    openBtn.style.display = (nodeData && nodeData.filePath) ? 'inline-block' : 'none';
+                }
+            }
+        };
+
         const MindMapStyle = {
             changeColor(bg, border, textFontColor) {
                 const selected = network.getSelectedNodes();
-                if (selected.length === 1) {
-                    nodes.update({
-                        id: selected[0],
-                        color: { background: bg, border: border, highlight: { background: bg, border: border } },
-                        font: { color: textFontColor }
-                    });
-                    this.updateActiveColorDot(bg);
-                }
+                if (selected.length !== 1) return;
+                
+                // Mettre à jour récursivement le nœud et tous ses enfants
+                this.applyColorHierarchy(selected[0], bg, border, textFontColor);
+            },
+            applyColorHierarchy(nodeId, bg, border, textFontColor) {
+                nodes.update({
+                    id: nodeId,
+                    color: { background: bg, border: border, highlight: { background: bg, border: border } },
+                    font: { color: textFontColor }
+                });
+                // Point 2 : Répercuter sur les nœuds filles
+                const allEdges = edges.get();
+                allEdges.forEach(edge => {
+                    if (edge.from === nodeId) {
+                        this.applyColorHierarchy(edge.to, bg, border, textFontColor);
+                    }
+                });
             },
             changeShape(shapeType) {
                 const selected = network.getSelectedNodes();
@@ -147,21 +238,81 @@
         };
 
         const MindMapUI = {
-            startInlineEditing(nodeId, domPosition) {
-                const nodeData = nodes.get(nodeId);
+            editSelectedEdge() {
+                const selectedEdges = network.getSelectedEdges();
+                if (selectedEdges.length === 1) {
+                    this.startInlineEditing(null, selectedEdges[0], 'edge');
+                }
+            },
+            // Point 6 : Édition intégrée directement sur le rectangle ou sur le lien
+            startInlineEditing(nodeId, edgeId, mode) {
                 const input = document.createElement('input');
-                input.type = 'text';
-                input.value = nodeData.label;
                 input.className = 'node-edit-input';
-                input.style.left = (domPosition.x - 50) + 'px';
-                input.style.top = (domPosition.y - 15) + 'px';
+                let currentLabel = "";
+                let targetPos = { x: 0, y: 0 };
+
+                if (mode === 'node') {
+                    const nodeData = nodes.get(nodeId);
+                    currentLabel = nodeData.label.replace(/\n\s*📄.*/g, '');
+                    targetPos = network.getBoundingBox(nodeId);
+                    
+                    // Masquer temporairement le texte du nœud pour ne pas avoir de doublons visuels
+                    nodes.update({ id: nodeId, font: { color: 'transparent' } });
+
+                    // Convertir les coordonnées canvas en coordonnées DOM écran
+                    const domPosTopLeft = network.canvasToDOM({ x: targetPos.left, y: targetPos.top });
+                    const domPosBottomRight = network.canvasToDOM({ x: targetPos.right, y: targetPos.bottom });
+                    
+                    const width = (domPosBottomRight.x - domPosTopLeft.x);
+                    const height = (domPosBottomRight.y - domPosTopLeft.y);
+
+                    input.style.left = (domPosTopLeft.x) + 'px';
+                    input.style.top = (domPosTopLeft.y) + 'px';
+                    input.style.width = Math.max(width - 16, 120) + 'px';
+                    input.style.height = Math.max(height - 10, 30) + 'px';
+                    input.style.textAlign = 'center';
+                } else {
+                    // Mode Branche / Lien (Point 5)
+                    const edgeData = edges.get(edgeId);
+                    currentLabel = edgeData.label || "";
+                    
+                    // Trouver le milieu de la ligne pour positionner l'input
+                    const connectedNodes = network.getConnectedNodes(edgeId);
+                    const pos1 = network.getPositions([connectedNodes[0]])[connectedNodes[0]];
+                    const pos2 = network.getPositions([connectedNodes[1]])[connectedNodes[1]];
+                    const midX = (pos1.x + pos2.x) / 2;
+                    const midY = (pos1.y + pos2.y) / 2;
+                    const domMid = network.canvasToDOM({ x: midX, y: midY });
+
+                    input.style.left = (domMid.x - 75) + 'px';
+                    input.style.top = (domMid.y - 15) + 'px';
+                    input.style.width = '150px';
+                    input.style.height = '26px';
+                }
+
+                input.type = 'text';
+                input.value = currentLabel;
                 document.body.appendChild(input);
                 input.focus();
                 input.select();
 
                 function finishEditing() {
-                    if (input.value.trim() !== "") {
-                        nodes.update({ id: nodeId, label: input.value.trim() });
+                    const val = input.value.trim();
+                    if (mode === 'node') {
+                        const nodeData = nodes.get(nodeId);
+                        // Rétablir la couleur de police correcte
+                        const isRoot = (nodeId === 'root');
+                        const defaultTextColor = (nodeData.color && nodeData.color.background === '#4A90E2') ? '#ffffff' : '#333333';
+                        
+                        if (val !== "") {
+                            let finalLabel = val;
+                            if (nodeData.filePath) finalLabel += `\n📄 Document joint`;
+                            nodes.update({ id: nodeId, label: finalLabel, font: { color: defaultTextColor } });
+                        } else {
+                            nodes.update({ id: nodeId, font: { color: defaultTextColor } });
+                        }
+                    } else {
+                        edges.update({ id: edgeId, label: val });
                     }
                     if (input.parentNode) document.body.removeChild(input);
                 }
@@ -169,9 +320,60 @@
                 input.addEventListener('blur', finishEditing);
                 input.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') finishEditing();
-                    if (e.key === 'Escape') { if (input.parentNode) document.body.removeChild(input); }
+                    if (e.key === 'Escape') {
+                        if (mode === 'node') {
+                            const nodeData = nodes.get(nodeId);
+                            const defaultTextColor = (nodeData.color && nodeData.color.background === '#4A90E2') ? '#ffffff' : '#333333';
+                            nodes.update({ id: nodeId, font: { color: defaultTextColor } });
+                        }
+                        if (input.parentNode) document.body.removeChild(input);
+                    }
                 });
             },
+
+            // Point 1 : Algorithme anti-superposition lors de la création par Tabulation
+            calculateSmartPosition(parentId) {
+                const parentPos = network.getPositions([parentId])[parentId];
+                const allNodes = nodes.get();
+                const connectedEdges = edges.get().filter(e => e.from === parentId);
+                
+                let targetX = parentPos.x + 220;
+                let targetY = parentPos.y;
+
+                if (connectedEdges.length > 0) {
+                    // Trouver le décalage vertical maximal des enfants existants
+                    const childrenIds = connectedEdges.map(e => e.to);
+                    const childrenPositions = network.getPositions(childrenIds);
+                    
+                    let lowestY = parentPos.y;
+                    Object.values(childrenPositions).forEach(pos => {
+                        if (pos.y > lowestY) lowestY = pos.y;
+                    });
+                    
+                    // On place le nouveau nœud 75 pixels plus bas que le plus bas des frères
+                    targetY = lowestY + 75;
+                } else {
+                    // Premier enfant : aligné horizontalement avec une légère variation aléatoire
+                    targetY = parentPos.y + (Math.random() * 20 - 10);
+                }
+
+                // Vérification finale globale de sécurité pour éviter l'exact chevauchement
+                let overlapDetected = true;
+                while (overlapDetected) {
+                    overlapDetected = false;
+                    for (let node of allNodes) {
+                        const pos = network.getPositions([node.id])[node.id];
+                        if (pos && Math.abs(pos.x - targetX) < 160 && Math.abs(pos.y - targetY) < 55) {
+                            targetY += 75; // On descend d'un cran si un autre nœud squatte la zone
+                            overlapDetected = true;
+                            break;
+                        }
+                    }
+                }
+
+                return { x: targetX, y: targetY };
+            },
+
             applyTemplate(templateName) {
                 if (!templateName) return;
                 if (confirm("Charger ce template va remplacer votre mind map actuelle. Continuer ?")) {
@@ -235,7 +437,8 @@
                 function buildTreeString(nodeId, depth) {
                     const node = currentNodes.find(n => n.id === nodeId);
                     if (!node) return;
-                    output += `${"\t".repeat(depth)}- ${node.label}\n`;
+                    let cleanLabel = node.label.replace(/\n\s*📄.*/g, '');
+                    output += `${"\t".repeat(depth)}- ${cleanLabel}${node.filePath ? ' (Lien: ' + node.filePath + ')' : ''}\n`;
                     currentEdges.filter(e => e.from === nodeId).forEach(edge => buildTreeString(edge.to, depth + 1));
                 }
 
@@ -250,26 +453,63 @@
                 const selected = network.getSelectedNodes();
                 if (selected.length === 1) {
                     const parentId = selected[0];
-                    const parentPos = network.getPositions([parentId])[parentId];
+                    const parentData = nodes.get(parentId);
+                    const smartPos = MindMapUI.calculateSmartPosition(parentId);
                     const newId = 'node_' + Date.now();
                     
+                    // Gestion de la couleur intelligente héritée (Point 2)
+                    let finalColor = { background: '#FFF3E0', border: '#FFB74D' };
+                    let finalFontColor = '#333333';
+
+                    if (parentId === 'root') {
+                        // On crée une nouvelle sous-branche principale : on lui donne une couleur unique
+                        const existingMainBranchesCount = edges.get().filter(e => e.from === 'root').length;
+                        const paletteIndex = existingMainBranchesCount % branchPalettes.length;
+                        finalColor = { 
+                            background: branchPalettes[paletteIndex].bg, 
+                            border: branchPalettes[paletteIndex].border,
+                            highlight: { background: branchPalettes[paletteIndex].bg, border: branchPalettes[paletteIndex].border }
+                        };
+                        finalFontColor = branchPalettes[paletteIndex].text;
+                    } else if (parentData && parentData.color) {
+                        // Nœud fille : il hérite exactement de la couleur du parent
+                        finalColor = {
+                            background: parentData.color.background,
+                            border: parentData.color.border,
+                            highlight: { background: parentData.color.background, border: parentData.color.border }
+                        };
+                        finalFontColor = (parentData.font && parentData.font.color) ? parentData.font.color : '#333333';
+                    }
+                    
                     nodes.add({
-                        id: newId, label: 'Sous-idée', x: parentPos.x + 180, y: parentPos.y + (Math.random() * 60 - 30),
-                        shape: 'box', color: { background: '#E8F5E9', border: '#81C784' }, margin: 10, font: { color: '#333333' }
+                        id: newId, label: 'Nouvelle sous-idée', x: smartPos.x, y: smartPos.y,
+                        shape: 'box', color: finalColor, margin: 10, font: { color: finalFontColor },
+                        filePath: null
                     });
-                    edges.add({ id: 'edge_' + Date.now(), from: parentId, to: newId });
+                    
+                    edges.add({ id: 'edge_' + Date.now(), from: parentId, to: newId, label: '' });
                     network.selectNodes([newId]);
+                    
+                    // On bascule tout de suite en édition interne
+                    setTimeout(() => { MindMapUI.startInlineEditing(newId, null, 'node'); }, 50);
                 }
             }
             if (event.key === 'Delete' || event.key === 'Backspace') {
-                const selected = network.getSelectedNodes();
-                if (selected.length > 0) {
-                    nodes.remove(selected);
+                const selectedNodes = network.getSelectedNodes();
+                const selectedEdges = network.getSelectedEdges();
+                if (selectedNodes.length > 0) {
+                    nodes.remove(selectedNodes);
+                    document.getElementById('style-bar').classList.remove('active');
+                } else if (selectedEdges.length > 0) {
+                    edges.remove(selectedEdges);
                     document.getElementById('style-bar').classList.remove('active');
                 }
             }
         });
 
+        if (document.readyState === 'complete') { startMindMapEngine(); }
+
+        // --- SÉCURITÉ D'ACTIVATION DES BOUTONS DE LA TOOLBAR ---
         function activateUserInterface() {
             document.getElementById('btn-save').disabled = false;
             document.getElementById('btn-load').disabled = false;
