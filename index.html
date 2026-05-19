@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindMap V2</title>
+    <title>MindMap V3 - Style & Design</title>
     
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
@@ -15,7 +15,7 @@
         }
         #network-canvas { width: 100vw; height: 100vh; }
         
-        /* Barre d'outils supérieure moderne */
+        /* Barre d'outils supérieure */
         #toolbar {
             position: absolute; top: 20px; right: 20px;
             background: white; padding: 10px 15px; border-radius: 8px;
@@ -41,35 +41,77 @@
         ul { margin: 0; padding-left: 18px; font-size: 12px; color: #666; }
         li { margin-bottom: 4px; }
 
-        /* Style de l'input d'édition dynamique */
         .node-edit-input {
             position: absolute; z-index: 100; border: 2px solid #4A90E2;
             padding: 4px 8px; border-radius: 4px; font-family: inherit;
             font-size: 14px; outline: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
+
+        /* --- NOUVEAU : Barre de Style en bas de l'écran --- */
+        #style-bar {
+            position: absolute; bottom: 30px; left: 50%;
+            transform: translateX(-50%); background: white;
+            padding: 12px 20px; border-radius: 30px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 10;
+            display: flex; align-items: center; gap: 15px;
+            transition: all 0.3s ease; opacity: 0; pointer-events: none;
+        }
+        #style-bar.active { opacity: 1; pointer-events: auto; }
+        .style-section { display: flex; gap: 8px; align-items: center; }
+        .style-label { font-size: 12px; color: #777; font-weight: bold; text-transform: uppercase; }
+        
+        /* Pastilles de couleur */
+        .color-dot {
+            width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+            border: 2px solid transparent; transition: transform 0.1s;
+        }
+        .color-dot:hover { transform: scale(1.2); }
+        
+        /* Boutons de forme */
+        .shape-btn {
+            background: #f0f2f5; border: 1px solid #ddd; padding: 4px 10px;
+            border-radius: 4px; cursor: pointer; font-size: 12px;
+        }
+        .shape-btn:hover { background: #e4e6e9; }
     </style>
 </head>
 <body>
 
     <div id="toolbar">
-        <select id="template-select" onchange="applyTemplate(this.value)" disabled style="opacity: 0.5; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-family: inherit;">
+        <select id="template-select" onchange="applyTemplate(this.value)" disabled style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-family: inherit;">
             <option value="">🌱 Choisir un template...</option>
             <option value="cadrage_idee.json">🎯 Cadrage d'Idée / Projet</option>
             <option value="resolution_probleme.json">🔍 Résolution de Problème</option>
         </select>
-
-        <button id="btn-save" class="btn" onclick="saveToPC()" disabled style="opacity: 0.5; cursor: not-allowed;">Enregistrer sous...</button>
-        <button id="btn-load" class="btn btn-secondary" onclick="loadFromPC()" disabled style="opacity: 0.5; cursor: not-allowed;">Ouvrir un projet</button>
+        <button id="btn-save" class="btn" onclick="saveToPC()" disabled>Enregistrer sous...</button>
+        <button id="btn-load" class="btn btn-secondary" onclick="loadFromPC()" disabled>Ouvrir un projet</button>
     </div>
 
     <div id="controls-overlay">
         <h3>Commandes :</h3>
         <ul>
-            <li><strong>Double-clic vide :</strong> Nouveau nœud racine</li>
+            <li><strong>Double-clic vide :</strong> Nouveau nœud</li>
             <li><strong>Double-clic nœud :</strong> Éditer le texte</li>
             <li><strong>Sélection + Tab :</strong> Ajouter une branche</li>
             <li><strong>Suppr :</strong> Supprimer l'élément</li>
         </ul>
+    </div>
+
+    <div id="style-bar">
+        <div class="style-section">
+            <span class="style-label">Couleur :</span>
+            <div class="color-dot" style="background: #4A90E2;" onclick="changeNodeColor('#4A90E2', '#357ABD', '#ffffff')"></div>
+            <div class="color-dot" style="background: #FFF3E0; border-color: #FFB74D" onclick="changeNodeColor('#FFF3E0', '#FFB74D', '#333333')"></div>
+            <div class="color-dot" style="background: #E8F5E9; border-color: #81C784" onclick="changeNodeColor('#E8F5E9', '#81C784', '#333333')"></div>
+            <div class="color-dot" style="background: #F3E5F5; border-color: #CE93D8" onclick="changeNodeColor('#F3E5F5', '#CE93D8', '#333333')"></div>
+            <div class="color-dot" style="background: #FFEBEE; border-color: #EF9A9A" onclick="changeNodeColor('#FFEBEE', '#EF9A9A', '#333333')"></div>
+        </div>
+        <div style="border-left: 1px solid #ddd; height: 20px;"></div>
+        <div class="style-section">
+            <span class="style-label">Forme :</span>
+            <button class="shape-btn" onclick="changeNodeShape('box')">Rectangle</button>
+            <button class="shape-btn" onclick="changeNodeShape('ellipse')">Ovale</button>
+        </div>
     </div>
 
     <div id="network-canvas"></div>
@@ -95,60 +137,115 @@
 
         let network = new vis.Network(container, data, options);
 
-        // --- GESTION DU DOUBLE-CLIC (Création ou Édition) ---
+        // --- NOUVEAU : Gestion de l'affichage de la barre de style ---
+        // --- Gestion de l'affichage et de la synchro de la barre de style ---
+        // --- Gestion de l'affichage et de la synchro de la barre de style ---
+        network.on("selectNode", function (params) {
+            document.getElementById('style-bar').classList.add('active');
+            
+            const nodeId = params.nodes[0];
+            const nodeData = nodes.get(nodeId);
+            
+            if (nodeData && nodeData.color && nodeData.color.background) {
+                updateActiveColorDot(nodeData.color.background);
+            } else {
+                updateActiveColorDot('#4A90E2'); // Bleu par défaut
+            }
+        });
+
+        network.on("deselectNode", function (params) {
+            document.getElementById('style-bar').classList.remove('active');
+        });
+
+        // --- Fonctions de modification du style ---
+        function changeNodeColor(bg, border, textFontColor) {
+            const selectedNodes = network.getSelectedNodes();
+            if (selectedNodes.length === 1) {
+                const nodeId = selectedNodes[0];
+                nodes.update({
+                    id: nodeId,
+                    color: { 
+                        background: bg, 
+                        border: border,
+                        highlight: { background: bg, border: border } 
+                    },
+                    font: { color: textFontColor }
+                });
+                
+                updateActiveColorDot(bg);
+            }
+        }
+
+        function updateActiveColorDot(currentBg) {
+            const dots = document.querySelectorAll('.color-dot');
+            dots.forEach(dot => {
+                // Nettoyage des chaînes pour éviter les faux négatifs de casse ou d'espaces
+                const targetColor = currentBg.toLowerCase().trim();
+                const clickAttr = dot.getAttribute('onclick').toLowerCase();
+                
+                if (clickAttr.includes(targetColor)) {
+                    dot.style.border = "2px solid #333";
+                    dot.style.transform = "scale(1.1)";
+                } else {
+                    dot.style.border = "2px solid transparent";
+                    dot.style.transform = "scale(1)";
+                }
+            });
+        }
+
+        function changeNodeShape(shapeType) {
+            const selectedNodes = network.getSelectedNodes();
+            if (selectedNodes.length === 1) {
+                nodes.update({
+                    id: selectedNodes[0],
+                    shape: shapeType
+                });
+            }
+        }
+
+        // --- INTERACTION DOUBLE-CLIC ---
         network.on("doubleClick", function (params) {
             if (params.nodes.length === 0) {
-                // Double-clic dans le vide -> Création d'un nœud racine
                 const canvasPosition = params.pointer.canvas;
                 const newId = 'node_' + Date.now();
                 nodes.add({
                     id: newId, label: 'Nouvelle idée', x: canvasPosition.x, y: canvasPosition.y,
-                    shape: 'box', color: { background: '#FFF3E0', border: '#FFB74D' }, margin: 10
+                    shape: 'box', color: { background: '#FFF3E0', border: '#FFB74D' }, margin: 10,
+                    font: { color: '#333333' }
                 });
             } else {
-                // Double-clic sur un nœud existant -> Édition du texte
                 const nodeId = params.nodes[0];
                 startEditing(nodeId, params.pointer.DOM);
             }
         });
 
-        // --- FONCTION D'ÉDITION INLINE ---
         function startEditing(nodeId, domPosition) {
             const nodeData = nodes.get(nodeId);
-            
-            // Création dynamique d'un champ HTML input
             const input = document.createElement('input');
             input.type = 'text';
             input.value = nodeData.label;
             input.className = 'node-edit-input';
-            
-            // Positionnement précis sur l'écran au niveau du nœud
             input.style.left = (domPosition.x - 50) + 'px';
             input.style.top = (domPosition.y - 15) + 'px';
             document.body.appendChild(input);
             input.focus();
             input.select();
 
-            // Fermeture de l'édition et sauvegarde de la valeur
             function finishEditing() {
                 if (input.value.trim() !== "") {
                     nodes.update({ id: nodeId, label: input.value.trim() });
                 }
-                if (input.parentNode) {
-                    document.body.removeChild(input);
-                }
+                if (input.parentNode) document.body.removeChild(input);
             }
 
             input.addEventListener('blur', finishEditing);
             input.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') finishEditing();
-                if (e.key === 'Escape') {
-                    if (input.parentNode) document.body.removeChild(input);
-                }
+                if (e.key === 'Escape') { if (input.parentNode) document.body.removeChild(input); }
             });
         }
 
-        // --- TOUCHES DE RACCOURCIS (Tab et Suppr) ---
+        // --- RACCOURCIS CLAVIER ---
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Tab') {
                 event.preventDefault();
@@ -160,7 +257,8 @@
                     
                     nodes.add({
                         id: newId, label: 'Sous-idée', x: parentPos.x + 180, y: parentPos.y + (Math.random() * 60 - 30),
-                        shape: 'box', color: { background: '#E8F5E9', border: '#81C784' }, margin: 10
+                        shape: 'box', color: { background: '#E8F5E9', border: '#81C784' }, margin: 10,
+                        font: { color: '#333333' }
                     });
 
                     edges.add({ id: 'edge_' + Date.now(), from: parentId, to: newId });
@@ -169,44 +267,17 @@
             }
             if (event.key === 'Delete' || event.key === 'Backspace') {
                 const selectedNodes = network.getSelectedNodes();
-                if (selectedNodes.length > 0) nodes.remove(selectedNodes);
+                if (selectedNodes.length > 0) {
+                    nodes.remove(selectedNodes);
+                    document.getElementById('style-bar').classList.remove('active');
+                }
             }
         });
 
-        // --- COMMUNICATION AVEC LE BACKEND PYTHON ---
-
-        function applyTemplate(templateName) {
-            if (!templateName) return;
-            
-            if (confirm("Charger ce template va remplacer votre mind map actuelle. Continuer ?")) {
-                window.pywebview.api.load_template(templateName).then(function(jsonString) {
-                    const importedData = JSON.parse(jsonString);
-                    if (importedData.error) {
-                        alert("Erreur : " + importedData.error);
-                        return;
-                    }
-
-                    // Remplacement des données
-                    nodes.clear();
-                    edges.clear();
-                    nodes.add(importedData.nodes);
-                    edges.add(importedData.edges);
-                    network.fit(); // Recadrer automatiquement la vue
-                    
-                    // Réinitialiser le sélecteur sur l'option par défaut
-                    document.getElementById('template-select').value = "";
-                });
-            } else {
-                document.getElementById('template-select').value = "";
-            }
-        }
-
+        // --- PYTHON APIS ---
         function saveToPC() {
-            // Extraction des données actuelles du graphe
             const currentNodes = nodes.get();
             const currentEdges = edges.get();
-            
-            // Pour chaque nœud, on enregistre sa position X,Y actuelle calculée par vis-network
             const positions = network.getPositions();
             const nodesWithPositions = currentNodes.map(node => {
                 if (positions[node.id]) {
@@ -215,49 +286,39 @@
                 }
                 return node;
             });
-
             const fullData = { nodes: nodesWithPositions, edges: currentEdges };
-            const jsonString = JSON.stringify(fullData, null, 2);
-
-            // Appel de la fonction Python exposée
-            window.pywebview.api.save_project(jsonString).then(function(response) {
-                alert(response);
-            });
+            window.pywebview.api.save_project(JSON.stringify(fullData, null, 2)).then(function(res) { alert(res); });
         }
 
         function loadFromPC() {
-            // Appel de la fonction Python pour lire un fichier
             window.pywebview.api.load_project().then(function(jsonString) {
-                if (!jsonString) return; // Annulé par l'utilisateur
-                
+                if (!jsonString) return;
                 const importedData = JSON.parse(jsonString);
-                if (importedData.error) {
-                    alert("Erreur de lecture : " + importedData.error);
-                    return;
-                }
-
-                // Nettoyage et reconstruction du canvas
-                nodes.clear();
-                edges.clear();
-                nodes.add(importedData.nodes);
-                edges.add(importedData.edges);
-                network.fit(); // Recentre la vue sur la map chargée
+                if (importedData.error) { alert("Erreur: " + importedData.error); return; }
+                nodes.clear(); edges.clear();
+                nodes.add(importedData.nodes); edges.add(importedData.edges);
+                network.fit();
             });
         }
 
-        // --- SÉCURISATION DU PONT PYTHON-JS ---
-        // Cet événement se déclenche dès que 'window.pywebview.api' est prêt
-        window.addEventListener('pywebviewready', function() {
-            const btnSave = document.getElementById('btn-save');
-            const btnLoad = document.getElementById('btn-load');
-            const selectTemplate = document.getElementById('template-select');
+        function applyTemplate(templateName) {
+            if (!templateName) return;
+            if (confirm("Charger ce template va remplacer votre mind map actuelle. Continuer ?")) {
+                window.pywebview.api.load_template(templateName).then(function(jsonString) {
+                    const importedData = JSON.parse(jsonString);
+                    if (importedData.error) { alert("Erreur : " + importedData.error); return; }
+                    nodes.clear(); edges.clear();
+                    nodes.add(importedData.nodes); edges.add(importedData.edges);
+                    network.fit();
+                    document.getElementById('template-select').value = "";
+                });
+            } else { document.getElementById('template-select').value = ""; }
+        }
 
-            btnSave.disabled = false; btnSave.style.opacity = 1; btnSave.style.cursor = 'pointer';
-            btnLoad.disabled = false; btnLoad.style.opacity = 1; btnLoad.style.cursor = 'pointer';
-            
-            // Activation du sélecteur
-            selectTemplate.disabled = false;
-            selectTemplate.style.opacity = 1;
+        window.addEventListener('pywebviewready', function() {
+            document.getElementById('btn-save').disabled = false;
+            document.getElementById('btn-load').disabled = false;
+            document.getElementById('template-select').disabled = false;
         });
     </script>
 </body>
