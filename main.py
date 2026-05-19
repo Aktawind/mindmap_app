@@ -1,6 +1,7 @@
 import webview
 import os
 import json
+import base64
 
 class MindMapAPI:
     def __init__(self):
@@ -21,7 +22,6 @@ class MindMapAPI:
         )
         
         if result:
-            # Sécurisation si le framework renvoie un tuple
             file_path = result[0] if isinstance(result, tuple) else result
             try:
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -42,7 +42,6 @@ class MindMapAPI:
         )
         
         if result:
-            # Sécurisation si le framework renvoie un tuple
             file_path = result[0] if isinstance(result, tuple) else result
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -64,15 +63,44 @@ class MindMapAPI:
                 return json.dumps({"error": str(e)})
         return json.dumps({"error": "Template introuvable"})
 
+    def export_png(self, base64_data):
+        """Prend la chaîne base64 du canvas, la décode et l'enregistre en PNG"""
+        if not self.window:
+            return "Erreur d'initialisation de la fenêtre"
+
+        result = self.window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            file_types=('PNG Image (*.png)', 'All files (*.*)'),
+            save_filename='ma_mindmap.png'
+        )
+
+        if result:
+            file_path = result[0] if isinstance(result, tuple) else result
+            try:
+                # Nettoyage de l'entête de la chaîne Data URL si présente
+                if "," in base64_data:
+                    base64_data = base64_data.split(",")[1]
+
+                # Décodage des données de l'image
+                image_bytes = base64.b64decode(base64_data)
+
+                # Écriture du fichier binaire
+                with open(file_path, 'wb') as f:
+                    f.write(image_bytes)
+                return f"🖼️ Image exportée avec succès : {os.path.basename(file_path)}"
+            except Exception as e:
+                return f"Erreur lors de l'export de l'image : {str(e)}"
+        return "Export annulé"
+
 def main():
     html_path = os.path.abspath("index.html")
     api = MindMapAPI()
     
     window = webview.create_window(
-        title="Ma MindMap App - Workspace",
+        title="Ma MindMap App - Workspace Pro",
         url=html_path,
-        width=1100,
-        height=800,
+        width=1200,
+        height=850,
         resizable=True,
         js_api=api
     )

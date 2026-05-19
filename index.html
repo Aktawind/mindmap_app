@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindMap V3 - Style & Design</title>
+    <title>MindMap V4 - Enterprise Edition</title>
     
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
@@ -30,6 +30,8 @@
         .btn:hover { background-color: #357ABD; }
         .btn-secondary { background-color: #6c757d; }
         .btn-secondary:hover { background-color: #5a6268; }
+        .btn-success { background-color: #28a745; }
+        .btn-success:hover { background-color: #218838; }
 
         #controls-overlay {
             position: absolute; top: 20px; left: 20px;
@@ -47,7 +49,7 @@
             font-size: 14px; outline: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         }
 
-        /* --- NOUVEAU : Barre de Style en bas de l'écran --- */
+        /* Barre de Style en bas de l'écran */
         #style-bar {
             position: absolute; bottom: 30px; left: 50%;
             transform: translateX(-50%); background: white;
@@ -60,14 +62,12 @@
         .style-section { display: flex; gap: 8px; align-items: center; }
         .style-label { font-size: 12px; color: #777; font-weight: bold; text-transform: uppercase; }
         
-        /* Pastilles de couleur */
         .color-dot {
             width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
             border: 2px solid transparent; transition: transform 0.1s;
         }
         .color-dot:hover { transform: scale(1.2); }
         
-        /* Boutons de forme */
         .shape-btn {
             background: #f0f2f5; border: 1px solid #ddd; padding: 4px 10px;
             border-radius: 4px; cursor: pointer; font-size: 12px;
@@ -83,8 +83,9 @@
             <option value="cadrage_idee.json">🎯 Cadrage d'Idée / Projet</option>
             <option value="resolution_probleme.json">🔍 Résolution de Problème</option>
         </select>
-        <button id="btn-save" class="btn" onclick="saveToPC()" disabled>Enregistrer sous...</button>
-        <button id="btn-load" class="btn btn-secondary" onclick="loadFromPC()" disabled>Ouvrir un projet</button>
+        <button id="btn-save" class="btn" onclick="saveToPC()" disabled>Enregistrer JSON</button>
+        <button id="btn-load" class="btn btn-secondary" onclick="loadFromPC()" disabled>Ouvrir JSON</button>
+        <button id="btn-export" class="btn btn-success" onclick="exportToPNG()" disabled>📷 Exporter Image</button>
     </div>
 
     <div id="controls-overlay">
@@ -137,19 +138,16 @@
 
         let network = new vis.Network(container, data, options);
 
-        // --- NOUVEAU : Gestion de l'affichage de la barre de style ---
-        // --- Gestion de l'affichage et de la synchro de la barre de style ---
-        // --- Gestion de l'affichage et de la synchro de la barre de style ---
+        // --- Synchronisation de la barre de style ---
         network.on("selectNode", function (params) {
             document.getElementById('style-bar').classList.add('active');
-            
             const nodeId = params.nodes[0];
             const nodeData = nodes.get(nodeId);
             
             if (nodeData && nodeData.color && nodeData.color.background) {
                 updateActiveColorDot(nodeData.color.background);
             } else {
-                updateActiveColorDot('#4A90E2'); // Bleu par défaut
+                updateActiveColorDot('#4A90E2');
             }
         });
 
@@ -157,21 +155,15 @@
             document.getElementById('style-bar').classList.remove('active');
         });
 
-        // --- Fonctions de modification du style ---
         function changeNodeColor(bg, border, textFontColor) {
             const selectedNodes = network.getSelectedNodes();
             if (selectedNodes.length === 1) {
                 const nodeId = selectedNodes[0];
                 nodes.update({
                     id: nodeId,
-                    color: { 
-                        background: bg, 
-                        border: border,
-                        highlight: { background: bg, border: border } 
-                    },
+                    color: { background: bg, border: border, highlight: { background: bg, border: border } },
                     font: { color: textFontColor }
                 });
-                
                 updateActiveColorDot(bg);
             }
         }
@@ -179,10 +171,8 @@
         function updateActiveColorDot(currentBg) {
             const dots = document.querySelectorAll('.color-dot');
             dots.forEach(dot => {
-                // Nettoyage des chaînes pour éviter les faux négatifs de casse ou d'espaces
                 const targetColor = currentBg.toLowerCase().trim();
                 const clickAttr = dot.getAttribute('onclick').toLowerCase();
-                
                 if (clickAttr.includes(targetColor)) {
                     dot.style.border = "2px solid #333";
                     dot.style.transform = "scale(1.1)";
@@ -196,14 +186,11 @@
         function changeNodeShape(shapeType) {
             const selectedNodes = network.getSelectedNodes();
             if (selectedNodes.length === 1) {
-                nodes.update({
-                    id: selectedNodes[0],
-                    shape: shapeType
-                });
+                nodes.update({ id: selectedNodes[0], shape: shapeType });
             }
         }
 
-        // --- INTERACTION DOUBLE-CLIC ---
+        // --- Interaction Double-Clic ---
         network.on("doubleClick", function (params) {
             if (params.nodes.length === 0) {
                 const canvasPosition = params.pointer.canvas;
@@ -245,7 +232,7 @@
             });
         }
 
-        // --- RACCOURCIS CLAVIER ---
+        // --- Raccourcis Clavier ---
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Tab') {
                 event.preventDefault();
@@ -274,7 +261,7 @@
             }
         });
 
-        // --- PYTHON APIS ---
+        // --- Communications avec l'API Python ---
         function saveToPC() {
             const currentNodes = nodes.get();
             const currentEdges = edges.get();
@@ -315,10 +302,34 @@
             } else { document.getElementById('template-select').value = ""; }
         }
 
+        // NOUVEAU : Fonction de capture et de transmission du PNG
+        function exportToPNG() {
+            // 1. On force vis-network à tout afficher à l'écran pour être sûr de tout capturer
+            network.fit();
+            
+            // Un très léger délai pour laisser le temps au canvas de se stabiliser après le zoom automatique
+            setTimeout(function() {
+                // 2. Récupération de l'élément canvas natif généré par vis-network
+                const canvasElement = container.getElementsByTagName('canvas')[0];
+                if (canvasElement) {
+                    // 3. Transformation du canvas graphique en chaîne Base64 PNG
+                    const base64Image = canvasElement.toDataURL('image/png');
+                    
+                    // 4. Envoi de l'image à Python
+                    window.pywebview.api.export_png(base64Image).then(function(response) {
+                        alert(response);
+                    });
+                } else {
+                    alert("Impossible de localiser le canvas graphique.");
+                }
+            }, 150);
+        }
+
         window.addEventListener('pywebviewready', function() {
             document.getElementById('btn-save').disabled = false;
             document.getElementById('btn-load').disabled = false;
             document.getElementById('template-select').disabled = false;
+            document.getElementById('btn-export').disabled = false; // Activation du bouton d'export
         });
     </script>
 </body>
