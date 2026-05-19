@@ -141,22 +141,31 @@ def on_loaded(window):
     window.evaluate_js("startMindMapEngine();")
 
 
+import sys  # <--- Assure-toi que 'import sys' est bien présent en haut du fichier !
+
 def main():
-    os.environ['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = '--disable-renderer-accessibility --disable-features=LayoutNG,AccessibilityObjectModel,LiveCaption'
-    project_dir = os.path.dirname(os.path.abspath(__file__))
+    # Optimisation des flags pour l'environnement Windows WebView2
+    os.environ['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = '--disable-renderer-accessibility --disable-features=LayoutNG,AccessibilityObjectModel,LiveCaption --allow-file-access-from-files'
+    
+    # Détection du mode exécutable (PyInstaller)
+    if getattr(sys, 'frozen', False):
+        project_dir = sys._MEIPASS
+    else:
+        project_dir = os.path.dirname(os.path.abspath(__file__))
+        
     html_path = os.path.join(project_dir, "index.html")
     
-    try:
-        with open(html_path, 'r', encoding='utf-8') as f: html_content = f.read()
-    except Exception as e:
-        print(f"Erreur index.html : {e}")
-        return
+    # --- CHEMIN DE L'ICÔNE DE LA FENÊTRE ---
+    icon_path = os.path.join(project_dir, "icon.png")
 
     api = MindMapAPI()
+    
+    # Ajout du paramètre icon=icon_path pour habiller la fenêtre
     window = webview.create_window(
         title="MindMap App",
-        html=html_content,
-        width=1500, height=850, resizable=True, js_api=api
+        url=html_path,
+        width=1200, height=850, resizable=True, js_api=api,
+        icon=icon_path if os.path.exists(icon_path) else None  # <--- AJOUT ICI
     )
     api.set_window(window)
     webview.start(on_loaded, window, debug=False)
