@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindMap Canvas</title>
+    <title>MindMap Canvas Interactif</title>
     
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
@@ -14,53 +14,132 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #f4f6f9; /* Un fond doux pour les yeux */
+            background-color: #f8f9fa;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         #network-canvas {
             width: 100vw;
             height: 100vh;
         }
+        /* Petit guide d'utilisation discret en haut à gauche */
+        #controls-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            pointer-events: none; /* Laisse passer les clics vers le canvas */
+            z-index: 10;
+        }
+        h3 { margin: 0 0 8px 0; font-size: 14px; color: #333; }
+        ul { margin: 0; padding-left: 18px; font-size: 12px; color: #666; }
+        li { margin-bottom: 4px; }
     </style>
 </head>
 <body>
 
+    <div id="controls-overlay">
+        <h3>Commandes rapides :</h3>
+        <ul>
+            <li><strong>Double-clic vide :</strong> Nouvelle idée racine</li>
+            <li><strong>Sélection + Tab :</strong> Ajouter une sous-branche</li>
+            <li><strong>Suppr / Delete :</strong> Supprimer l'élément</li>
+            <li><strong>Glisser-déposer :</strong> Organiser les nœuds</li>
+        </ul>
+    </div>
+
     <div id="network-canvas"></div>
 
     <script type="text/javascript">
-        // 1. Définition des nœuds (Le point de départ)
+        // Base de données locale de la Mind Map
         const nodes = new vis.DataSet([
-            { 
-                id: 1, 
-                label: 'Mon Projet Créatif', 
-                color: { background: '#4A90E2', border: '#357ABD' },
-                shape: 'box',
-                margin: 12,
-                font: { color: '#ffffff', size: 16, face: 'Segoe UI' }
-            }
+            { id: 'root', label: 'Mon Projet Créatif', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD' }, margin: 12, font: { color: '#ffffff' } }
         ]);
-
-        // 2. Définition des liens (Vide pour l'instant)
         const edges = new vis.DataSet([]);
 
-        // 3. Configuration du canvas
         const container = document.getElementById('network-canvas');
         const data = { nodes: nodes, edges: edges };
+        
         const options = {
             nodes: {
-                shadow: { enabled: true, color: 'rgba(0,0,0,0.1)', size: 4, x: 2, y: 2 }
+                shadow: { enabled: true, color: 'rgba(0,0,0,0.05)', size: 4, x: 2, y: 2 }
             },
-            physics: {
-                enabled: false // Désactivé pour pouvoir placer les nœuds librement au drag & drop
+            edges: {
+                smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.6 },
+                color: { color: '#A0AEC0', highlight: '#4A90E2' },
+                width: 2
             },
-            interaction: {
-                hover: true,
-                dragNodes: true
-            }
+            physics: { enabled: false }, // Désactivé pour un contrôle manuel total du placement
+            interaction: { hover: true, dragNodes: true }
         };
 
-        // 4. Initialisation du réseau graphique
         const network = new vis.Network(container, data, options);
+
+        // --- INTERACTIONS ---
+
+        // 1. Double-clic pour créer un nœud racine autonome
+        network.on("doubleClick", function (params) {
+            if (params.nodes.length === 0) {
+                const canvasPosition = params.pointer.canvas;
+                const newId = 'node_' + Date.now();
+                
+                nodes.add({
+                    id: newId,
+                    label: 'Nouvelle idée',
+                    x: canvasPosition.x,
+                    y: canvasPosition.y,
+                    shape: 'box',
+                    color: { background: '#FFF3E0', border: '#FFB74D' },
+                    margin: 10
+                });
+            }
+        });
+
+        // 2. Touche "Tab" pour ajouter un sous-nœud (une branche)
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Tab') {
+                event.preventDefault(); // Empêche le focus de sauter ailleurs
+                
+                const selectedNodes = network.getSelectedNodes();
+                if (selectedNodes.length === 1) {
+                    const parentId = selectedNodes[0];
+                    const parentPos = network.getPositions([parentId])[parentId];
+                    const newId = 'node_' + Date.now();
+                    
+                    // On place le sous-nœud légèrement décalé vers la droite
+                    nodes.add({
+                        id: newId,
+                        label: 'Sous-idée',
+                        x: parentPos.x + 180,
+                        y: parentPos.y + (Math.random() * 60 - 30), // Légère variation de hauteur
+                        shape: 'box',
+                        color: { background: '#E8F5E9', border: '#81C784' },
+                        margin: 10
+                    });
+
+                    // Liaison par une flèche/ligne
+                    edges.add({
+                        id: 'edge_' + Date.now(),
+                        from: parentId,
+                        to: newId
+                    });
+
+                    // Focus immédiat sur le nouveau nœud pour pouvoir enchaîner
+                    network.selectNodes([newId]);
+                }
+            }
+            
+            // 3. Touche "Suppr" pour nettoyer le canvas
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                const selectedNodes = network.getSelectedNodes();
+                const selectedEdges = network.getSelectedEdges();
+                
+                if (selectedNodes.length > 0) nodes.remove(selectedNodes);
+                if (selectedEdges.length > 0) edges.remove(selectedEdges);
+            }
+        });
     </script>
 </body>
 </html>
