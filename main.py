@@ -1,20 +1,70 @@
 import webview
 import os
+import json
+
+class MindMapAPI:
+    def __init__(self):
+        self.window = None
+
+    def set_window(self, window):
+        self.window = window
+
+    def save_project(self, data_json):
+        """Ouvre une boîte de dialogue Windows pour sauvegarder le JSON"""
+        if not self.window:
+            return False
+        
+        result = self.window.create_file_dialog(
+            webview.SAVE_DIALOG, 
+            file_types=('JSON Files (*.json)', 'All files (*.*)'),
+            save_filename='ma_mindmap.json'
+        )
+        
+        if result:
+            # FIX : Si pywebview renvoie un tuple (ex: ('chemin/fichier.json',)), on extrait le premier élément
+            file_path = result[0] if isinstance(result, tuple) else result
+            
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(data_json)
+                return f"Sauvegardé avec succès dans : {os.path.basename(file_path)}"
+            except Exception as e:
+                return f"Erreur lors de la sauvegarde : {str(e)}"
+        return "Sauvegarde annulée"
+
+    def load_project(self):
+        """Ouvre une boîte de dialogue Windows pour charger un JSON"""
+        if not self.window:
+            return None
+            
+        result = self.window.create_file_dialog(
+            webview.OPEN_DIALOG, 
+            file_types=('JSON Files (*.json)', 'All files (*.*)')
+        )
+        
+        if result and len(result) > 0:
+            file_path = result[0]
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception as e:
+                return json.dumps({"error": str(e)})
+        return None
 
 def main():
-    # Récupérer le chemin absolu du fichier index.html
     html_path = os.path.abspath("index.html")
+    api = MindMapAPI()
     
-    # Créer la fenêtre de l'application
     window = webview.create_window(
-        title="Ma MindMap App - Concept V1",
+        title="Ma MindMap App - Persistance & Édition",
         url=html_path,
-        width=1024,
-        height=768,
+        width=1100,
+        height=800,
         resizable=True,
-        min_size=(800, 600)
+        js_api=api
     )
     
+    api.set_window(window)
     webview.start(debug=False)
 
 if __name__ == "__main__":
