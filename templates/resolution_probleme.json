@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    { "id": "p_root", "label": "⚠️ Le Problème / Bug", "x": 0, "y": 0, "shape": "box", "color": { "background": "#E53935", "border": "#B71C1C" }, "font": { "color": "#ffffff", "size": 16 }, "margin": 12 },
+    { "id": "p_1", "label": "🔍 Symptômes visibles", "x": -220, "y": -50, "shape": "box", "color": { "background": "#ECEFF1", "border": "#78909C" }, "margin": 10 },
+    { "id": "p_2", "label": "🤔 Causes probables", "x": 220, "y": -50, "shape": "box", "color": { "background": "#FFF3E0", "border": "#FFB74D" }, "margin": 10 },
+    { "id": "p_3", "label": "🧪 Solutions court terme (Fix)", "x": 220, "y": 50, "shape": "box", "color": { "background": "#E8F5E9", "border": "#81C784" }, "margin": 10 },
+    { "id": "p_4", "label": "🛡️ Prévention long terme", "x": 220, "y": 150, "shape": "box", "color": { "background": "#E8F5E9", "border": "#81C784" }, "margin": 10 }
+  ],
+  "edges": [
+    { "id": "e_p1", "from": "p_root", "to": "p_1" },
+    { "id": "e_p2", "from": "p_root", "to": "p_2" },
+    { "id": "e_p3", "from": "p_root", "to": "p_3" },
+    { "id": "e_p4", "from": "p_root", "to": "p_4" }
+  ]
+}

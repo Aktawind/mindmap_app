@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    { "id": "t_root", "label": "💡 Mon Idée Géniale", "x": 0, "y": 0, "shape": "box", "color": { "background": "#4A90E2", "border": "#357ABD" }, "font": { "color": "#ffffff", "size": 16 }, "margin": 12 },
+    { "id": "t_1", "label": "🎯 Quel est le but précis ?", "x": 220, "y": -100, "shape": "box", "color": { "background": "#FFF3E0", "border": "#FFB74D" }, "margin": 10 },
+    { "id": "t_2", "label": "👥 Pour qui ? (Public cible)", "x": 220, "y": 0, "shape": "box", "color": { "background": "#FFF3E0", "border": "#FFB74D" }, "margin": 10 },
+    { "id": "t_3", "label": "🛠️ De quoi ai-je besoin ? (Ressources)", "x": 220, "y": 100, "shape": "box", "color": { "background": "#FFF3E0", "border": "#FFB74D" }, "margin": 10 },
+    { "id": "t_4", "label": "🚀 Première action concrète", "x": 0, "y": 180, "shape": "box", "color": { "background": "#E8F5E9", "border": "#81C784" }, "margin": 12 }
+  ],
+  "edges": [
+    { "id": "e_t1", "from": "t_root", "to": "t_1" },
+    { "id": "e_t2", "from": "t_root", "to": "t_2" },
+    { "id": "e_t3", "from": "t_root", "to": "t_3" },
+    { "id": "e_t4", "from": "t_root", "to": "t_4" }
+  ]
+}
