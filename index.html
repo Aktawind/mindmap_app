@@ -52,6 +52,12 @@
 <body>
 
     <div id="toolbar">
+        <select id="template-select" onchange="applyTemplate(this.value)" disabled style="opacity: 0.5; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-family: inherit;">
+            <option value="">🌱 Choisir un template...</option>
+            <option value="cadrage_idee.json">🎯 Cadrage d'Idée / Projet</option>
+            <option value="resolution_probleme.json">🔍 Résolution de Problème</option>
+        </select>
+
         <button id="btn-save" class="btn" onclick="saveToPC()" disabled style="opacity: 0.5; cursor: not-allowed;">Enregistrer sous...</button>
         <button id="btn-load" class="btn btn-secondary" onclick="loadFromPC()" disabled style="opacity: 0.5; cursor: not-allowed;">Ouvrir un projet</button>
     </div>
@@ -169,6 +175,32 @@
 
         // --- COMMUNICATION AVEC LE BACKEND PYTHON ---
 
+        function applyTemplate(templateName) {
+            if (!templateName) return;
+            
+            if (confirm("Charger ce template va remplacer votre mind map actuelle. Continuer ?")) {
+                window.pywebview.api.load_template(templateName).then(function(jsonString) {
+                    const importedData = JSON.parse(jsonString);
+                    if (importedData.error) {
+                        alert("Erreur : " + importedData.error);
+                        return;
+                    }
+
+                    // Remplacement des données
+                    nodes.clear();
+                    edges.clear();
+                    nodes.add(importedData.nodes);
+                    edges.add(importedData.edges);
+                    network.fit(); // Recadrer automatiquement la vue
+                    
+                    // Réinitialiser le sélecteur sur l'option par défaut
+                    document.getElementById('template-select').value = "";
+                });
+            } else {
+                document.getElementById('template-select').value = "";
+            }
+        }
+
         function saveToPC() {
             // Extraction des données actuelles du graphe
             const currentNodes = nodes.get();
@@ -218,17 +250,14 @@
         window.addEventListener('pywebviewready', function() {
             const btnSave = document.getElementById('btn-save');
             const btnLoad = document.getElementById('btn-load');
+            const selectTemplate = document.getElementById('template-select');
 
-            // Réactivation des boutons
-            btnSave.disabled = false;
-            btnSave.style.opacity = 1;
-            btnSave.style.cursor = 'pointer';
-
-            btnLoad.disabled = false;
-            btnLoad.style.opacity = 1;
-            btnLoad.style.cursor = 'pointer';
+            btnSave.disabled = false; btnSave.style.opacity = 1; btnSave.style.cursor = 'pointer';
+            btnLoad.disabled = false; btnLoad.style.opacity = 1; btnLoad.style.cursor = 'pointer';
             
-            console.log("Le pont Python-JS est prêt !");
+            // Activation du sélecteur
+            selectTemplate.disabled = false;
+            selectTemplate.style.opacity = 1;
         });
     </script>
 </body>

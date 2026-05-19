@@ -50,6 +50,20 @@ class MindMapAPI:
             except Exception as e:
                 return json.dumps({"error": str(e)})
         return None
+    
+    def load_template(self, template_name):
+        """Lit un fichier template JSON local et renvoie son contenu"""
+        # Sécurisation du nom de fichier pour éviter les injections de chemin
+        safe_name = os.path.basename(template_name)
+        template_path = os.path.join("templates", safe_name)
+        
+        if os.path.exists(template_path):
+            try:
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception as e:
+                return json.dumps({"error": str(e)})
+        return json.dumps({"error": "Template introuvable"})
 
 def main():
     html_path = os.path.abspath("index.html")
