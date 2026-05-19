@@ -86,6 +86,7 @@
         <button id="btn-save" class="btn" onclick="saveToPC()" disabled>Enregistrer JSON</button>
         <button id="btn-load" class="btn btn-secondary" onclick="loadFromPC()" disabled>Ouvrir JSON</button>
         <button id="btn-export" class="btn btn-success" onclick="exportToPNG()" disabled>📷 Exporter Image</button>
+        <button id="btn-export-md" class="btn" style="background-color: #17a2b8;" onclick="exportToMarkdown()" disabled>📝 Exporter Texte</button>
     </div>
 
     <div id="controls-overlay">
@@ -325,11 +326,57 @@
             }, 150);
         }
 
+        // --- Fonction d'exportation au format Markdown ---
+        function exportToMarkdown() {
+            const currentNodes = nodes.get();
+            const currentEdges = edges.get();
+            
+            if (currentNodes.length === 0) {
+                alert("La mind map est vide.");
+                return;
+            }
+
+            // 1. Trouver le nœud racine (on cherche 'root', sinon le premier nœud créé)
+            let rootNode = currentNodes.find(n => n.id === 'root');
+            if (!rootNode) {
+                // Si pas de 'root', on prend le nœud qui n'a pas de parent (pas de flèche pointant vers lui)
+                const targetIds = new Set(currentEdges.map(e => e.to));
+                rootNode = currentNodes.find(n => !targetIds.has(n.id)) || currentNodes[0];
+            }
+
+            let output = "";
+
+            // 2. Fonction récursive pour parcourir l'arbre et appliquer l'indentation
+            function buildTreeString(nodeId, depth) {
+                const node = currentNodes.find(n => n.id === nodeId);
+                if (!node) return;
+
+                // Génère les tabulations selon la profondeur dans l'arbre
+                const indentation = "\t".repeat(depth);
+                output += `${indentation}- ${node.label}\n`;
+
+                // Trouver tous les enfants directs de ce nœud
+                const childEdges = currentEdges.filter(e => e.from === nodeId);
+                childEdges.forEach(edge => {
+                    buildTreeString(edge.to, depth + 1);
+                });
+            }
+
+            // Lancement de la construction de l'arbre textuel
+            buildTreeString(rootNode.id, 0);
+
+            // 3. Envoi de la chaîne générée à l'API Python
+            window.pywebview.api.export_markdown(output).then(function(response) {
+                if(response) alert(response);
+            });
+        }
+
         window.addEventListener('pywebviewready', function() {
             document.getElementById('btn-save').disabled = false;
             document.getElementById('btn-load').disabled = false;
             document.getElementById('template-select').disabled = false;
             document.getElementById('btn-export').disabled = false; // Activation du bouton d'export
+            document.getElementById('btn-export-md').disabled = false; // Activation ici !
         });
     </script>
 </body>

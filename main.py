@@ -91,6 +91,27 @@ class MindMapAPI:
             except Exception as e:
                 return f"Erreur lors de l'export de l'image : {str(e)}"
         return "Export annulé"
+    
+    def export_markdown(self, markdown_text):
+        """Ouvre une boîte de dialogue Windows pour enregistrer la structure en Markdown"""
+        if not self.window:
+            return False
+        
+        result = self.window.create_file_dialog(
+            webview.SAVE_DIALOG, 
+            file_types=('Markdown Files (*.md)', 'Text Files (*.txt)', 'All files (*.*)'),
+            save_filename='ma_mindmap.md'
+        )
+        
+        if result:
+            file_path = result[0] if isinstance(result, tuple) else result
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(markdown_text)
+                return f"📝 Structure exportée avec succès dans : {os.path.basename(file_path)}"
+            except Exception as e:
+                return f"Erreur lors de l'export Markdown : {str(e)}"
+        return "Export annulé"
 
 def main():
     html_path = os.path.abspath("index.html")
