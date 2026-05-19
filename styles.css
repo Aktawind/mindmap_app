@@ -6,30 +6,50 @@ body, html {
 }
 #network-canvas { width: 100vw; height: 100vh; }
 
-/* --- BARRE D'OUTILS (TOOLBAR) --- */
-#toolbar {
-    position: absolute; top: 20px; right: 20px;
-    background: white; padding: 10px 15px; border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 10;
-    display: flex; gap: 10px;
+/* --- BARRE DE MENUS STYLE LOGICIEL PRO (REMPLACE LA TOOLBAR) --- */
+#app-menu-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 40px; background: #ffffff;
+    border-bottom: 1px solid #e2e8f0; box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    z-index: 1000; display: flex; align-items: center; padding: 0 15px; gap: 5px;
 }
-.btn {
-    color: white; border: none; padding: 8px 14px; 
-    border-radius: 5px; cursor: pointer; font-weight: 500; \
-    font-size: 13px; transition: background 0.2s;
+.menu-item {
+    position: relative; display: inline-block;
 }
-.btn-primary { background-color: #4A90E2; }
-.btn-primary:hover { background-color: #357ABD; }
-.btn-secondary { background-color: #6c757d; }
-.btn-secondary:hover { background-color: #5a6268; }
-.btn-success { background-color: #2ECC71; }
-.btn-success:hover { background-color: #27AE60; }
-.btn-info { background-color: #17a2b8; }
-.btn-info:hover { background-color: #138496; }
+.menu-btn {
+    background: transparent; border: none; padding: 6px 12px;
+    font-size: 13px; font-weight: 500; color: #4A5568; cursor: pointer;
+    border-radius: 4px; transition: background 0.15s; font-family: inherit;
+}
+.menu-btn:hover { background: #edf2f7; color: #2d3748; }
 
-/* --- OVERLAY COMMANDES --- */
+/* Liste déroulante des sous-menus */
+.menu-dropdown {
+    display: none; position: absolute; top: 100%; left: 0;
+    background: #ffffff; min-width: 180px; border: 1px solid #e2e8f0;
+    border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    padding: 6px 0; z-index: 1001;
+}
+.menu-item:hover .menu-dropdown { display: block; }
+.dropdown-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; font-size: 13px; color: #4A5568; text-decoration: none;
+    cursor: pointer; transition: background 0.1s;
+}
+.dropdown-item:hover { background: #f7fafc; color: #1a202c; }
+.dropdown-item .shortcut { font-size: 11px; color: #a0aec0; margin-left: 15px; }
+.menu-divider { height: 1px; background: #edf2f7; margin: 6px 0; }
+.dropdown-item:disabled, .dropdown-item[disabled] { color: #cbd5e1; cursor: not-allowed; background: transparent; }
+
+/* Ajustement des sélecteurs intégrés au menu */
+.menu-select {
+    padding: 4px 8px; border-radius: 4px; border: 1px solid #e2e8f0;
+    font-family: inherit; font-size: 12px; color: #4A5568; outline: none; background: #f7fafc;
+}
+
+/* --- AJUSTEMENT DES OVERLAYS (POUR NE PAS CHEVAUCHER LE MENU) --- */
 #controls-overlay {
-    position: absolute; top: 20px; left: 20px;
+    position: absolute; top: 55px; left: 20px;
     background: rgba(255, 255, 255, 0.95); padding: 12px 18px; 
     border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     pointer-events: none; z-index: 10;

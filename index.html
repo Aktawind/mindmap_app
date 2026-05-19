@@ -14,23 +14,47 @@
 </head>
 <body>
 
-    <div id="toolbar">
-        <select id="template-select" onchange="MindMapUI.applyTemplate(this.value)" disabled style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-family: inherit;">
-            <option value="">🌱 Choisir un template...</option>
+    <div id="app-menu-bar">
+        <div class="menu-item">
+            <button class="menu-btn">Fichier</button>
+            <div class="menu-dropdown">
+                <div class="dropdown-item" onclick="MindMapApp.newProject()">📁 Nouveau projet</div>
+                <div class="menu-divider"></div>
+                <button id="btn-load" class="dropdown-item" onclick="MindMapApp.loadProject()" disabled style="width:100%; text-align:left; border:none; background:none;">📂 Ouvrir un projet</button>
+                <button id="btn-save" class="dropdown-item" onclick="MindMapApp.saveProject()" disabled style="width:100%; text-align:left; border:none; background:none;">💾 Enregistrer sous...</button>
+            </div>
+        </div>
+
+        <div class="menu-item">
+            <button class="menu-btn">Édition</button>
+            <div class="menu-dropdown">
+                <div class="dropdown-item" onclick="MindMapHistory.undo()">↩️ Annuler <span class="shortcut">Ctrl+Z</span></div>
+                <div class="dropdown-item" onclick="MindMapHistory.redo()">↪️ Rétablir <span class="shortcut">Ctrl+Y</span></div>
+            </div>
+        </div>
+
+        <div class="menu-item">
+            <button class="menu-btn">Exporter</button>
+            <div class="menu-dropdown">
+                <button id="btn-export-png" class="dropdown-item" onclick="MindMapApp.exportPNG()" disabled style="width:100%; text-align:left; border:none; background:none;">Exporter en Image</button>
+                <button id="btn-export-md" class="dropdown-item" onclick="MindMapApp.exportMarkdown()" disabled style="width:100%; text-align:left; border:none; background:none;">Exporter en Markdown</button>
+            </div>
+        </div>
+
+        <div style="border-left: 1px solid #e2e8f0; height: 20px; margin: 0 10px;"></div>
+
+        <select id="template-select" class="menu-select" onchange="MindMapUI.applyTemplate(this.value)" disabled>
+            <option value="">Choisir un template...</option>
             <option value="cadrage_idee.json">🎯 Cadrage d'Idée / Projet</option>
             <option value="resolution_probleme.json">🔍 Résolution de Problème</option>
         </select>
-        <button id="btn-save" class="btn btn-primary" onclick="MindMapApp.saveProject()" disabled>Enregistrer JSON</button>
-        <button id="btn-load" class="btn btn-secondary" onclick="MindMapApp.loadProject()" disabled>Ouvrir JSON</button>
-        <button id="btn-export-png" class="btn btn-success" onclick="MindMapApp.exportPNG()" disabled>📷 Image</button>
-        <button id="btn-export-md" class="btn btn-info" onclick="MindMapApp.exportMarkdown()" disabled>📝 Texte</button>
     </div>
 
     <div id="controls-overlay">
         <h3>Commandes :</h3>
         <ul>
             <li><strong>Double-clic vide :</strong> Nouveau nœud</li>
-            <li><strong>Double-clic nœud/ligne :</strong> Éditer le texte</li>
+            <li><strong>Double-clic élément :</strong> Éditer le texte</li>
             <li><strong>Sélection + Tab :</strong> Ajouter une branche</li>
             <li><strong>Suppr :</strong> Supprimer l'élément</li>
         </ul>
@@ -73,13 +97,12 @@
     <script type="text/javascript">
         let nodes, edges, network, container;
 
-        // Palette de couleurs pro prédéfinies pour les nouvelles branches principales
         const branchPalettes = [
-            { bg: '#FFF3E0', border: '#FFB74D', text: '#333333' }, // Orange clair
-            { bg: '#E8F5E9', border: '#81C784', text: '#333333' }, // Vert clair
-            { bg: '#F3E5F5', border: '#CE93D8', text: '#333333' }, // Violet clair
-            { bg: '#FFEBEE', border: '#EF9A9A', text: '#333333' }, // Rouge clair
-            { bg: '#E0F7FA', border: '#4DD0E1', text: '#333333' }  // Cyan clair
+            { bg: '#FFF3E0', border: '#FFB74D', text: '#333333' },
+            { bg: '#E8F5E9', border: '#81C784', text: '#333333' },
+            { bg: '#F3E5F5', border: '#CE93D8', text: '#333333' },
+            { bg: '#FFEBEE', border: '#EF9A9A', text: '#333333' },
+            { bg: '#E0F7FA', border: '#4DD0E1', text: '#333333' }
         ];
 
         function startMindMapEngine() {
@@ -105,14 +128,81 @@
             setupNetworkEvents();
             activateUserInterface();
 
+            // Enregistrer l'état initial dans l'historique
+            MindMapHistory.init();
+
             setTimeout(() => {
-                // Point 3 : Démarrage moins zoomé à l'affichage initial
                 network.moveTo({ scale: 0.85 }); 
                 document.body.style.opacity = "1";
             }, 100);
         }
 
+        // --- NOUVEAU MODULE : HISTORIQUE MULTI-NIVEAUX (UNDO/REDO) ---
+        const MindMapHistory = {
+            undoStack: [],
+            redoStack: [],
+            isApplyingState: false,
+
+            init() {
+                this.undoStack = [];
+                this.redoStack = [];
+                this.saveState(); // Enregistre l'état de départ
+            },
+
+            // Capture une photo du graphe à un instant T
+            saveState() {
+                if (this.isApplyingState) return; 
+                
+                const currentState = {
+                    nodes: nodes.get(),
+                    edges: edges.get()
+                };
+                
+                this.undoStack.push(JSON.stringify(currentState));
+                this.redoStack = []; // On efface la pile de refonte lors d'une nouvelle action
+                
+                // Limitation optionnelle de la pile pour préserver la mémoire (ex: 40 actions max)
+                if (this.undoStack.length > 41) this.undoStack.shift();
+            },
+
+            undo() {
+                if (this.undoStack.length <= 1) return; // Impossible de remonter au-delà de l'état initial
+                
+                const currentState = this.undoStack.pop();
+                this.redoStack.push(currentState);
+                
+                const previousStateStr = this.undoStack[this.undoStack.length - 1];
+                this.applyState(previousStateStr);
+            },
+
+            redo() {
+                if (this.redoStack.length === 0) return;
+                
+                const nextStateStr = this.redoStack.pop();
+                this.undoStack.push(nextStateStr);
+                this.applyState(nextStateStr);
+            },
+
+            applyState(stateString) {
+                this.isApplyingState = true;
+                const state = JSON.parse(stateString);
+                
+                nodes.clear();
+                edges.clear();
+                nodes.add(state.nodes);
+                edges.add(state.edges);
+                
+                this.isApplyingState = false;
+                document.getElementById('style-bar').classList.remove('active');
+            }
+        };
+
         function setupNetworkEvents() {
+            // Déclencher une sauvegarde après le déplacement d'un nœud
+            network.on("dragEnd", function () {
+                MindMapHistory.saveState();
+            });
+
             network.on("selectNode", function (params) {
                 document.getElementById('edge-style-controls').style.display = 'none';
                 document.getElementById('node-style-controls').style.display = 'flex';
@@ -124,7 +214,6 @@
             });
 
             network.on("selectEdge", function (params) {
-                // Si on a cliqué sur une ligne et pas sur un nœud
                 if (params.nodes.length === 0) {
                     document.getElementById('node-style-controls').style.display = 'none';
                     document.getElementById('edge-style-controls').style.display = 'flex';
@@ -132,12 +221,8 @@
                 }
             });
 
-            network.on("deselectNode", function () {
-                document.getElementById('style-bar').classList.remove('active');
-            });
-            network.on("deselectEdge", function () {
-                document.getElementById('style-bar').classList.remove('active');
-            });
+            network.on("deselectNode", function () { document.getElementById('style-bar').classList.remove('active'); });
+            network.on("deselectEdge", function () { document.getElementById('style-bar').classList.remove('active'); });
 
             network.on("doubleClick", function (params) {
                 if (params.nodes.length > 0) {
@@ -151,6 +236,7 @@
                         shape: 'box', color: { background: '#FFF3E0', border: '#FFB74D' }, margin: 10, font: { color: '#333333' },
                         filePath: null
                     });
+                    MindMapHistory.saveState(); // Capture du nouveau nœud vide
                 }
             });
         }
@@ -159,19 +245,18 @@
             attachFile() {
                 const selected = network.getSelectedNodes();
                 if (selected.length !== 1) return;
-                
                 const nodeId = selected[0];
                 const nodeData = nodes.get(nodeId);
 
                 window.pywebview.api.select_local_file().then(filePath => {
                     if (filePath) {
                         let baseLabel = nodeData.label.replace(/\n\s*📄.*/g, '');
-                        // Point 4 : On écrit explicitement "Document joint" au lieu du nom brut du fichier
                         nodes.update({
                             id: nodeId,
                             label: `${baseLabel}\n📄 Document joint`,
                             filePath: filePath
                         });
+                        MindMapHistory.saveState(); // Sauvegarde de l'attachement
                         this.updateUIForSelectedNode(nodes.get(nodeId));
                     }
                 });
@@ -181,16 +266,12 @@
                 if (selected.length !== 1) return;
                 const nodeData = nodes.get(selected[0]);
                 if (nodeData && nodeData.filePath) {
-                    window.pywebview.api.open_local_file(nodeData.filePath).then(res => {
-                        if (res !== true) alert(res);
-                    });
+                    window.pywebview.api.open_local_file(nodeData.filePath).then(res => { if (res !== true) alert(res); });
                 }
             },
             updateUIForSelectedNode(nodeData) {
                 const openBtn = document.getElementById('btn-open-file');
-                if (openBtn) {
-                    openBtn.style.display = (nodeData && nodeData.filePath) ? 'inline-block' : 'none';
-                }
+                if (openBtn) openBtn.style.display = (nodeData && nodeData.filePath) ? 'inline-block' : 'none';
             }
         };
 
@@ -198,9 +279,8 @@
             changeColor(bg, border, textFontColor) {
                 const selected = network.getSelectedNodes();
                 if (selected.length !== 1) return;
-                
-                // Mettre à jour récursivement le nœud et tous ses enfants
                 this.applyColorHierarchy(selected[0], bg, border, textFontColor);
+                MindMapHistory.saveState(); // Sauvegarde du changement de couleur global sur la branche
             },
             applyColorHierarchy(nodeId, bg, border, textFontColor) {
                 nodes.update({
@@ -208,18 +288,16 @@
                     color: { background: bg, border: border, highlight: { background: bg, border: border } },
                     font: { color: textFontColor }
                 });
-                // Point 2 : Répercuter sur les nœuds filles
                 const allEdges = edges.get();
                 allEdges.forEach(edge => {
-                    if (edge.from === nodeId) {
-                        this.applyColorHierarchy(edge.to, bg, border, textFontColor);
-                    }
+                    if (edge.from === nodeId) this.applyColorHierarchy(edge.to, bg, border, textFontColor);
                 });
             },
             changeShape(shapeType) {
                 const selected = network.getSelectedNodes();
                 if (selected.length === 1) {
                     nodes.update({ id: selected[0], shape: shapeType });
+                    MindMapHistory.saveState();
                 }
             },
             updateActiveColorDot(currentBg) {
@@ -227,11 +305,9 @@
                     const targetColor = currentBg.toLowerCase().trim();
                     const clickAttr = dot.getAttribute('onclick').toLowerCase();
                     if (clickAttr.includes(targetColor)) {
-                        dot.style.border = "2px solid #333";
-                        dot.style.transform = "scale(1.1)";
+                        dot.style.border = "2px solid #333"; dot.style.transform = "scale(1.1)";
                     } else {
-                        dot.style.border = "2px solid transparent";
-                        dot.style.transform = "scale(1)";
+                        dot.style.border = "2px solid transparent"; dot.style.transform = "scale(1)";
                     }
                 });
             }
@@ -240,11 +316,8 @@
         const MindMapUI = {
             editSelectedEdge() {
                 const selectedEdges = network.getSelectedEdges();
-                if (selectedEdges.length === 1) {
-                    this.startInlineEditing(null, selectedEdges[0], 'edge');
-                }
+                if (selectedEdges.length === 1) this.startInlineEditing(null, selectedEdges[0], 'edge');
             },
-            // Point 6 : Édition intégrée directement sur le rectangle ou sur le lien
             startInlineEditing(nodeId, edgeId, mode) {
                 const input = document.createElement('input');
                 input.className = 'node-edit-input';
@@ -255,39 +328,26 @@
                     const nodeData = nodes.get(nodeId);
                     currentLabel = nodeData.label.replace(/\n\s*📄.*/g, '');
                     targetPos = network.getBoundingBox(nodeId);
-                    
-                    // Masquer temporairement le texte du nœud pour ne pas avoir de doublons visuels
                     nodes.update({ id: nodeId, font: { color: 'transparent' } });
 
-                    // Convertir les coordonnées canvas en coordonnées DOM écran
                     const domPosTopLeft = network.canvasToDOM({ x: targetPos.left, y: targetPos.top });
                     const domPosBottomRight = network.canvasToDOM({ x: targetPos.right, y: targetPos.bottom });
-                    
                     const width = (domPosBottomRight.x - domPosTopLeft.x);
                     const height = (domPosBottomRight.y - domPosTopLeft.y);
 
-                    input.style.left = (domPosTopLeft.x) + 'px';
-                    input.style.top = (domPosTopLeft.y) + 'px';
-                    input.style.width = Math.max(width - 16, 120) + 'px';
-                    input.style.height = Math.max(height - 10, 30) + 'px';
+                    input.style.left = (domPosTopLeft.x) + 'px'; input.style.top = (domPosTopLeft.y) + 'px';
+                    input.style.width = Math.max(width - 16, 120) + 'px'; input.style.height = Math.max(height - 10, 30) + 'px';
                     input.style.textAlign = 'center';
                 } else {
-                    // Mode Branche / Lien (Point 5)
                     const edgeData = edges.get(edgeId);
                     currentLabel = edgeData.label || "";
-                    
-                    // Trouver le milieu de la ligne pour positionner l'input
                     const connectedNodes = network.getConnectedNodes(edgeId);
                     const pos1 = network.getPositions([connectedNodes[0]])[connectedNodes[0]];
                     const pos2 = network.getPositions([connectedNodes[1]])[connectedNodes[1]];
-                    const midX = (pos1.x + pos2.x) / 2;
-                    const midY = (pos1.y + pos2.y) / 2;
-                    const domMid = network.canvasToDOM({ x: midX, y: midY });
+                    const domMid = network.canvasToDOM({ x: (pos1.x + pos2.x) / 2, y: (pos1.y + pos2.y) / 2 });
 
-                    input.style.left = (domMid.x - 75) + 'px';
-                    input.style.top = (domMid.y - 15) + 'px';
-                    input.style.width = '150px';
-                    input.style.height = '26px';
+                    input.style.left = (domMid.x - 75) + 'px'; input.style.top = (domMid.y - 15) + 'px';
+                    input.style.width = '150px'; input.style.height = '26px';
                 }
 
                 input.type = 'text';
@@ -300,10 +360,7 @@
                     const val = input.value.trim();
                     if (mode === 'node') {
                         const nodeData = nodes.get(nodeId);
-                        // Rétablir la couleur de police correcte
-                        const isRoot = (nodeId === 'root');
                         const defaultTextColor = (nodeData.color && nodeData.color.background === '#4A90E2') ? '#ffffff' : '#333333';
-                        
                         if (val !== "") {
                             let finalLabel = val;
                             if (nodeData.filePath) finalLabel += `\n📄 Document joint`;
@@ -315,6 +372,7 @@
                         edges.update({ id: edgeId, label: val });
                     }
                     if (input.parentNode) document.body.removeChild(input);
+                    MindMapHistory.saveState(); // Sauvegarde du texte final validé
                 }
 
                 input.addEventListener('blur', finishEditing);
@@ -331,46 +389,30 @@
                 });
             },
 
-            // Point 1 : Algorithme anti-superposition lors de la création par Tabulation
             calculateSmartPosition(parentId) {
                 const parentPos = network.getPositions([parentId])[parentId];
                 const allNodes = nodes.get();
                 const connectedEdges = edges.get().filter(e => e.from === parentId);
-                
-                let targetX = parentPos.x + 220;
-                let targetY = parentPos.y;
+                let targetX = parentPos.x + 220, targetY = parentPos.y;
 
                 if (connectedEdges.length > 0) {
-                    // Trouver le décalage vertical maximal des enfants existants
                     const childrenIds = connectedEdges.map(e => e.to);
                     const childrenPositions = network.getPositions(childrenIds);
-                    
                     let lowestY = parentPos.y;
-                    Object.values(childrenPositions).forEach(pos => {
-                        if (pos.y > lowestY) lowestY = pos.y;
-                    });
-                    
-                    // On place le nouveau nœud 75 pixels plus bas que le plus bas des frères
+                    Object.values(childrenPositions).forEach(pos => { if (pos.y > lowestY) lowestY = pos.y; });
                     targetY = lowestY + 75;
                 } else {
-                    // Premier enfant : aligné horizontalement avec une légère variation aléatoire
                     targetY = parentPos.y + (Math.random() * 20 - 10);
                 }
 
-                // Vérification finale globale de sécurité pour éviter l'exact chevauchement
                 let overlapDetected = true;
                 while (overlapDetected) {
                     overlapDetected = false;
                     for (let node of allNodes) {
                         const pos = network.getPositions([node.id])[node.id];
-                        if (pos && Math.abs(pos.x - targetX) < 160 && Math.abs(pos.y - targetY) < 55) {
-                            targetY += 75; // On descend d'un cran si un autre nœud squatte la zone
-                            overlapDetected = true;
-                            break;
-                        }
+                        if (pos && Math.abs(pos.x - targetX) < 160 && Math.abs(pos.y - targetY) < 55) { targetY += 75; overlapDetected = true; break; }
                     }
                 }
-
                 return { x: targetX, y: targetY };
             },
 
@@ -384,20 +426,31 @@
                         nodes.add(importedData.nodes); edges.add(importedData.edges);
                         network.fit();
                         document.getElementById('template-select').value = "";
+                        MindMapHistory.init(); // Réinitialiser l'historique sur le template
                     });
                 } else { document.getElementById('template-select').value = ""; }
             }
         };
 
         const MindMapApp = {
+            // NOUVEAU : CRÉATION D'UN PROJET À ZÉRO (POINT 2)
+            newProject() {
+                if (confirm("Voulez-vous créer un nouveau projet ? Les modifications non enregistrées seront perdues.")) {
+                    nodes.clear();
+                    edges.clear();
+                    nodes.add([
+                        { id: 'root', label: 'Nouveau Projet', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }
+                    ]);
+                    network.moveTo({ position: { x: 0, y: 0 }, scale: 1 });
+                    document.getElementById('style-bar').classList.remove('active');
+                    MindMapHistory.init(); // Reset historique
+                }
+            },
             saveProject() {
                 const currentNodes = nodes.get();
                 const positions = network.getPositions();
                 const nodesWithPositions = currentNodes.map(node => {
-                    if (positions[node.id]) {
-                        node.x = positions[node.id].x;
-                        node.y = positions[node.id].y;
-                    }
+                    if (positions[node.id]) { node.x = positions[node.id].x; node.y = positions[node.id].y; }
                     return node;
                 });
                 const fullData = { nodes: nodesWithPositions, edges: edges.get() };
@@ -411,27 +464,20 @@
                     nodes.clear(); edges.clear();
                     nodes.add(importedData.nodes); edges.add(importedData.edges);
                     network.fit();
+                    MindMapHistory.init(); // Reset historique sur le fichier chargé
                 });
             },
             exportPNG() {
                 network.fit();
                 setTimeout(() => {
                     const canvasElement = container.getElementsByTagName('canvas')[0];
-                    if (canvasElement) {
-                        window.pywebview.api.export_png(canvasElement.toDataURL('image/png')).then(res => alert(res));
-                    }
+                    if (canvasElement) window.pywebview.api.export_png(canvasElement.toDataURL('image/png')).then(res => alert(res));
                 }, 150);
             },
             exportMarkdown() {
-                const currentNodes = nodes.get();
-                const currentEdges = edges.get();
+                const currentNodes = nodes.get(); const currentEdges = edges.get();
                 if (currentNodes.length === 0) return;
-
-                let rootNode = currentNodes.find(n => n.id === 'root');
-                if (!rootNode) {
-                    const targetIds = new Set(currentEdges.map(e => e.to));
-                    rootNode = currentNodes.find(n => !targetIds.has(n.id)) || currentNodes[0];
-                }
+                let rootNode = currentNodes.find(n => n.id === 'root') || currentNodes[0];
 
                 let output = "";
                 function buildTreeString(nodeId, depth) {
@@ -441,56 +487,50 @@
                     output += `${"\t".repeat(depth)}- ${cleanLabel}${node.filePath ? ' (Lien: ' + node.filePath + ')' : ''}\n`;
                     currentEdges.filter(e => e.from === nodeId).forEach(edge => buildTreeString(edge.to, depth + 1));
                 }
-
                 buildTreeString(rootNode.id, 0);
                 window.pywebview.api.export_markdown(output).then(res => { if(res) alert(res); });
             }
         };
 
+        // Raccourcis Clavier Windows (Ctrl+Z, Ctrl+Y, Tab, Suppr)
         document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key.toLowerCase() === 'z') {
+                event.preventDefault();
+                MindMapHistory.undo();
+            }
+            if (event.ctrlKey && event.key.toLowerCase() === 'y') {
+                event.preventDefault();
+                MindMapHistory.redo();
+            }
             if (event.key === 'Tab') {
                 event.preventDefault();
                 const selected = network.getSelectedNodes();
                 if (selected.length === 1) {
-                    const parentId = selected[0];
-                    const parentData = nodes.get(parentId);
+                    const parentId = selected[0]; const parentData = nodes.get(parentId);
                     const smartPos = MindMapUI.calculateSmartPosition(parentId);
                     const newId = 'node_' + Date.now();
                     
-                    // Gestion de la couleur intelligente héritée (Point 2)
                     let finalColor = { background: '#FFF3E0', border: '#FFB74D' };
                     let finalFontColor = '#333333';
 
                     if (parentId === 'root') {
-                        // On crée une nouvelle sous-branche principale : on lui donne une couleur unique
                         const existingMainBranchesCount = edges.get().filter(e => e.from === 'root').length;
                         const paletteIndex = existingMainBranchesCount % branchPalettes.length;
-                        finalColor = { 
-                            background: branchPalettes[paletteIndex].bg, 
-                            border: branchPalettes[paletteIndex].border,
-                            highlight: { background: branchPalettes[paletteIndex].bg, border: branchPalettes[paletteIndex].border }
-                        };
+                        finalColor = branchPalettes[paletteIndex];
                         finalFontColor = branchPalettes[paletteIndex].text;
                     } else if (parentData && parentData.color) {
-                        // Nœud fille : il hérite exactement de la couleur du parent
-                        finalColor = {
-                            background: parentData.color.background,
-                            border: parentData.color.border,
-                            highlight: { background: parentData.color.background, border: parentData.color.border }
-                        };
+                        finalColor = parentData.color;
                         finalFontColor = (parentData.font && parentData.font.color) ? parentData.font.color : '#333333';
                     }
                     
                     nodes.add({
                         id: newId, label: 'Nouvelle sous-idée', x: smartPos.x, y: smartPos.y,
-                        shape: 'box', color: finalColor, margin: 10, font: { color: finalFontColor },
-                        filePath: null
+                        shape: 'box', color: finalColor, margin: 10, font: { color: finalFontColor }, filePath: null
                     });
-                    
                     edges.add({ id: 'edge_' + Date.now(), from: parentId, to: newId, label: '' });
                     network.selectNodes([newId]);
                     
-                    // On bascule tout de suite en édition interne
+                    MindMapHistory.saveState(); // Sauvegarde de la création de branche
                     setTimeout(() => { MindMapUI.startInlineEditing(newId, null, 'node'); }, 50);
                 }
             }
@@ -500,16 +540,15 @@
                 if (selectedNodes.length > 0) {
                     nodes.remove(selectedNodes);
                     document.getElementById('style-bar').classList.remove('active');
+                    MindMapHistory.saveState();
                 } else if (selectedEdges.length > 0) {
                     edges.remove(selectedEdges);
                     document.getElementById('style-bar').classList.remove('active');
+                    MindMapHistory.saveState();
                 }
             }
         });
 
-        if (document.readyState === 'complete') { startMindMapEngine(); }
-
-        // --- SÉCURITÉ D'ACTIVATION DES BOUTONS DE LA TOOLBAR ---
         function activateUserInterface() {
             document.getElementById('btn-save').disabled = false;
             document.getElementById('btn-load').disabled = false;
@@ -517,6 +556,8 @@
             document.getElementById('btn-export-png').disabled = false;
             document.getElementById('btn-export-md').disabled = false;
         }
+
+        if (document.readyState === 'complete') { startMindMapEngine(); }
     </script>
 </body>
 </html>

@@ -121,7 +121,7 @@ def main():
 
     api = MindMapAPI()
     window = webview.create_window(
-        title="Ma MindMap App - Workspace Pro & Modulaire",
+        title="MindMapping - Workspace for creating and organizing ideas",
         html=html_content,
         width=1500, height=850, resizable=True, js_api=api
     )
