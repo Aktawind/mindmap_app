@@ -147,10 +147,20 @@
             setTimeout(() => {
                 network.moveTo({ scale: 0.85 }); 
                 document.body.style.opacity = "1";
-                if (window.pywebview && window.pywebview.api) {
-                    window.pywebview.api.update_window_title("[Nouveau Projet]");
-                }
-            }, 50);
+                 // --- CORRECTIF DU FREEZE DES 10 SECONDES ---
+            // On modifie le titre via le DOM, WebView2 répercutera le titre sur la fenêtre Windows.
+            // On supprime l'appel à l'API Python ici pour éviter le deadlock de démarrage !
+            document.title = "MindMap App - [Nouveau Projet]";
+            
+            /* ANCIEN CODE SUPPRIMÉ :
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.update_window_title("[Nouveau Projet]");
+            }
+            */
+            // --------------------------------------------
+            
+        }, 50);
+
         }
 
         const MindMapHistory = {
@@ -486,14 +496,6 @@
             startMindMapEngine();
         });
 
-        // CANAL 2 (SÉCURITÉ TEMPO) : Si après 1.5 seconde le moteur n'est toujours pas démarré,
-        // c'est que pywebviewready a loupé le coche. On force l'ouverture manuellement !
-        setTimeout(function() {
-            if (!isEngineStarted) {
-                console.log("Tempo de secours activée : Démarrage forcé de l'application.");
-                startMindMapEngine();
-            }
-        }, 1500);
-    </script>
+     </script>
 </body>
 </html>

@@ -5,6 +5,12 @@ import base64
 import logging
 import sys
 
+# --- PATCH ANTI-FREEZE 10 SECONDES ---
+# Désactive la résolution DNS (getfqdn) très lente du serveur HTTP local de Python
+from http.server import BaseHTTPRequestHandler
+BaseHTTPRequestHandler.address_string = lambda self: self.client_address[0]
+# -------------------------------------
+
 # Silence complet sur les avertissements pour maximiser les performances de communication
 logging.basicConfig(level=logging.CRITICAL)
 logger = logging.getLogger('pywebview')
@@ -126,7 +132,13 @@ def main():
         '--disable-renderer-accessibility '
         '--disable-features=LayoutNG,AccessibilityObjectModel,LiveCaption '
         '--allow-file-access-from-files '
-        '--disable-web-security'
+        '--disable-web-security '
+        '--disable-gpu '
+        '--disable-gpu-compositing '
+        '--disable-accelerated-2d-canvas '
+        '--disable-gpu-sandbox'
+
+        '--proxy-server="direct://"' # <--- AJOUT IMPORTANT ICI
     )
     
     if getattr(sys, 'frozen', False):
