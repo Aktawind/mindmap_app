@@ -93,3 +93,4 @@ body, html {
 .color-dot:hover { transform: scale(1.15); }
 .shape-btn { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 15px; font-size: 12px; cursor: pointer; transition: background 0.1s; font-family: inherit; }
 .shape-btn:hover { background: #e2e8f0; }
+

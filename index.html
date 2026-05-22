@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindMap App</title>
+    <title>Mindy - MindMap App</title>
     
     <link rel="stylesheet" href="./styles.css">
     
@@ -62,7 +62,7 @@
             <li><strong>Double-clic vide :</strong> Nouveau nœud</li>
             <li><strong>Double-clic élément :</strong> Éditer le texte</li>
             <li><strong>Sélection + Tab :</strong> Ajouter une branche</li>
-            <li><strong>Maintenir le clic (15px) :</strong> Déplacer un nœud</li>
+            <li><strong>Maintenir le clic :</strong> Déplacer un nœud</li>
             <li><strong>Suppr :</strong> Supprimer l'élément</li>
         </ul>
     </div>
@@ -130,13 +130,16 @@
             isEngineStarted = true;
 
             nodes = new vis.DataSet([
-                { id: 'root', label: 'Mon Projet Créatif', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }
+                { id: 'root', label: 'Nouveau noeud', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }
             ]);
             edges = new vis.DataSet([]);
             container = document.getElementById('network-canvas');
 
             const options = {
-                nodes: { shadow: { enabled: true, color: 'rgba(0,0,0,0.05)', size: 4, x: 2, y: 2 } },
+                nodes: { 
+                    shadow: { enabled: true, color: 'rgba(0,0,0,0.05)', size: 4, x: 2, y: 2 },
+                    font: { multi: true } // S'assure que les retours à la ligne et caractères gras s'affichent correctement
+                },
                 edges: {
                     smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.6 },
                     color: { color: '#A0AEC0', highlight: '#4A90E2', inherit: false }, 
@@ -160,7 +163,7 @@
             setTimeout(() => {
                 network.moveTo({ scale: 0.85 }); 
                 document.body.style.opacity = "1";
-                document.title = "MindMap App - [Nouveau Projet]";
+                document.title = "Mindy -MindMap App - [Nouveau Projet]";
             }, 50);
         }
 
@@ -354,60 +357,121 @@
                 const selectedEdges = network.getSelectedEdges();
                 if (selectedEdges.length === 1) this.startInlineEditing(null, selectedEdges[0], 'edge');
             },
+            // --- REMPLACEZ startInlineEditing ET AJOUTEZ toggleUrgent DANS L'OBJET MindMapUI ---
             startInlineEditing(nodeId, edgeId, mode) {
-                const input = document.createElement('input');
+                // Utilisation d'un textarea pour autoriser le multi-ligne et caractères spéciaux
+                const input = document.createElement('textarea');
                 input.className = 'node-edit-input';
-                let currentLabel = ""; let targetPos = { x: 0, y: 0 };
+                let currentLabel = ""; 
+                let targetPos = { x: 0, y: 0 };
 
                 if (mode === 'node') {
                     const nodeData = nodes.get(nodeId);
-                    currentLabel = nodeData.label.replace(/\n\s*📄.*/g, '');
+                    if (!nodeData) return;
+                    // On nettoie le texte pour l'édition en retirant le tag de pièce jointe et l'alarme urgente
+                    currentLabel = nodeData.label.replace(/\n\s*📄.*/g, '').replace(/^🚨\s*/, "");
                     targetPos = network.getBoundingBox(nodeId);
-                    nodes.update({ id: nodeId, font: { color: 'transparent' } });
+                    
+                    // Positionnement dynamique au-dessus du nœud
                     const domPosTopLeft = network.canvasToDOM({ x: targetPos.left, y: targetPos.top });
                     const domPosBottomRight = network.canvasToDOM({ x: targetPos.right, y: targetPos.bottom });
-                    input.style.left = (domPosTopLeft.x) + 'px'; input.style.top = (domPosTopLeft.y) + 'px';
-                    input.style.width = Math.max(domPosBottomRight.x - domPosTopLeft.x - 16, 120) + 'px';
-                    input.style.height = Math.max(domPosBottomRight.y - domPosTopLeft.y - 10, 30) + 'px';
+                    input.style.left = (domPosTopLeft.x) + 'px'; 
+                    input.style.top = (domPosTopLeft.y) + 'px';
+                    input.style.width = Math.max(domPosBottomRight.x - domPosTopLeft.x - 16, 140) + 'px';
+                    input.style.height = Math.max(domPosBottomRight.y - domPosTopLeft.y - 10, 50) + 'px';
                     input.style.textAlign = 'center';
                 } else {
-                    const edgeData = edges.get(edgeId); currentLabel = edgeData.label || "";
+                    const edgeData = edges.get(edgeId);
+                    if (!edgeData) return;
+                    currentLabel = edgeData.label || "";
                     const connectedNodes = network.getConnectedNodes(edgeId);
                     const pos1 = network.getPositions([connectedNodes[0]])[connectedNodes[0]];
                     const pos2 = network.getPositions([connectedNodes[1]])[connectedNodes[1]];
                     const domMid = network.canvasToDOM({ x: (pos1.x + pos2.x) / 2, y: (pos1.y + pos2.y) / 2 });
-                    input.style.left = (domMid.x - 75) + 'px'; input.style.top = (domMid.y - 15) + 'px';
-                    input.style.width = '150px'; input.style.height = '26px';
+                    input.style.left = (domMid.x - 75) + 'px'; 
+                    input.style.top = (domMid.y - 15) + 'px';
+                    input.style.width = '150px'; 
+                    input.style.height = '35px';
                 }
 
-                input.type = 'text'; input.value = currentLabel;
-                document.body.appendChild(input); input.focus(); input.select();
+                input.value = currentLabel; 
+                input.style.resize = "none";
+                document.body.appendChild(input); 
+                input.focus(); 
+                input.select();
+
+                let isFinishing = false;
 
                 function finishEditing() {
+                    if (isFinishing) return;
+                    isFinishing = true;
                     const val = input.value.trim();
+                    
                     if (mode === 'node') {
                         const nodeData = nodes.get(nodeId);
-                        const defaultTextColor = (nodeData.color && nodeData.color.background === '#4A90E2') ? '#ffffff' : '#333333';
-                        if (val !== "") {
-                            let finalLabel = val; if (nodeData.filePath) finalLabel += `\n📄 Document joint`;
-                            nodes.update({ id: nodeId, label: finalLabel, font: { color: defaultTextColor } });
-                        } else { nodes.update({ id: nodeId, font: { color: defaultTextColor } }); }
-                    } else { edges.update({ id: edgeId, label: val }); }
-                    if (input.parentNode) document.body.removeChild(input);
+                        if (nodeData) {
+                            if (val !== "") {
+                                let finalLabel = val;
+                                // Ré-injection de la sirène si le nœud est en mode urgent
+                                if (nodeData.label && nodeData.label.startsWith("🚨 ")) {
+                                    finalLabel = "🚨 " + finalLabel;
+                                }
+                                // Ré-injection de la mention pièce jointe si existante
+                                if (nodeData.filePath) {
+                                    finalLabel += `\n📄 Document joint`;
+                                }
+                                nodes.update({ id: nodeId, label: finalLabel });
+                            }
+                        }
+                    } else {
+                        if (edges.get(edgeId)) edges.update({ id: edgeId, label: val });
+                    }
+                    if (input.parentNode) input.parentNode.removeChild(input);
                     MindMapHistory.saveState();
                 }
 
-                input.addEventListener('blur', finishEditing);
+                input.addEventListener('blur', function() { finishEditing(); });
                 input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') finishEditing();
+                    // Entrée seule valide la saisie, Shift+Entrée passe à la ligne !
+                    if (e.key === 'Enter' && !e.shiftKey) { 
+                        e.preventDefault(); 
+                        finishEditing(); 
+                    }
                     if (e.key === 'Escape') {
-                        if (mode === 'node') {
-                            const nodeData = nodes.get(nodeId);
-                            nodes.update({ id: nodeId, font: { color: (nodeData.color && nodeData.color.background === '#4A90E2') ? '#ffffff' : '#333333' } });
-                        }
-                        if (input.parentNode) document.body.removeChild(input);
+                        isFinishing = true;
+                        if (input.parentNode) input.parentNode.removeChild(input);
                     }
                 });
+            },
+
+            // Fonction pour basculer le Mode Urgent (Géré via un bouton ou raccourci clavier)
+            toggleUrgent() {
+                const selectedNodes = network.getSelectedNodes();
+                if (selectedNodes.length !== 1) return;
+                const nodeId = selectedNodes[0]; 
+                const nodeData = nodes.get(nodeId);
+                
+                let currentLabel = nodeData.label; 
+                let isUrgent = currentLabel.startsWith("🚨 ");
+                let newLabel = currentLabel; 
+                let newColor = nodeData.color ? { ...nodeData.color } : { background: '#FFF3E0', border: '#FFB74D' };
+                let newBorderWidth = nodeData.borderWidth || 1;
+
+                if (!isUrgent) {
+                    // On passe en mode urgent : ajout de l'émoji et forçage de la bordure rouge épaisse
+                    newLabel = "🚨 " + currentLabel; 
+                    newColor.border = "#E53E3E";
+                    newColor.highlight = { background: newColor.background, border: "#E53E3E" };
+                    newBorderWidth = 3;
+                } else {
+                    // On désactive le mode urgent : retrait de l'émoji et retour à une bordure normale
+                    newLabel = currentLabel.replace(/^🚨\s*/, "");
+                    newColor.border = "#CBD5E0"; // Vous pouvez ajuster selon la couleur du thème par défaut
+                    newBorderWidth = 1;
+                }
+                
+                nodes.update({ id: nodeId, label: newLabel, color: newColor, borderWidth: newBorderWidth });
+                MindMapHistory.saveState();
             },
 
             calculateSmartPosition(parentId) {
@@ -454,7 +518,7 @@
             newProject() {
                 if (confirm("Voulez-vous créer un nouveau projet ? Les modifications non enregistrées seront perdues.")) {
                     nodes.clear(); edges.clear();
-                    nodes.add([{ id: 'root', label: 'Mon Projet Créatif', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }]);
+                    nodes.add([{ id: 'root', label: 'Nouveau noeud', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }]);
                     network.moveTo({ position: { x: 0, y: 0 }, scale: 1 });
                     document.getElementById('style-bar').classList.remove('active');
                     window.pywebview.api.reset_current_path(); 
@@ -573,6 +637,10 @@
                 const selectedNodes = network.getSelectedNodes(); const selectedEdges = network.getSelectedEdges();
                 if (selectedNodes.length > 0) { nodes.remove(selectedNodes); document.getElementById('style-bar').classList.remove('active'); MindMapHistory.saveState(); } 
                 else if (selectedEdges.length > 0) { edges.remove(selectedEdges); document.getElementById('style-bar').classList.remove('active'); MindMapHistory.saveState(); }
+            }
+            if (event.key.toLowerCase() === 'u' && !document.querySelector('.node-edit-input')) {
+                // Si l'utilisateur appuie sur 'U' (hors édition de texte), on bascule le mode urgent
+                MindMapUI.toggleUrgent();
             }
         });
 

@@ -45,7 +45,7 @@ class MindMapAPI:
 
     def update_window_title(self, suffix=None):
         if not self.window: return
-        base_title = "MindMap App"
+        base_title = "Mindy - MindMap App"
         if suffix:
             self.window.set_title(f"{base_title} - {suffix}")
         else:
@@ -149,7 +149,7 @@ def main():
     api = MindMapAPI()
     
     window = webview.create_window(
-        title="MindMap App",
+        title="Mindy - MindMap App",
         url=os.path.join(project_dir, "index.html"),
         width=1500, height=850, resizable=True, js_api=api
     )
