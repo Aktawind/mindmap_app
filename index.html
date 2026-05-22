@@ -146,7 +146,7 @@
                 physics: { enabled: false },
                 interaction: { 
                     hover: true, 
-                    dragNodes: false, // Bloqué à false pour empêcher le glissement instantané intempestif
+                    dragNodes: true, // Bloqué à false pour empêcher le glissement instantané intempestif
                     selectable: true,
                     multiselect: false
                 }
@@ -199,44 +199,61 @@
             let startPointerPos = null;
             let isDraggingValidated = false;
 
-            // CORRECTIF : GESTION FINALE ET PRECISA DU "MAINTENIR POUR DEPLACER"
+            // 1. Détection du clic sur un nœud (sauf le nœud principal si tu veux, ou tous)
             network.on("pointerDown", function(params) {
-                if (params.nodes.length === 1) {
+                // Si on clique sur un seul nœud (et qu'on exclut le principal 'root' si souhaité)
+                if (params.nodes.length === 1 && params.nodes[0] !== 'root') {
                     dragTargetNodeId = params.nodes[0];
                     startPointerPos = { x: params.pointer.DOM.x, y: params.pointer.DOM.y };
                     isDraggingValidated = false;
                 }
             });
 
+            // 2. Déplacement à la souris
             network.on("pointerMove", function(params) {
-                if (dragTargetNodeId && startPointerPos) {
+                // S'assurer qu'un nœud est ciblé et que le bouton GAUCHE est physiquement enfoncé (buttons === 1)
+                if (dragTargetNodeId && startPointerPos && params.event.buttons === 1) {
                     const currentPos = params.pointer.DOM;
                     const distance = Math.sqrt(
                         Math.pow(currentPos.x - startPointerPos.x, 2) + 
                         Math.pow(currentPos.y - startPointerPos.y, 2)
                     );
 
-                    // Il faut déplacer la souris d'au moins 15px pour déclencher le mouvement du nœud
+                    // Si on franchit le seuil des 15 pixels, on valide le déplacement
                     if (!isDraggingValidated && distance > 15) {
                         isDraggingValidated = true;
                     }
 
+                    // Si le déplacement est validé, on met à jour la position du nœud sur le canvas
                     if (isDraggingValidated) {
                         const canvasPos = params.pointer.canvas;
                         nodes.update({ id: dragTargetNodeId, x: canvasPos.x, y: canvasPos.y });
                     }
+                } 
+                // Sécurité absolue : si le bouton de la souris est relâché (buttons === 0), on libère le nœud immédiatement
+                else if (dragTargetNodeId && params.event.buttons === 0) {
+                    releaseNode();
                 }
             });
 
+            // 3. Relâchement de la souris
             network.on("pointerUp", function() {
-                if (isDraggingValidated) {
-                    MindMapHistory.saveState(); 
-                }
-                dragTargetNodeId = null;
-                startPointerPos = null;
-                isDraggingValidated = false;
+                releaseNode();
             });
 
+            // Fonction pour nettoyer l'état de drag et sauvegarder l'historique
+            function releaseNode() {
+                if (dragTargetNodeId) {
+                    if (isDraggingValidated) {
+                        MindMapHistory.saveState(); 
+                    }
+                    dragTargetNodeId = null;
+                    startPointerPos = null;
+                    isDraggingValidated = false;
+                }
+            }
+
+            // --- Le reste de tes événements reste identique à ton code d'origine ---
             network.on("selectNode", function (params) {
                 document.getElementById('edge-style-controls').style.display = 'none';
                 document.getElementById('node-style-controls').style.display = 'flex';
