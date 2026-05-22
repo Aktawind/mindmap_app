@@ -6,12 +6,13 @@
     <title>MindMap App</title>
     
     <link rel="stylesheet" href="./styles.css">
+    
     <script type="text/javascript" src="./vis-network.min.js"></script>
     
     <style>
         body { 
             opacity: 0; 
-            transition: opacity 0.1s ease-in-out; 
+            transition: opacity 0.15s ease-in-out; 
             background-color: #f8f9fa; 
         }
     </style>
@@ -61,6 +62,7 @@
             <li><strong>Double-clic vide :</strong> Nouveau nœud</li>
             <li><strong>Double-clic élément :</strong> Éditer le texte</li>
             <li><strong>Sélection + Tab :</strong> Ajouter une branche</li>
+            <li><strong>Maintenir le clic (15px) :</strong> Déplacer un nœud</li>
             <li><strong>Suppr :</strong> Supprimer l'élément</li>
         </ul>
     </div>
@@ -99,29 +101,32 @@
 
     <div id="network-canvas"></div>
 
-    <script type="text/javascript" src="qrc:///qtwebchannel/qwebchannel.js"></script>
-
     <script type="text/javascript">
         let nodes, edges, network, container;
         let isEngineStarted = false;
-        let backend = null;
 
+        // Palettes de couleurs complètes (Nœud + Ligne de liaison)
         const branchPalettes = [
-            { bg: '#FFF3E0', border: '#FFB74D', text: '#333333' },
-            { bg: '#E8F5E9', border: '#81C784', text: '#333333' },
-            { bg: '#F3E5F5', border: '#CE93D8', text: '#333333' },
-            { bg: '#FFEBEE', border: '#EF9A9A', text: '#333333' },
-            { bg: '#E0F7FA', border: '#4DD0E1', text: '#333333' }
+            { bg: '#FFF3E0', border: '#FFB74D', text: '#333333', edge: '#FFB74D' },
+            { bg: '#E8F5E9', border: '#81C784', text: '#333333', edge: '#81C784' },
+            { bg: '#F3E5F5', border: '#CE93D8', text: '#333333', edge: '#CE93D8' },
+            { bg: '#FFEBEE', border: '#EF9A9A', text: '#333333', edge: '#EF9A9A' },
+            { bg: '#E0F7FA', border: '#4DD0E1', text: '#333333', edge: '#4DD0E1' }
         ];
-
-        // Initialisation de la liaison Qt
-        new QWebChannel(qt.webChannelTransport, function (channel) {
-            backend = channel.objects.pyBridge;
-            startMindMapEngine();
-        });
 
         function startMindMapEngine() {
             if (isEngineStarted) return;
+            
+            // Sécurité anti-crash si la bibliothèque vis n'est pas encore accessible
+            if (typeof vis === 'undefined') {
+                // Tente un rechargement forcé par CDN si le fichier local a échoué à charger
+                const script = document.createElement('script');
+                script.src = "https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/vis-network.min.js";
+                script.onload = () => { isEngineStarted = false; startMindMapEngine(); };
+                document.head.appendChild(script);
+                return;
+            }
+
             isEngineStarted = true;
 
             nodes = new vis.DataSet([
@@ -134,14 +139,16 @@
                 nodes: { shadow: { enabled: true, color: 'rgba(0,0,0,0.05)', size: 4, x: 2, y: 2 } },
                 edges: {
                     smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.6 },
-                    color: { color: '#A0AEC0', highlight: '#4A90E2' }, 
-                    width: 2,
+                    color: { color: '#A0AEC0', highlight: '#4A90E2', inherit: false }, 
+                    width: 3, 
                     font: { align: 'horizontal', background: '#f8f9fa', size: 11, color: '#4A5568' }
                 },
                 physics: { enabled: false },
                 interaction: { 
                     hover: true, 
-                    dragNodes: true  // Restaure le clic simple pour sélectionner, maintenir enfoncé pour déplacer
+                    dragNodes: false, // Bloqué à false pour empêcher le glissement instantané intempestif
+                    selectable: true,
+                    multiselect: false
                 }
             };
 
@@ -188,9 +195,48 @@
         };
 
         function setupNetworkEvents() {
-            // L'historique ne retient PLUS les clics simples, seulement les actions structurelles concrètes !
-            network.on("dragEnd", function () { MindMapHistory.saveState(); });
-            
+            let dragTargetNodeId = null;
+            let startPointerPos = null;
+            let isDraggingValidated = false;
+
+            // CORRECTIF : GESTION FINALE ET PRECISA DU "MAINTENIR POUR DEPLACER"
+            network.on("pointerDown", function(params) {
+                if (params.nodes.length === 1) {
+                    dragTargetNodeId = params.nodes[0];
+                    startPointerPos = { x: params.pointer.DOM.x, y: params.pointer.DOM.y };
+                    isDraggingValidated = false;
+                }
+            });
+
+            network.on("pointerMove", function(params) {
+                if (dragTargetNodeId && startPointerPos) {
+                    const currentPos = params.pointer.DOM;
+                    const distance = Math.sqrt(
+                        Math.pow(currentPos.x - startPointerPos.x, 2) + 
+                        Math.pow(currentPos.y - startPointerPos.y, 2)
+                    );
+
+                    // Il faut déplacer la souris d'au moins 15px pour déclencher le mouvement du nœud
+                    if (!isDraggingValidated && distance > 15) {
+                        isDraggingValidated = true;
+                    }
+
+                    if (isDraggingValidated) {
+                        const canvasPos = params.pointer.canvas;
+                        nodes.update({ id: dragTargetNodeId, x: canvasPos.x, y: canvasPos.y });
+                    }
+                }
+            });
+
+            network.on("pointerUp", function() {
+                if (isDraggingValidated) {
+                    MindMapHistory.saveState(); 
+                }
+                dragTargetNodeId = null;
+                startPointerPos = null;
+                isDraggingValidated = false;
+            });
+
             network.on("selectNode", function (params) {
                 document.getElementById('edge-style-controls').style.display = 'none';
                 document.getElementById('node-style-controls').style.display = 'flex';
@@ -199,7 +245,7 @@
                 MindMapStyle.updateActiveColorDot((nodeData && nodeData.color) ? nodeData.color.background : '#4A90E2');
                 MindMapAttachments.updateUIForSelectedNode(nodeData);
             });
-            
+
             network.on("selectEdge", function (params) {
                 if (params.nodes.length === 0) {
                     document.getElementById('node-style-controls').style.display = 'none';
@@ -207,7 +253,7 @@
                     document.getElementById('style-bar').classList.add('active');
                 }
             });
-            
+
             network.on("deselectNode", function () { document.getElementById('style-bar').classList.remove('active'); });
             network.on("deselectEdge", function () { document.getElementById('style-bar').classList.remove('active'); });
             
@@ -220,37 +266,32 @@
                         id: 'node_' + Date.now(), label: 'Nouvelle idée', x: pos.x, y: pos.y,
                         shape: 'box', color: { background: '#FFF3E0', border: '#FFB74D' }, margin: 10, font: { color: '#333333' }, filePath: null
                     });
-                    MindMapHistory.saveState(); // Enregistrement sélectif de l'historique
+                    MindMapHistory.saveState();
                 }
             });
         }
 
         const MindMapAttachments = {
             attachFile() {
-                if (!backend) return;
                 const selected = network.getSelectedNodes();
                 if (selected.length !== 1) return;
                 const nodeId = selected[0];
                 const nodeData = nodes.get(nodeId);
-                
-                backend.select_local_file(function(filePath) {
+                window.pywebview.api.select_local_file().then(filePath => {
                     if (filePath) {
                         let baseLabel = nodeData.label.replace(/\n\s*📄.*/g, '');
                         nodes.update({ id: nodeId, label: `${baseLabel}\n📄 Document joint`, filePath: filePath });
                         MindMapHistory.saveState();
-                        MindMapAttachments.updateUIForSelectedNode(nodes.get(nodeId));
+                        this.updateUIForSelectedNode(nodes.get(nodeId));
                     }
                 });
             },
             openFile() {
-                if (!backend) return;
                 const selected = network.getSelectedNodes();
                 if (selected.length !== 1) return;
                 const nodeData = nodes.get(selected[0]);
                 if (nodeData && nodeData.filePath) {
-                    backend.open_local_file(nodeData.filePath, function(res) {
-                        if (res !== "true") alert(res);
-                    });
+                    window.pywebview.api.open_local_file(nodeData.filePath).then(res => { if (res !== true) alert(res); });
                 }
             },
             updateUIForSelectedNode(nodeData) {
@@ -263,12 +304,17 @@
             changeColor(bg, border, textFontColor) {
                 const selected = network.getSelectedNodes();
                 if (selected.length !== 1) return;
-                this.applyColorHierarchy(selected[0], bg, border, textFontColor);
+                this.applyColorHierarchy(selected[0], bg, border, textFontColor, border);
                 MindMapHistory.saveState();
             },
-            applyColorHierarchy(nodeId, bg, border, textFontColor) {
+            applyColorHierarchy(nodeId, bg, border, textFontColor, edgeColor) {
                 nodes.update({ id: nodeId, color: { background: bg, border: border, highlight: { background: bg, border: border } }, font: { color: textFontColor } });
-                edges.get().forEach(edge => { if (edge.from === nodeId) this.applyColorHierarchy(edge.to, bg, border, textFontColor); });
+                edges.get().forEach(edge => { 
+                    if (edge.from === nodeId) {
+                        edges.update({ id: edge.id, color: { color: edgeColor, highlight: edgeColor } });
+                        this.applyColorHierarchy(edge.to, bg, border, textFontColor, edgeColor);
+                    }
+                });
             },
             changeShape(shapeType) {
                 const selected = network.getSelectedNodes();
@@ -371,17 +417,16 @@
             },
 
             applyTemplate(templateName) {
-                if (!templateName || !backend) return;
+                if (!templateName) return;
                 if (confirm("Charger ce template va remplacer votre mind map actuelle. Continuer ?")) {
-                    // Correction Callback asynchrone Qt
-                    backend.load_template(templateName, function(jsonString) {
+                    window.pywebview.api.load_template(templateName).then(function(jsonString) {
                         const importedData = JSON.parse(jsonString);
                         if (importedData.error) { alert("Erreur : " + importedData.error); return; }
                         nodes.clear(); edges.clear();
                         nodes.add(importedData.nodes); edges.add(importedData.edges);
                         network.fit();
                         document.getElementById('template-select').value = "";
-                        backend.reset_current_path(); 
+                        window.pywebview.api.reset_current_path(); 
                         MindMapHistory.init();
                     });
                 } else { document.getElementById('template-select').value = ""; }
@@ -395,32 +440,26 @@
                     nodes.add([{ id: 'root', label: 'Mon Projet Créatif', x: 0, y: 0, shape: 'box', color: { background: '#4A90E2', border: '#357ABD', highlight: { background: '#4A90E2', border: '#357ABD' } }, margin: 12, font: { color: '#ffffff', size: 16 }, filePath: null }]);
                     network.moveTo({ position: { x: 0, y: 0 }, scale: 1 });
                     document.getElementById('style-bar').classList.remove('active');
-                    if (backend) backend.reset_current_path(); 
+                    window.pywebview.api.reset_current_path(); 
                     MindMapHistory.init();
                 }
             },
             saveProject(forceSaveAs = false) {
-                if (!backend) return;
                 const currentNodes = nodes.get(); const positions = network.getPositions();
                 const nodesWithPositions = currentNodes.map(node => {
                     if (positions[node.id]) { node.x = positions[node.id].x; node.y = positions[node.id].y; }
                     return node;
                 });
                 const fullData = { nodes: nodesWithPositions, edges: edges.get() };
-                
-                // Correction Callback asynchrone Qt
-                backend.save_project_dialog(JSON.stringify(fullData, null, 2), forceSaveAs, function(res) {
-                    if (res !== "true" && res !== "Annulé") alert(res); 
+                window.pywebview.api.save_project(JSON.stringify(fullData, null, 2), forceSaveAs).then(res => {
+                    if (res !== true && res !== "Annulé") alert(res); 
                 });
             },
             loadProject() {
-                if (!backend) return;
-                // Correction Callback asynchrone Qt
-                backend.load_project_dialog(function(jsonResponse) {
-                    if (!jsonResponse) return; // Annulé
+                window.pywebview.api.load_project().then(jsonResponse => {
+                    if (!jsonResponse) return;
                     const data = JSON.parse(jsonResponse);
-                    if (data.status === "error") { alert("Erreur: " + data.message); return; }
-                    
+                    if (data.error) { alert("Erreur: " + data.error); return; }
                     const importedData = JSON.parse(data.content);
                     nodes.clear(); edges.clear();
                     nodes.add(importedData.nodes); edges.add(importedData.edges);
@@ -429,17 +468,17 @@
                 });
             },
             exportPNG() {
-                if (!backend) return;
                 network.fit();
                 setTimeout(() => {
                     const canvasElement = container.getElementsByTagName('canvas')[0];
                     if (canvasElement) {
-                        backend.export_file(canvasElement.toDataURL('image/png'), "png");
+                        window.pywebview.api.export_png(canvasElement.toDataURL('image/png')).then(res => {
+                            if(res !== true && res !== "Annulé") alert(res);
+                        });
                     }
                 }, 150);
             },
             exportMarkdown() {
-                if (!backend) return;
                 const currentNodes = nodes.get(); const currentEdges = edges.get();
                 if (currentNodes.length === 0) return;
                 let rootNode = currentNodes.find(n => n.id === 'root') || currentNodes[0];
@@ -451,11 +490,12 @@
                     currentEdges.filter(e => e.from === nodeId).forEach(edge => buildTreeString(edge.to, depth + 1));
                 }
                 buildTreeString(rootNode.id, 0);
-                backend.export_file(output, "md");
+                window.pywebview.api.export_markdown(output).then(res => {
+                    if(res !== true && res !== "Annulé") alert(res);
+                });
             }
         };
 
-        // Écouteur global pour intercepter les touches systèmes dans la fenêtre Qt
         document.addEventListener('keydown', function(event) {
             if (event.ctrlKey && event.key.toLowerCase() === 's') { event.preventDefault(); MindMapApp.saveProject(false); }
             if (event.ctrlKey && event.key.toLowerCase() === 'z') { event.preventDefault(); MindMapHistory.undo(); }
@@ -468,25 +508,47 @@
                     const parentId = selected[0]; const parentData = nodes.get(parentId);
                     const smartPos = MindMapUI.calculateSmartPosition(parentId);
                     const newId = 'node_' + Date.now();
+                    const edgeId = 'edge_' + Date.now();
                     
-                    let finalColor = { background: '#FFF3E0', border: '#FFB74D' }; let finalFontColor = '#333333';
+                    let finalColor = { background: '#FFF3E0', border: '#FFB74D' }; 
+                    let finalFontColor = '#333333';
+                    let finalEdgeColor = '#A0AEC0'; 
                     
-                    // RESTAURATION : Distribution de couleurs cycliques pour chaque branche du nœud principal (root)
+                    // CORRECTIF STRICT : GENERATION UNIQUE DE COULEUR PAR BRANCHE DU NOEUD PRINCIPAL
                     if (parentId === 'root') {
-                        const paletteIndex = edges.get().filter(e => e.from === 'root').length % branchPalettes.length;
-                        finalColor = branchPalettes[paletteIndex]; 
-                        finalFontColor = branchPalettes[paletteIndex].text;
+                        const rootBranchesCount = edges.get().filter(e => e.from === 'root').length;
+                        const palette = branchPalettes[rootBranchesCount % branchPalettes.length];
+                        
+                        finalColor = { background: palette.bg, border: palette.border, highlight: { background: palette.bg, border: palette.border } };
+                        finalFontColor = palette.text;
+                        finalEdgeColor = palette.edge; // Colore la branche (la ligne)
                     } else if (parentData && parentData.color) {
-                        // Les sous-branches héritent automatiquement de la couleur de leur branche parente
                         finalColor = parentData.color; 
                         finalFontColor = (parentData.font && parentData.font.color) ? parentData.font.color : '#333333';
+                        const parentEdge = edges.get().find(e => e.to === parentId);
+                        if (parentEdge && parentEdge.color) {
+                            finalEdgeColor = parentEdge.color.color;
+                        }
                     }
                     
                     nodes.add({ id: newId, label: 'Nouvelle sous-idée', x: smartPos.x, y: smartPos.y, shape: 'box', color: finalColor, margin: 10, font: { color: finalFontColor }, filePath: null });
-                    edges.add({ id: 'edge_' + Date.now(), from: parentId, to: newId, label: '' });
+                    
+                    edges.add({ 
+                        id: edgeId, 
+                        from: parentId, 
+                        to: newId, 
+                        label: '', 
+                        color: { color: finalEdgeColor, highlight: finalEdgeColor, hover: finalEdgeColor } 
+                    });
+                    
                     network.selectNodes([newId]);
                     
-                    MindMapHistory.saveState(); // Enregistrement sélectif structurel
+                    document.getElementById('edge-style-controls').style.display = 'none';
+                    document.getElementById('node-style-controls').style.display = 'flex';
+                    document.getElementById('style-bar').classList.add('active');
+                    MindMapStyle.updateActiveColorDot(finalColor.background);
+                    
+                    MindMapHistory.saveState();
                     setTimeout(() => { MindMapUI.startInlineEditing(newId, null, 'node'); }, 50);
                 }
             }
@@ -505,6 +567,10 @@
             document.getElementById('btn-export-png').disabled = false;
             document.getElementById('btn-export-md').disabled = false;
         }
+
+        // Double déclencheur de sécurité : s'exécute dès que l'un des deux signaux est prêt
+        window.addEventListener('pywebviewready', function() { startMindMapEngine(); });
+        document.addEventListener('DOMContentLoaded', function() { startMindMapEngine(); });
      </script>
 </body>
 </html>
