@@ -70,7 +70,9 @@ body, html {
     outline: none; 
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     box-sizing: border-box;
-    padding: 2px 6px;
+    padding: 4px 6px;
+    white-space: pre-wrap; /* Conserve les retours à la ligne à l'écran */
+    overflow: hidden;
 }
 
 /* --- BARRE DE STYLE CONTEXTUELLE --- */
