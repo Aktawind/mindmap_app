@@ -186,6 +186,82 @@ class MindMapScene(QGraphicsScene):
             self.signals.itemDoubleClicked.emit(event.scenePos())
         super().mouseDoubleClickEvent(event)
 
+class MindMapControlView(QGraphicsView):
+    def __init__(self, scene, parent=None):
+        super().__init__(scene, parent)
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Mode de sélection par défaut (rectangle élastique)
+        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        self.setStyleSheet("border: none;")
+        
+        # Pour mémoriser l'état du déplacement
+        self._is_panning = False
+        self._pan_start_x = 0
+        self._pan_start_y = 0
+
+    def mousePressEvent(self, event):
+        # Si on clique avec le clic GAUME ou DROIT (au choix, ici le clic DROIT ou le clic MOLETTE sont parfaits pour le panoramique)
+        # Utilisons le clic DROIT pour se déplacer dans le vide sans casser la sélection au clic gauche
+        if event.button() == Qt.MouseButton.RightButton:
+            item = self.itemAt(event.position().toPoint())
+            # On ne se déplace que si on clique dans le vide
+            if not item:
+                self._is_panning = True
+                self._pan_start_x = event.position().x()
+                self._pan_start_y = event.position().y()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._is_panning:
+            # Calcul du déplacement de la souris
+            dx = event.position().x() - self._pan_start_x
+            dy = event.position().y() - self._pan_start_y
+            
+            # Ajustement des barres de défilement (scrolling inverse pour un effet "tapis de table")
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - int(dx))
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - int(dy))
+            
+            self._pan_start_x = event.position().x()
+            self._pan_start_y = event.position().y()
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.RightButton and self._is_panning:
+            self._is_panning = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):
+        # Gestion du Zoom avec la molette de la souris
+        zoom_in_factor = 1.15
+        zoom_out_factor = 1 / zoom_in_factor
+
+        # Définir des limites de zoom pour éviter de perdre le graphique
+        # On calcule le niveau actuel basé sur la matrice de transformation
+        current_scale = self.transform().m11()
+        
+        # Récupère l'orientation et l'intensité du défilement
+        angle = event.angleDelta().y()
+
+        if angle > 0 and current_scale < 3.0:  # Zoom max x3
+            zoom_factor = zoom_in_factor
+        elif angle < 0 and current_scale > 0.3:  # Zoom min x0.3
+            zoom_factor = zoom_out_factor
+        else:
+            zoom_factor = 1.0
+
+        # Permet de zoomer en ciblant la position de la souris
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.scale(zoom_factor, zoom_factor)
+        event.accept()
 
 class MindMapApp(QMainWindow):
     def __init__(self):
@@ -213,14 +289,15 @@ class MindMapApp(QMainWindow):
 
     def setup_ui(self):
         self.scene = MindMapScene(self)
+        # Crée un canevas géant de -5000 à +5000 en X et Y. Le centre est en (0,0)
+        self.scene.setSceneRect(-5000, -5000, 10000, 10000)
         self.scene.selectionChanged.connect(self.on_selection_changed)
         self.scene.signals.itemDoubleClicked.connect(self.on_bg_double_clicked)
         
-        self.view = QGraphicsView(self.scene)
-        self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        self.view.setStyleSheet("border: none;")
+        # Remplacement par notre vue customisée
+        self.view = MindMapControlView(self.scene, self)
         self.setCentralWidget(self.view)
+        self.view.centerOn(0, 0)
 
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("Fichier")

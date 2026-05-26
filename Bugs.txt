@@ -1,8 +1,8 @@
-- l'image générée est flou
-- Pouvoir choisir son alignement
-- Quand on créé un nouveau noeud, il s'aligne avec son noeud parent et ses frères
 - Prévoir d'autres templates
-- Pouvoir mettre des flèches des un sens ou les 2 pour les branches
+- Pouvoir mettre des flèches dans un sens ou les 2 pour les branches
 - Agrandir les ovales et prévoir des losanges
 - Liens courbes ou rectilignes
 - Un bouton où tout s'aligne sans se superposer
+- pouvoir mettre en gras
+- zomm et déplacement du graph
+- mettre un lien url
