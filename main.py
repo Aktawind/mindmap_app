@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, 
-    QAction, QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker
+    QAction, QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon
 )
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl
 
@@ -191,6 +191,9 @@ class MindMapApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Mindy - MindMap App - [Nouveau Projet]")
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         self.resize(1500, 850)
         
         self.current_file_path = None
