@@ -5,13 +5,13 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsItem, 
     QGraphicsPathItem, QMenu, QMenuBar, QFileDialog, 
     QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-    QFrame, QComboBox, QTextEdit
+    QFrame, QComboBox, QTextEdit, QTabWidget, QInputDialog
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, 
     QAction, QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon
 )
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl
+from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings
 
 # --- PALETTES DE COULEURS ---
 BRANCH_PALETTES = [
@@ -28,7 +28,7 @@ class GraphicsSignals(QObject):
     positionChanged = pyqtSignal()
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', file_path=None):
+    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', file_path=None, url_link=None, is_bold=False):
         super().__init__()
         self.node_id = node_id
         self.label = label
@@ -37,6 +37,8 @@ class NodeItem(QGraphicsItem):
         self.border_color = QColor(border)
         self.font_color = QColor(font_color)
         self.file_path = file_path
+        self.url_link = url_link
+        self.is_bold = is_bold
         self.border_width = 1
         
         self.setPos(x, y)
@@ -59,6 +61,8 @@ class NodeItem(QGraphicsItem):
 
     def recalculate_size(self):
         font = QFont('Segoe UI', 11)
+        if self.is_bold:
+            font.setBold(True)
         fm = QFontMetrics(font)
         lines = self.label.split('\n')
         max_width = max(fm.horizontalAdvance(line) for line in lines) if lines else 0
@@ -90,8 +94,12 @@ class NodeItem(QGraphicsItem):
             painter.drawRoundedRect(self.rect, 6, 6)
 
         painter.setPen(QPen(self.font_color))
-        painter.setFont(QFont('Segoe UI', 11))
-        # Utilisation stricte de l'Enum AlignmentFlag pour éviter les erreurs PyQt
+        font = QFont('Segoe UI', 11)
+        if self.is_bold:
+            font.setBold(True)
+        if self.url_link:
+            font.setUnderline(True)
+        painter.setFont(font)
         painter.drawText(self.rect, int(Qt.AlignmentFlag.AlignCenter), self.label)
 
     def itemChange(self, change, value):
@@ -166,7 +174,6 @@ class EdgeItem(QGraphicsPathItem):
             
             painter.setPen(QPen(QColor('#4A5568')))
             painter.setFont(font)
-            # Correction du bug ici : Passage correct du rectangle et de l'alignement
             painter.drawText(rect, int(Qt.AlignmentFlag.AlignCenter), self.label)
 
     def mouseDoubleClickEvent(self, event):
@@ -190,22 +197,16 @@ class MindMapControlView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Mode de sélection par défaut (rectangle élastique)
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self.setStyleSheet("border: none;")
         
-        # Pour mémoriser l'état du déplacement
         self._is_panning = False
         self._pan_start_x = 0
         self._pan_start_y = 0
 
     def mousePressEvent(self, event):
-        # Si on clique avec le clic GAUME ou DROIT (au choix, ici le clic DROIT ou le clic MOLETTE sont parfaits pour le panoramique)
-        # Utilisons le clic DROIT pour se déplacer dans le vide sans casser la sélection au clic gauche
         if event.button() == Qt.MouseButton.RightButton:
             item = self.itemAt(event.position().toPoint())
-            # On ne se déplace que si on clique dans le vide
             if not item:
                 self._is_panning = True
                 self._pan_start_x = event.position().x()
@@ -217,11 +218,9 @@ class MindMapControlView(QGraphicsView):
 
     def mouseMoveEvent(self, event):
         if self._is_panning:
-            # Calcul du déplacement de la souris
             dx = event.position().x() - self._pan_start_x
             dy = event.position().y() - self._pan_start_y
             
-            # Ajustement des barres de défilement (scrolling inverse pour un effet "tapis de table")
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - int(dx))
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - int(dy))
             
@@ -240,46 +239,66 @@ class MindMapControlView(QGraphicsView):
         super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event):
-        # Gestion du Zoom avec la molette de la souris
         zoom_in_factor = 1.15
         zoom_out_factor = 1 / zoom_in_factor
-
-        # Définir des limites de zoom pour éviter de perdre le graphique
-        # On calcule le niveau actuel basé sur la matrice de transformation
         current_scale = self.transform().m11()
-        
-        # Récupère l'orientation et l'intensité du défilement
         angle = event.angleDelta().y()
 
-        if angle > 0 and current_scale < 3.0:  # Zoom max x3
+        if angle > 0 and current_scale < 3.0:
             zoom_factor = zoom_in_factor
-        elif angle < 0 and current_scale > 0.3:  # Zoom min x0.3
+        elif angle < 0 and current_scale > 0.3:
             zoom_factor = zoom_out_factor
         else:
             zoom_factor = 1.0
 
-        # Permet de zoomer en ciblant la position de la souris
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.scale(zoom_factor, zoom_factor)
         event.accept()
 
+
+class MindMapWorkspace(QWidget):
+    """ Encapsule les données et la vue propre à un projet unique (un onglet) """
+    def __init__(self, main_app, file_path=None):
+        super().__init__()
+        self.main_app = main_app
+        self.current_file_path = file_path
+        self.undo_stack = []
+        self.redo_stack = []
+        self.is_applying_state = False
+
+        self.scene = MindMapScene(self)
+        self.scene.setSceneRect(-5000, -5000, 10000, 10000)
+        
+        self.scene.selectionChanged.connect(self.main_app.on_selection_changed)
+        self.scene.signals.itemDoubleClicked.connect(self.main_app.on_bg_double_clicked)
+        
+        self.view = MindMapControlView(self.scene, self)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.view)
+        self.view.centerOn(0, 0)
+
+
 class MindMapApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Mindy - MindMap App - [Nouveau Projet]")
+        self.setWindowTitle("Mindy - MindMap App")
+        self.settings = QSettings("MindyApp", "MindMapEditor")
+        
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         self.resize(1500, 850)
         
-        self.current_file_path = None
-        self.undo_stack = []
-        self.redo_stack = []
-        self.is_applying_state = False
-
         self.setup_ui()
         self.setup_shortcuts()
-        self.new_project(force_empty=True)
+        
+        # Charger le dernier projet ou créer un projet vide par défaut
+        self.load_last_project_on_startup()
+
+    def current_workspace(self) -> MindMapWorkspace:
+        return self.tab_widget.currentWidget()
 
     def create_separator(self):
         sep = QWidget()
@@ -288,20 +307,17 @@ class MindMapApp(QMainWindow):
         return sep
 
     def setup_ui(self):
-        self.scene = MindMapScene(self)
-        # Crée un canevas géant de -5000 à +5000 en X et Y. Le centre est en (0,0)
-        self.scene.setSceneRect(-5000, -5000, 10000, 10000)
-        self.scene.selectionChanged.connect(self.on_selection_changed)
-        self.scene.signals.itemDoubleClicked.connect(self.on_bg_double_clicked)
-        
-        # Remplacement par notre vue customisée
-        self.view = MindMapControlView(self.scene, self)
-        self.setCentralWidget(self.view)
-        self.view.centerOn(0, 0)
+        # Système d'onglets central
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
+        self.setCentralWidget(self.tab_widget)
 
+        # Menus
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("Fichier")
-        file_menu.addAction("📁 Nouveau projet", self.new_project)
+        file_menu.addAction("📁 Nouveau projet", lambda: self.new_project())
         file_menu.addSeparator()
         file_menu.addAction("📂 Ouvrir un projet", self.load_project)
         file_menu.addAction("💾 Enregistrer", self.save_project).setShortcut("Ctrl+S")
@@ -323,6 +339,7 @@ class MindMapApp(QMainWindow):
         self.template_combo.currentIndexChanged.connect(self.apply_template)
         menu_bar.setCornerWidget(self.template_combo, Qt.Corner.TopRightCorner)
 
+        # Barre de style flottante
         self.style_bar = QFrame(self)
         self.style_bar.setStyleSheet("""
             QFrame { background: white; border-radius: 20px; border: 1px solid #e2e8f0; }
@@ -331,9 +348,19 @@ class MindMapApp(QMainWindow):
         """)
         style_layout = QHBoxLayout(self.style_bar)
         
+        # Commandes de Nœuds
         self.node_controls = QWidget()
         nc_layout = QHBoxLayout(self.node_controls)
         nc_layout.setContentsMargins(0,0,0,0)
+        
+        # Bouton GRAS
+        btn_bold = QPushButton("B")
+        btn_bold.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        btn_bold.setFixedSize(26, 26)
+        btn_bold.clicked.connect(self.toggle_bold)
+        nc_layout.addWidget(btn_bold)
+        
+        nc_layout.addWidget(self.create_separator())
         
         for color, border in [('#60A5FA', '#3B82F6'), ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'), ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')]:
             btn = QPushButton()
@@ -359,9 +386,14 @@ class MindMapApp(QMainWindow):
 
         nc_layout.addWidget(self.create_separator())
         
-        btn_attach = QPushButton("📎 Associer")
+        # Pièces jointes & URL
+        btn_attach = QPushButton("📎 Fichier")
         btn_attach.clicked.connect(self.attach_file)
         nc_layout.addWidget(btn_attach)
+        
+        btn_url = QPushButton("🔗 URL")
+        btn_url.clicked.connect(self.attach_url)
+        nc_layout.addWidget(btn_url)
         
         self.btn_open = QPushButton("📂 Ouvrir")
         self.btn_open.setStyleSheet("background: #2D3748; color: white;")
@@ -370,11 +402,12 @@ class MindMapApp(QMainWindow):
 
         self.btn_detach = QPushButton("❌ Dissocier")
         self.btn_detach.setStyleSheet("background: #FED7D7; color: #C53030;")
-        self.btn_detach.clicked.connect(self.detach_file)
+        self.btn_detach.clicked.connect(self.detach_links)
         nc_layout.addWidget(self.btn_detach)
         
         style_layout.addWidget(self.node_controls)
         
+        # Commandes de Relations (Liaisons existantes)
         self.edge_controls = QWidget()
         ec_layout = QHBoxLayout(self.edge_controls)
         ec_layout.setContentsMargins(0,0,0,0)
@@ -383,16 +416,27 @@ class MindMapApp(QMainWindow):
         ec_layout.addWidget(btn_edit_edge)
         style_layout.addWidget(self.edge_controls)
         
+        # NOUVEAU : Commandes Multi-sélection (Relier deux nœuds existants)
+        self.connect_controls = QWidget()
+        cc_layout = QHBoxLayout(self.connect_controls)
+        cc_layout.setContentsMargins(0,0,0,0)
+        btn_connect = QPushButton("🔗 Relier les 2 nœuds")
+        btn_connect.setStyleSheet("background: #EBF8FF; border: 1px solid #90CDF4; color: #2B6CB0; font-weight: bold;")
+        btn_connect.clicked.connect(self.connect_selected_nodes)
+        cc_layout.addWidget(btn_connect)
+        style_layout.addWidget(self.connect_controls)
+        
         self.style_bar.hide()
         
+        # Overlay d'aide
         self.overlay = QFrame(self)
         self.overlay.setStyleSheet("background: rgba(255,255,255,0.95); border-radius: 8px; border: 1px solid #ddd;")
         ol_layout = QVBoxLayout(self.overlay)
-        lbl = QLabel("<b>Commandes :</b><br>- Double-clic vide : Nouveau nœud<br>- Double-clic : Éditer le texte<br>- Sélect + Tab : Ajouter une branche<br>- Suppr : Supprimer l'élément")
+        lbl = QLabel("<b>Commandes :</b><br>- Double-clic vide : Nouveau nœud<br>- Double-clic : Éditer le texte<br>- Sélect + Tab : Ajouter une branche<br>- Ctrl + Clic : Sélectionner 2 nœuds<br>- Suppr : Supprimer l'élément")
         lbl.setFont(QFont("Segoe UI", 9))
         ol_layout.addWidget(lbl)
-        self.overlay.resize(230, 130)
-        self.overlay.move(20, 40)
+        self.overlay.resize(230, 140)
+        self.overlay.move(20, 60)
 
     def setup_shortcuts(self):
         self.shortcut_tab = QShortcut(QKeySequence(Qt.Key.Key_Tab), self)
@@ -415,15 +459,53 @@ class MindMapApp(QMainWindow):
         self.style_bar.move(x, y)
         self.overlay.raise_()
 
-    # --- HISTORIQUE & ETATS ---
+    # --- GESTION DES ONGLETS & PERSISTANCE ---
+    def load_last_project_on_startup(self):
+        last_path = self.settings.value("last_project_path", "")
+        if last_path and os.path.exists(last_path):
+            self.load_project_from_path(last_path)
+        else:
+            self.new_project(force_empty=True)
+            
+        # 🌟 AJOUT : Centrage forcé sur le graphique au tout premier affichage
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, self.center_on_graph)
+
+    def close_tab(self, index):
+        if self.tab_widget.count() > 1:
+            self.tab_widget.removeTab(index)
+        else:
+            self.new_project(force_empty=True)
+            self.tab_widget.removeTab(0)
+
+    def on_tab_changed(self, index):
+        self.update_title()
+        self.on_selection_changed()
+
+    def update_title(self):
+        ws = self.current_workspace()
+        if not ws: return
+        title = "Mindy - MindMap App"
+        if ws.current_file_path:
+            title += f" - {os.path.basename(ws.current_file_path)}"
+            self.tab_widget.setTabText(self.tab_widget.currentIndex(), os.path.basename(ws.current_file_path))
+        else:
+            title += " - [Nouveau Projet]"
+            self.tab_widget.setTabText(self.tab_widget.currentIndex(), "[Nouveau Projet]")
+        self.setWindowTitle(title)
+
+    # --- HISTORIQUE & ETATS (Adaptés aux espaces) ---
     def get_state(self):
+        ws = self.current_workspace()
+        if not ws: return {'nodes': [], 'edges': []}
         nodes, edges = [], []
-        for item in self.scene.items():
+        for item in ws.scene.items():
             if isinstance(item, NodeItem):
                 nodes.append({
                     'id': item.node_id, 'label': item.label, 'x': item.pos().x(), 'y': item.pos().y(),
                     'shape': item.shape_type, 'bg': item.bg_color.name(), 'border': item.border_color.name(),
-                    'font_color': item.font_color.name(), 'border_width': item.border_width, 'file_path': item.file_path
+                    'font_color': item.font_color.name(), 'border_width': item.border_width, 
+                    'file_path': item.file_path, 'url_link': item.url_link, 'is_bold': item.is_bold
                 })
             elif isinstance(item, EdgeItem):
                 edges.append({
@@ -433,113 +515,119 @@ class MindMapApp(QMainWindow):
         return {'nodes': nodes, 'edges': edges}
 
     def save_state(self):
-        if self.is_applying_state: return
-        self.undo_stack.append(json.dumps(self.get_state()))
-        self.redo_stack.clear()
-        if len(self.undo_stack) > 41: self.undo_stack.pop(0)
+        ws = self.current_workspace()
+        if not ws or ws.is_applying_state: return
+        ws.undo_stack.append(json.dumps(self.get_state()))
+        ws.redo_stack.clear()
+        if len(ws.undo_stack) > 41: ws.undo_stack.pop(0)
 
     def apply_state(self, state_str):
-        self.is_applying_state = True
+        ws = self.current_workspace()
+        if not ws: return
+        ws.is_applying_state = True
         state = json.loads(state_str)
-        self.scene.clear()
+        ws.scene.clear()
         
         node_map = {}
         for nd in state['nodes']:
-            bg = nd.get('bg')
-            border = nd.get('border')
-            font_color = nd.get('font_color')
-            
-            if not bg and 'color' in nd:
-                color_data = nd['color']
-                if isinstance(color_data, dict):
-                    bg = color_data.get('background', '#60A5FA')
-                    border = color_data.get('border', '#3B82F6')
-                else:
-                    bg = border = color_data
-                    
-            if not font_color and 'font' in nd:
-                font_data = nd['font']
-                if isinstance(font_data, dict):
-                    font_color = font_data.get('color', '#ffffff')
-            
-            bg = bg or '#60A5FA'
-            border = border or '#3B82F6'
-            font_color = font_color or '#ffffff'
+            bg = nd.get('bg', '#60A5FA')
+            border = nd.get('border', '#3B82F6')
+            font_color = nd.get('font_color', '#ffffff')
 
-            node = NodeItem(nd['id'], nd['label'], nd['x'], nd['y'], nd['shape'], bg, border, font_color, nd.get('file_path'))
+            node = NodeItem(
+                nd['id'], nd['label'], nd['x'], nd['y'], nd['shape'], bg, border, font_color, 
+                nd.get('file_path'), nd.get('url_link'), nd.get('is_bold', False)
+            )
             node.border_width = nd.get('border_width', 1)
             node.signals.itemDoubleClicked.connect(self.start_inline_editing)
             node.signals.positionChanged.connect(self.save_state)
-            self.scene.addItem(node)
+            ws.scene.addItem(node)
             node_map[nd['id']] = node
             
         for ed in state['edges']:
             if ed['from'] in node_map and ed['to'] in node_map:
                 color = ed.get('color', '#A0AEC0')
-                if isinstance(color, dict):
-                    color = color.get('color', '#A0AEC0')
-                
                 edge = EdgeItem(ed['id'], node_map[ed['from']], node_map[ed['to']], ed.get('label', ''), color)
                 edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
-                self.scene.addItem(edge)
+                ws.scene.addItem(edge)
                 
-        self.is_applying_state = False
+        ws.is_applying_state = False
         self.on_selection_changed()
 
     def undo(self):
-        if len(self.undo_stack) <= 1: return
-        self.redo_stack.append(self.undo_stack.pop())
-        self.apply_state(self.undo_stack[-1])
+        ws = self.current_workspace()
+        if not ws or len(ws.undo_stack) <= 1: return
+        ws.redo_stack.append(ws.undo_stack.pop())
+        self.apply_state(ws.undo_stack[-1])
 
     def redo(self):
-        if not self.redo_stack: return
-        self.undo_stack.append(self.redo_stack.pop())
-        self.apply_state(self.undo_stack[-1])
+        ws = self.current_workspace()
+        if not ws or not ws.redo_stack: return
+        ws.undo_stack.append(ws.redo_stack.pop())
+        self.apply_state(ws.undo_stack[-1])
 
     # --- INTERACTIONS GRAPHIQUES ---
     def on_selection_changed(self):
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: 
+            self.style_bar.hide()
+            return
+            
+        sel = ws.scene.selectedItems()
         if len(sel) == 1:
             self.style_bar.show()
+            self.connect_controls.hide()
             if isinstance(sel[0], NodeItem):
                 self.node_controls.show()
                 self.edge_controls.hide()
-                has_file = bool(sel[0].file_path)
-                self.btn_open.setVisible(has_file)
-                self.btn_detach.setVisible(has_file)
+                has_links = bool(sel[0].file_path or sel[0].url_link)
+                self.btn_open.setVisible(has_links)
+                self.btn_detach.setVisible(has_links)
             elif isinstance(sel[0], EdgeItem):
                 self.node_controls.hide()
                 self.edge_controls.show()
+        elif len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
+            # Activation du panneau contextuel pour lier 2 noeuds séparés
+            self.style_bar.show()
+            self.node_controls.hide()
+            self.edge_controls.hide()
+            self.connect_controls.show()
         else:
             self.style_bar.hide()
 
     def on_bg_double_clicked(self, pos):
-        node_id = f"node_{len(self.scene.items())}"
+        ws = self.current_workspace()
+        if not ws: return
+        node_id = f"node_{len(ws.scene.items())}"
         node = NodeItem(node_id, "Nouvelle idée", pos.x(), pos.y(), bg='#FFF3E0', border='#FFB74D', font_color='#333333')
         node.signals.itemDoubleClicked.connect(self.start_inline_editing)
         node.signals.positionChanged.connect(self.save_state)
-        self.scene.addItem(node)
+        ws.scene.addItem(node)
         self.save_state()
 
     def edit_selected_edge(self):
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], EdgeItem):
             self.start_inline_editing(sel[0])
 
     def start_inline_editing(self, item):
+        ws = self.current_workspace()
+        if not ws: return
         self.edit_item = item
-        self.editor = QTextEdit(self.view)
+        self.editor = QTextEdit(ws.view)
         
         if isinstance(item, NodeItem):
             clean_text = item.label.replace('\n📄 Document joint', '').replace('🚨 ', '')
-            view_pos = self.view.mapFromScene(item.pos())
+            view_pos = ws.view.mapFromScene(item.pos())
             w = int(item.rect.width())
             h = max(int(item.rect.height()), 40)
             self.editor.setGeometry(view_pos.x() - w//2, view_pos.y() - h//2, w, h)
         else:
             clean_text = item.label
             center = item.path().pointAtPercent(0.5)
-            view_pos = self.view.mapFromScene(center)
+            view_pos = ws.view.mapFromScene(center)
             self.editor.setGeometry(view_pos.x() - 75, view_pos.y() - 15, 150, 40)
 
         self.editor.setText(clean_text)
@@ -585,40 +673,42 @@ class MindMapApp(QMainWindow):
 
     def on_tab_pressed(self):
         if hasattr(self, 'editor') and self.editor is not None: return
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             self.add_child_node(sel[0])
 
     def delete_selected(self):
-        """ Suppression avec nettoyage strict des liaisons en mémoire """
         if hasattr(self, 'editor') and self.editor is not None: return
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
         if not sel: return
         
         for item in sel:
             if isinstance(item, NodeItem):
                 for edge in list(item.edges):
-                    # Supprime le lien des listes internes des deux noeuds connectés
                     if edge in edge.source_node.edges:
                         edge.source_node.edges.remove(edge)
                     if edge in edge.dest_node.edges:
                         edge.dest_node.edges.remove(edge)
-                    if edge.scene() == self.scene:
-                        self.scene.removeItem(edge)
-                if item.scene() == self.scene:
-                    self.scene.removeItem(item)
+                    if edge.scene() == ws.scene:
+                        ws.scene.removeItem(edge)
+                if item.scene() == ws.scene:
+                    ws.scene.removeItem(item)
             elif isinstance(item, EdgeItem):
                 if item in item.source_node.edges:
                     item.source_node.edges.remove(item)
                 if item in item.dest_node.edges:
                     item.dest_node.edges.remove(item)
-                if item.scene() == self.scene:
-                    self.scene.removeItem(item)
+                if item.scene() == ws.scene:
+                    ws.scene.removeItem(item)
                     
         self.save_state()
 
     def calculate_smart_position(self, parent_node):
-        """ Algorithme robuste anti-chevauchement calqué sur l'original web """
+        ws = self.current_workspace()
         target_x = parent_node.pos().x() + 220
         child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
         
@@ -632,7 +722,7 @@ class MindMapApp(QMainWindow):
             target_y = parent_node.pos().y()
 
         overlap = True
-        all_nodes = [i for i in self.scene.items() if isinstance(i, NodeItem)]
+        all_nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
         
         while overlap:
             overlap = False
@@ -645,13 +735,12 @@ class MindMapApp(QMainWindow):
         return target_x, target_y
 
     def add_child_node(self, parent_node):
-        new_id = f"node_{len(self.scene.items())}"
-        edge_id = f"edge_{len(self.scene.items())}"
+        ws = self.current_workspace()
+        new_id = f"node_{len(ws.scene.items())}"
+        edge_id = f"edge_{len(ws.scene.items())}"
         
         t_x, t_y = self.calculate_smart_position(parent_node)
-            
         bg, border, text_col, edge_col = parent_node.bg_color.name(), parent_node.border_color.name(), parent_node.font_color.name(), '#A0AEC0'
-        
         child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
         
         if parent_node.node_id == 'root':
@@ -668,17 +757,53 @@ class MindMapApp(QMainWindow):
         edge = EdgeItem(edge_id, parent_node, new_node, "", color=edge_col)
         edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
         
-        self.scene.addItem(new_node)
-        self.scene.addItem(edge)
+        ws.scene.addItem(new_node)
+        ws.scene.addItem(edge)
         self.save_state()
         
-        self.scene.clearSelection()
+        ws.scene.clearSelection()
         new_node.setSelected(True)
         self.start_inline_editing(new_node)
 
-    # --- STYLES & PIECES JOINTES ---
+    # --- NOUVELLE FONCTIONNALITÉ 5 : RELIER DEUX NOEUDS SÉPARÉS ---
+    def connect_selected_nodes(self):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
+            node1, node2 = sel[0], sel[1]
+            
+            # Éviter de recréer un doublon si la connexion existe déjà
+            already_linked = any(
+                (e.source_node == node1 and e.dest_node == node2) or 
+                (e.source_node == node2 and e.dest_node == node1) 
+                for e in node1.edges
+            )
+            if not already_linked:
+                edge_id = f"edge_{len(ws.scene.items())}"
+                edge = EdgeItem(edge_id, node1, node2, "", color='#A0AEC0')
+                edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
+                ws.scene.addItem(edge)
+                self.save_state()
+                ws.scene.clearSelection()
+                edge.setSelected(True)
+
+    # --- STYLE : EN GRAS ---
+    def toggle_bold(self):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            node = sel[0]
+            node.is_bold = not node.is_bold
+            node.recalculate_size()
+            node.update()
+            self.save_state()
+
     def change_color(self, bg, border):
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             self.apply_color_hierarchy(sel[0], bg, border, '#333333', border)
             self.save_state()
@@ -695,7 +820,9 @@ class MindMapApp(QMainWindow):
                 self.apply_color_hierarchy(edge.dest_node, bg, border, text_col, edge_col)
 
     def change_shape(self, shape_type):
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             sel[0].shape_type = shape_type
             sel[0].update()
@@ -703,7 +830,9 @@ class MindMapApp(QMainWindow):
 
     def toggle_urgent(self):
         if hasattr(self, 'editor') and self.editor is not None: return
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             node = sel[0]
             if node.label.startswith("🚨 "):
@@ -717,8 +846,11 @@ class MindMapApp(QMainWindow):
             node.recalculate_size()
             self.save_state()
 
+    # --- PIÈCES JOINTES & LIENS LIENS WEB ---
     def attach_file(self):
-        sel = self.scene.selectedItems()
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             path, _ = QFileDialog.getOpenFileName(self, "Choisir un fichier")
             if path:
@@ -727,78 +859,119 @@ class MindMapApp(QMainWindow):
                 if "📄 Document joint" not in node.label:
                     node.label += "\n📄 Document joint"
                 node.recalculate_size()
-                self.btn_open.setVisible(True)
-                self.btn_detach.setVisible(True)
+                self.on_selection_changed()
                 self.save_state()
 
-    def detach_file(self):
-        sel = self.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem) and sel[0].file_path:
+    def attach_url(self):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            node = sel[0]
+            url, ok = QInputDialog.getText(self, "Associer une URL", "Entrez l'adresse internet :", text=node.url_link or "https://")
+            if ok and url.strip():
+                node.url_link = url.strip()
+                node.recalculate_size()
+                self.on_selection_changed()
+                node.update()
+                self.save_state()
+
+    def detach_links(self):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
             node = sel[0]
             node.file_path = None
+            node.url_link = None
             node.label = node.label.replace("\n📄 Document joint", "")
             node.recalculate_size()
-            self.btn_open.setVisible(False)
-            self.btn_detach.setVisible(False)
+            self.on_selection_changed()
+            node.update()
             self.save_state()
 
     def open_file(self):
-        sel = self.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem) and sel[0].file_path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(sel[0].file_path))
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            node = sel[0]
+            if node.url_link:
+                QDesktopServices.openUrl(QUrl(node.url_link))
+            elif node.file_path:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(node.file_path))
 
-    # --- FICHIERS & EXPORTS ---
-    def update_title(self):
-        title = "Mindy - MindMap App"
-        if self.current_file_path:
-            title += f" - {os.path.basename(self.current_file_path)}"
-        else:
-            title += " - [Nouveau Projet]"
-        self.setWindowTitle(title)
-
+    # --- LOGIQUE PROJETS, FICHIERS & EXPORTS ---
     def new_project(self, force_empty=False):
-        if force_empty or QMessageBox.question(self, "Nouveau", "Créer un nouveau projet ? Les modifications non enregistrées seront perdues.") == QMessageBox.StandardButton.Yes:
-            self.scene.clear()
-            self.undo_stack.clear()
-            self.redo_stack.clear()
-            self.current_file_path = None
-            
+        if force_empty or QMessageBox.question(self, "Nouveau", "Créer un nouveau projet dans un nouvel onglet ?") == QMessageBox.StandardButton.Yes:
+            ws = MindMapWorkspace(self)
             root = NodeItem('root', 'Nouveau noeud', 0, 0, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
             root.signals.itemDoubleClicked.connect(self.start_inline_editing)
             root.signals.positionChanged.connect(self.save_state)
-            self.scene.addItem(root)
+            ws.scene.addItem(root)
+            
+            self.tab_widget.addTab(ws, "[Nouveau Projet]")
+            self.tab_widget.setCurrentWidget(ws)
             self.save_state()
             self.update_title()
-            self.on_selection_changed()
 
     def load_project(self):
         path, _ = QFileDialog.getOpenFileName(self, "Ouvrir", "", "JSON (*.json)")
         if path:
-            with open(path, 'r', encoding='utf-8') as f:
-                state_str = f.read()
-            self.apply_state(state_str)
-            self.undo_stack.clear()
-            self.redo_stack.clear()
-            self.save_state()
-            self.current_file_path = path
-            self.update_title()
+            self.load_project_from_path(path)
+
+    def center_on_graph(self):
+        ws = self.current_workspace()
+        if not ws: return
+        
+        # Récupère la zone englobant uniquement les éléments dessinés
+        rect = ws.scene.itemsBoundingRect()
+        
+        # Si la scène n'est pas vide, on centre la vue sur le milieu de cette zone
+        if not rect.isEmpty():
+            ws.view.centerOn(rect.center())
+
+    def load_project_from_path(self, path):
+        with open(path, 'r', encoding='utf-8') as f:
+            state_str = f.read()
+            
+        ws = MindMapWorkspace(self, path)
+        self.tab_widget.addTab(ws, os.path.basename(path))
+        self.tab_widget.setCurrentWidget(ws)
+        
+        self.apply_state(state_str)
+        self.save_state()
+        
+        self.settings.setValue("last_project_path", path)
+        self.update_title()
+        
+        # 🌟 AJOUT : Centrer la vue dès que le projet est chargé
+        self.center_on_graph()
 
     def save_project(self, force_save_as=False):
-        if not self.current_file_path or force_save_as:
+        ws = self.current_workspace()
+        if not ws: return
+        
+        if not ws.current_file_path or force_save_as:
             path, _ = QFileDialog.getSaveFileName(self, "Enregistrer", "ma_mindmap.json", "JSON (*.json)")
             if not path: return
-            self.current_file_path = path
+            ws.current_file_path = path
             
-        with open(self.current_file_path, 'w', encoding='utf-8') as f:
+        with open(ws.current_file_path, 'w', encoding='utf-8') as f:
             json.dump(self.get_state(), f, indent=2)
+            
+        self.settings.setValue("last_project_path", ws.current_file_path)
         self.update_title()
 
     def apply_template(self, index):
         if index == 0: return
+        ws = self.current_workspace()
+        if not ws: return
+        
         filename = self.template_combo.itemData(index)
         self.template_combo.setCurrentIndex(0)
         
-        if QMessageBox.question(self, "Template", "Charger ce template remplacera la mind map actuelle. Continuer ?") == QMessageBox.StandardButton.Yes:
+        if QMessageBox.question(self, "Template", "Charger ce template remplacera la mind map de l'onglet actuel. Continuer ?") == QMessageBox.StandardButton.Yes:
             if getattr(sys, 'frozen', False):
                 base_dir = sys._MEIPASS
             else:
@@ -810,45 +983,47 @@ class MindMapApp(QMainWindow):
                 with open(template_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     
-                if "content" in data:
-                    state_str = data["content"]
-                else:
-                    state_str = json.dumps(data)
-                    
+                state_str = data["content"] if "content" in data else json.dumps(data)
                 self.apply_state(state_str)
-                self.undo_stack.clear()
-                self.redo_stack.clear()
-                self.current_file_path = None
+                ws.undo_stack.clear()
+                ws.redo_stack.clear()
                 self.save_state()
-                self.update_title()
             else:
                 QMessageBox.warning(self, "Erreur", f"Le fichier template est introuvable :\n{template_path}")
 
     def export_png(self):
+        ws = self.current_workspace()
+        if not ws: return
         path, _ = QFileDialog.getSaveFileName(self, "Exporter PNG", "ma_mindmap.png", "PNG (*.png)")
         if path:
-            self.scene.clearSelection()
-            rect = self.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
+            ws.scene.clearSelection()
+            rect = ws.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
             pixmap = QPixmap(int(rect.width()), int(rect.height()))
             pixmap.fill(QColor('#f8f9fa'))
             painter = QPainter(pixmap)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            self.scene.render(painter, target=QRectF(pixmap.rect()), source=rect)
+            ws.scene.render(painter, target=QRectF(pixmap.rect()), source=rect)
             painter.end()
             pixmap.save(path)
 
     def export_md(self):
+        ws = self.current_workspace()
+        if not ws: return
         path, _ = QFileDialog.getSaveFileName(self, "Exporter Markdown", "ma_mindmap.md", "Markdown (*.md)")
         if path:
-            nodes = [i for i in self.scene.items() if isinstance(i, NodeItem)]
+            nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
             root = next((n for n in nodes if n.node_id == 'root'), nodes[0] if nodes else None)
             if not root: return
             
             output = []
             def build_tree(node, depth):
                 clean_label = node.label.replace('\n📄 Document joint', '').replace('\n', ' ')
-                link = f" (Lien: {node.file_path})" if node.file_path else ""
-                output.append(f"{'  ' * depth}- {clean_label}{link}")
+                additions = []
+                if node.file_path: additions.append(f"Fichier: {node.file_path}")
+                if node.url_link: additions.append(f"URL: {node.url_link}")
+                link_str = f" ({', '.join(additions)})" if additions else ""
+                
+                output.append(f"{'  ' * depth}- {clean_label}{link_str}")
                 children = [e.dest_node for e in node.edges if e.source_node == node]
                 for child in children:
                     build_tree(child, depth + 1)
@@ -856,6 +1031,7 @@ class MindMapApp(QMainWindow):
             build_tree(root, 0)
             with open(path, 'w', encoding='utf-8') as f:
                 f.write("\n".join(output))
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

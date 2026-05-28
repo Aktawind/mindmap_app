@@ -3,6 +3,5 @@
 - Agrandir les ovales et prévoir des losanges
 - Liens courbes ou rectilignes
 - Un bouton où tout s'aligne sans se superposer
-- pouvoir mettre en gras
-- zomm et déplacement du graph
-- mettre un lien url
+- plusieurs autres format que urgent : fait, en cours
+- refonte du json
