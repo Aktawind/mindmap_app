@@ -1,0 +1,50 @@
+{
+  "id": "root",
+  "label": "🧠 Brain Dump : Vider son sac",
+  "x": 0.0,
+  "y": 100.0,
+  "shape": "box",
+  "bg": "#4a90e2",
+  "border": "#357abd",
+  "font_color": "#ffffff",
+  "children": [
+    {
+      "label": "🚨 À faire absolument (Aujourd'hui / Cette semaine)",
+      "x": -350.0,
+      "y": -50.0,
+      "bg": "#ffebee",
+      "border": "#e53e3e",
+      "font_color": "#333333",
+      "border_width": 3,
+      "children": [
+        { "label": "[Action 1]" },
+        { "label": "[Action 2]" }
+      ]
+    },
+    {
+      "label": "💭 À penser / Idées en vrac (À creuser plus tard)",
+      "x": 0.0,
+      "y": -200.0,
+      "bg": "#f3e5f5",
+      "border": "#ce93d8",
+      "font_color": "#333333",
+      "children": [
+        { "label": "[Idée d'amélioration de l'IHM]" },
+        { "label": "[Note] Creuser la nouvelle lib Python" }
+      ]
+    },
+    {
+      "label": "🛑 À potentiellement abandonner / Ne pas faire",
+      "x": 350.0,
+      "y": -50.0,
+      "bg": "#edf2f7",
+      "border": "#a0aec0",
+      "font_color": "#4a5568",
+      "children": [
+        { "label": "[Projet secondaire trop chronophage]" },
+        { "label": "[Ancienne tâche qui n'est plus d'actualité]" }
+      ]
+    }
+  ],
+  "cross_links": []
+}

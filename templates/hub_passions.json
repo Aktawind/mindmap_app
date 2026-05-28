@@ -1,0 +1,55 @@
+{
+  "id": "root",
+  "label": "🎨 Mon Écosystème de Passions",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#2d3748",
+  "border": "#1a202c",
+  "font_color": "#ffffff",
+  "is_bold": true,
+  "children": [
+    {
+      "label": "🎸 Passion A (ex: Musique / Info / ...)",
+      "x": -250.0,
+      "y": -120.0,
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "children": [
+        { "id": "focus_a", "label": "🔥 LE PROJET ACTIF (Un seul à la fois)" },
+        { "label": "💡 Idées pour plus tard (Bac à sable)" },
+        { "label": "📚 Ressources & Liens utiles" }
+      ]
+    },
+    {
+      "label": "📸 Passion B (ex: Photo / Impression 3D / ...)",
+      "x": 250.0,
+      "y": -120.0,
+      "bg": "#e8f5e9",
+      "border": "#81c784",
+      "font_color": "#333333",
+      "children": [
+        { "id": "focus_b", "label": "🔥 LE PROJET ACTIF" },
+        { "label": "💡 Idées pour plus tard" }
+      ]
+    },
+    {
+      "id": "temps_dispo",
+      "label": "⏳ Logistique & Temps disponible",
+      "x": 0.0,
+      "y": 150.0,
+      "bg": "#e0f7fa",
+      "border": "#4dd0e1",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Combien d'heures par semaine je peux y dédier ?" },
+        { "label": "Le rituel : bloquer un créneau fixe dans l'agenda" }
+      ]
+    }
+  ],
+  "cross_links": [
+    { "from": "temps_dispo", "to": "focus_a", "label": "Partage le temps", "color": "#a0aec0" },
+    { "from": "temps_dispo", "to": "focus_b", "label": "Partage le temps", "color": "#a0aec0" }
+  ]
+}

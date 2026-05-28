@@ -1,0 +1,59 @@
+{
+  "id": "root",
+  "label": "🔋 Check-up Énergie & Charge Mentale",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#319795",
+  "border": "#234e52",
+  "font_color": "#ffffff",
+  "is_bold": true,
+  "children": [
+    {
+      "id": "fuites",
+      "label": "📉 1. Qu'est-ce qui me vide en ce moment ? (Fuites)",
+      "x": -300.0,
+      "y": -120.0,
+      "bg": "#ffebee",
+      "border": "#ef9a9a",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Surchauffe cognitive (Trop de projets / passions en parallèle)" },
+        { "label": "Frictions relationnelles ou contrariétés pro/perso" },
+        { "label": "Manque de sommeil / Mauvaise hygiène de vie" }
+      ]
+    },
+    {
+      "id": "recharges",
+      "label": "📈 2. Qu'est-ce qui me redonne de l'énergie ? (Ressources)",
+      "x": 300.0,
+      "y": -120.0,
+      "bg": "#e8f5e9",
+      "border": "#81c784",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Une passion spécifique " },
+        { "label": "Déconnexion totale (Marcher, sport, musique, rien faire)" },
+        { "label": "Temps calme de qualité sans écrans ni notifications" }
+      ]
+    },
+    {
+      "id": "limites",
+      "label": "🛑 3. Les limites à poser IMMEDIATEMENT",
+      "x": 0.0,
+      "y": 150.0,
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "border_width": 2,
+      "children": [
+        { "label": "Dire 'Non' ou reporter une tâche non urgente" },
+        { "label": "Mettre des barrières strictes aux notifications" },
+        { "label": "Bloquer un créneau de 1h de récupération dans l'agenda" }
+      ]
+    }
+  ],
+  "cross_links": [
+    { "from": "fuites", "to": "limites", "label": "Nécessite une action", "color": "#ffb74d" }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "id": "root",
+  "label": "🗣️ Réunion : [Sujet / Nom de l'interlocuteur]",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#4a90e2",
+  "border": "#357abd",
+  "font_color": "#ffffff",
+  "is_bold": true,
+  "children": [
+    {
+      "label": "🎯 Mon Objectif",
+      "x": -250.0,
+      "y": -100.0,
+      "bg": "#e6fffa",
+      "border": "#4fd1c5",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Le résultat idéal en sortant de la pièce" }
+      ]
+    },
+    {
+      "label": "💬 Points clés à aborder",
+      "x": 250.0,
+      "y": -100.0,
+      "bg": "#ebf8ff",
+      "border": "#63b3ed",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Argument 1 (Faits / Chiffres)" },
+        { "label": "Argument 2 (Solutions proposées)" }
+      ]
+    },
+    {
+      "id": "objections",
+      "label": "⚠️ Objections possibles (Anticipation)",
+      "x": -250.0,
+      "y": 120.0,
+      "bg": "#ffebee",
+      "border": "#ef9a9a",
+      "font_color": "#333333",
+      "children": [
+        { "id": "reponse_obj", "label": "Si on me dit [X] -> Ma réponse : [Y]" }
+      ]
+    },
+    {
+      "label": "📝 Notes & Décisions (À remplir pendant)",
+      "x": 250.0,
+      "y": 120.0,
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Actions décidées" },
+        { "label": "Prochaine échéance / Date du prochain point" }
+      ]
+    }
+  ],
+  "cross_links": [
+    { "from": "objections", "to": "reponse_obj", "label": "Stratégie", "color": "#e53e3e" }
+  ]
+}

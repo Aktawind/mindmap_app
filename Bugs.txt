@@ -1,7 +1,3 @@
-- Prévoir d'autres templates
-- Pouvoir mettre des flèches dans un sens ou les 2 pour les branches
-- Agrandir les ovales et prévoir des losanges
 - Liens courbes ou rectilignes
 - Un bouton où tout s'aligne sans se superposer
 - plusieurs autres format que urgent : fait, en cours
-- refonte du json

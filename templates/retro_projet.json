@@ -1,0 +1,55 @@
+{
+  "id": "root",
+  "label": "🏁 Rétrospective : Projet [Nom]",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#2d3748",
+  "border": "#4a5568",
+  "font_color": "#ffffff",
+  "is_bold": true,
+  "children": [
+    {
+      "label": "🟢 Ce qui a super bien marché",
+      "x": -250.0,
+      "y": -120.0,
+      "bg": "#e8f5e9",
+      "border": "#81c784",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Les points forts techniques ou organisationnels" },
+        { "label": "Ce dont on est fiers" }
+      ]
+    },
+    {
+      "id": "problemes",
+      "label": "🔴 Ce qui a posé problème / Les frictions",
+      "x": 250.0,
+      "y": -120.0,
+      "bg": "#ffebee",
+      "border": "#ef9a9a",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Les imprévus / Les pertes de temps" },
+        { "label": "Les manques (outils, communication, docs)" }
+      ]
+    },
+    {
+      "id": "lecons",
+      "label": "💡 Leçons apprises pour le PROCHAIN projet",
+      "x": 0.0,
+      "y": 150.0,
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "border_width": 2,
+      "children": [
+        { "label": "Règle n°1 à appliquer dès le départ" },
+        { "label": "Amélioration technique à automatiser" }
+      ]
+    }
+  ],
+  "cross_links": [
+    { "from": "problemes", "to": "lecons", "label": "Action corrective", "color": "#ffb74d" }
+  ]
+}

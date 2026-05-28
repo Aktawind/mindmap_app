@@ -1,0 +1,50 @@
+{
+  "id": "root",
+  "label": "✈️ Projet : [Nom du Voyage ou de l'Événement]",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#319795",
+  "border": "#234e52",
+  "font_color": "#ffffff",
+  "is_bold": true,
+  "children": [
+    {
+      "label": "📅 Logistique & Transports",
+      "x": -250.0,
+      "y": -100.0,
+      "bg": "#ebf8ff",
+      "border": "#63b3ed",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Billets / Réservations", "file_path": null },
+        { "label": "Hébergements (Où dormir ?)" }
+      ]
+    },
+    {
+      "label": "🗺️ Programme / À voir / À faire",
+      "x": 250.0,
+      "y": -100.0,
+      "bg": "#e8f5e9",
+      "border": "#81c784",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Les incontournables (Priorité 1)" },
+        { "label": "Options si on a le temps (Priorité 2)" }
+      ]
+    },
+    {
+      "label": "💰 Budget & Dépenses",
+      "x": 0.0,
+      "y": 150.0,
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Estimation du coût global" },
+        { "label": "Suivi des acomptes déjà payés" }
+      ]
+    }
+  ],
+  "cross_links": []
+}

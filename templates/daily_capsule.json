@@ -1,0 +1,50 @@
+{
+  "id": "root",
+  "label": "☀️ Ma Journée du [Date]",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#4a90e2",
+  "border": "#357abd",
+  "font_color": "#ffffff",
+  "is_bold": true,
+  "children": [
+    {
+      "label": "💼 Côté Pro (Le focus)",
+      "x": -250.0,
+      "y": -100.0,
+      "bg": "#ebf8ff",
+      "border": "#63b3ed",
+      "font_color": "#333333",
+      "children": [
+        { "label": "🚨 LA tâche principale (Si je ne fais que ça, ma journée est réussie)" },
+        { "label": "📞 Points / Réunions du jour" }
+      ]
+    },
+    {
+      "label": "🏡 Côté Perso & Logistique",
+      "x": 250.0,
+      "y": -100.0,
+      "bg": "#e8f5e9",
+      "border": "#81c784",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Impératifs (Courses, rdv, administratif)" },
+        { "label": "⚡ Ce soir : 30 min dédiées à ma passion du moment" }
+      ]
+    },
+    {
+      "label": "🧠 État d'esprit / Énergie",
+      "x": 0.0,
+      "y": 120.0,
+      "bg": "#f3e5f5",
+      "border": "#ce93d8",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Niveau d'énergie (Top / Moyen / Fatigué)" },
+        { "label": "Note : Ne pas oublier de faire des pauses !" }
+      ]
+    }
+  ],
+  "cross_links": []
+}

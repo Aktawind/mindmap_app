@@ -1,15 +1,71 @@
 {
-  "nodes": [
-    { "id": "t_root", "label": "💡 Mon Idée Géniale", "x": 0, "y": 0, "shape": "box", "color": { "background": "#4A90E2", "border": "#357ABD" }, "font": { "color": "#ffffff", "size": 16 }, "margin": 12 },
-    { "id": "t_1", "label": "🎯 Quel est le but précis ?", "x": 220, "y": -100, "shape": "box", "color": { "background": "#FFF3E0", "border": "#FFB74D" }, "margin": 10 },
-    { "id": "t_2", "label": "👥 Pour qui ? (Public cible)", "x": 220, "y": 0, "shape": "box", "color": { "background": "#FFF3E0", "border": "#FFB74D" }, "margin": 10 },
-    { "id": "t_3", "label": "🛠️ De quoi ai-je besoin ? (Ressources)", "x": 220, "y": 100, "shape": "box", "color": { "background": "#FFF3E0", "border": "#FFB74D" }, "margin": 10 },
-    { "id": "t_4", "label": "🚀 Première action concrète", "x": 0, "y": 180, "shape": "box", "color": { "background": "#E8F5E9", "border": "#81C784" }, "margin": 12 }
+  "id": "root",
+  "label": "💡 Nouvelle Idée : [Nom du Projet]",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#4a90e2",
+  "border": "#357abd",
+  "font_color": "#ffffff",
+  "border_width": 2,
+  "is_bold": true,
+  "children": [
+    {
+      "id": "vision",
+      "label": "🎯 1. Vision & Objectifs (Pourquoi ?)",
+      "x": -250.0,
+      "y": -150.0,
+      "bg": "#e0f7fa",
+      "border": "#4dd0e1",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Quel problème précis cela résout-il ?" },
+        { "label": "Quelle est la proposition de valeur unique ?" },
+        { "label": "Critères de succès (À quoi voit-on que c'est réussi ?)" }
+      ]
+    },
+    {
+      "id": "cible",
+      "label": "👥 2. Public Cible (Pour qui ?)",
+      "x": 250.0,
+      "y": -150.0,
+      "bg": "#e0f7fa",
+      "border": "#4dd0e1",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Qui sont les utilisateurs / bénéficiaires finaux ?" },
+        { "label": "Quelles sont leurs attentes principales ?" }
+      ]
+    },
+    {
+      "id": "contraintes",
+      "label": "⚠️ 3. Obstacles & Risques",
+      "x": -250.0,
+      "y": 150.0,
+      "bg": "#ffebee",
+      "border": "#ef9a9a",
+      "font_color": "#333333",
+      "children": [
+        { "id": "risque_technique", "label": "Bloquants techniques potentiels" },
+        { "label": "Contraintes de temps ou de budget" }
+      ]
+    },
+    {
+      "id": "action",
+      "label": "🚀 4. Plan d'Action & MVP",
+      "x": 250.0,
+      "y": 150.0,
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "children": [
+        { "id": "mvp", "label": "Étape 1 : Le plus petit produit viable (MVP)" },
+        { "label": "Étape 2 : Recueil des retours utilisateurs" },
+        { "label": "Étape 3 : Itération et passage à l'échelle" }
+      ]
+    }
   ],
-  "edges": [
-    { "id": "e_t1", "from": "t_root", "to": "t_1" },
-    { "id": "e_t2", "from": "t_root", "to": "t_2" },
-    { "id": "e_t3", "from": "t_root", "to": "t_3" },
-    { "id": "e_t4", "from": "t_root", "to": "t_4" }
+  "cross_links": [
+    { "from": "risque_technique", "to": "mvp", "label": "À tester en priorité dans le MVP", "color": "#e53e3e" }
   ]
 }

@@ -1,0 +1,69 @@
+{
+  "id": "root",
+  "label": "🚀 Guide de démarrage : [Nom du Projet / Banc]",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#319795",
+  "border": "#234e52",
+  "font_color": "#ffffff",
+  "border_width": 2,
+  "is_bold": true,
+  "children": [
+    {
+      "id": "docs",
+      "label": "📄 1. Documentation essentielle",
+      "x": -300.0,
+      "y": -120.0,
+      "bg": "#e6fffa",
+      "border": "#4fd1c5",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Manuel Utilisateur", "file_path": "C:/Chemin/Vers/Manuel.pdf" },
+        { "label": "Spécifications Techniques / Architecture" }
+      ]
+    },
+    {
+      "id": "env",
+      "label": "💻 2. Configuration de l'environnement",
+      "x": 0.0,
+      "y": -180.0,
+      "bg": "#ebf8ff",
+      "border": "#63b3ed",
+      "font_color": "#333333",
+      "children": [
+        { "id": "scripts", "label": "Installer les dépendances (Python/C++)" },
+        { "label": "Vérifier les licences (ex: LabView, IDE)" }
+      ]
+    },
+    {
+      "id": "run",
+      "label": "🏃 3. Premiers pas & Validation",
+      "x": 300.0,
+      "y": -120.0,
+      "bg": "#feebc8",
+      "border": "#fbd38d",
+      "font_color": "#333333",
+      "children": [
+        { "label": "Lancer le script de test d'affichage" },
+        { "label": "Exécuter une séquence de test à vide" }
+      ]
+    },
+    {
+      "id": "team",
+      "label": "👥 4. Qui contacter en cas de blocage ?",
+      "x": 0.0,
+      "y": 150.0,
+      "bg": "#f3e5f5",
+      "border": "#ce93d8",
+      "font_color": "#333333",
+      "children": [
+        { "id": "referent_technique", "label": "Référent Code / Backend : [Nom]" },
+        { "label": "Chef de projet : [Nom]" }
+      ]
+    }
+  ],
+  "cross_links": [
+    { "from": "scripts", "to": "referent_technique", "label": "Si erreur d'installation", "color": "#ce93d8" }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "id": "root",
+  "label": "⏳ Gestion du Temps & Priorités",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#2d3748",
+  "border": "#1a202c",
+  "font_color": "#ffffff",
+  "border_width": 1,
+  "children": [
+    {
+      "label": "🔥 Q1 : Urgent & Important (À FAIRE)",
+      "x": -250.0,
+      "y": -150.0,
+      "bg": "#ffebee",
+      "border": "#e53e3e",
+      "font_color": "#333333",
+      "border_width": 2,
+      "children": [
+        { "label": "[Tâche critique 1] - Échéance proche" },
+        { "label": "[Tâche critique 2] - Crise à régler" }
+      ]
+    },
+    {
+      "label": "🌱 Q2 : Important mais Non Urgent (À PLANIFIER)",
+      "x": 250.0,
+      "y": -150.0,
+      "bg": "#e8f5e9",
+      "border": "#38a169",
+      "font_color": "#333333",
+      "border_width": 2,
+      "children": [
+        { "label": "[Fond] R&D, Refactoring, Améliorations" },
+        { "label": "[Formation] Monter en compétences" },
+        { "label": "[Veille] Veille technique" }
+      ]
+    },
+    {
+      "label": "🗣️ Q3 : Urgent mais Non Important (À DÉLÉGUER / LIMITER)",
+      "x": -250.0,
+      "y": 150.0,
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "children": [
+        { "label": "[Interruption] Répondre à certaines demandes d'assistance" },
+        { "label": "[Réunions] Réunions sans ordre du jour clair" }
+      ]
+    },
+    {
+      "label": "🗑️ Q4 : Ni Urgent ni Important (À ÉLIMINER)",
+      "x": 250.0,
+      "y": 150.0,
+      "bg": "#f7fafc",
+      "border": "#cbd5e0",
+      "font_color": "#718096",
+      "children": [
+        { "label": "[Distraction] Tri de mails secondaires" },
+        { "label": "[Micro-optimisation] Perte de temps sur un détail" }
+      ]
+    }
+  ],
+  "cross_links": []
+}
