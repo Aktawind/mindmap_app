@@ -15,11 +15,11 @@ from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTime
 
 # --- PALETTES DE COULEURS ---
 BRANCH_PALETTES = [
+    {'bg': '#E0F7FA', 'border': '#4DD0E1', 'text': '#333333', 'edge': '#4DD0E1'},
     {'bg': '#FFF3E0', 'border': '#FFB74D', 'text': '#333333', 'edge': '#FFB74D'},
     {'bg': '#E8F5E9', 'border': '#81C784', 'text': '#333333', 'edge': '#81C784'},
     {'bg': '#F3E5F5', 'border': '#CE93D8', 'text': '#333333', 'edge': '#CE93D8'},
-    {'bg': '#FFEBEE', 'border': '#EF9A9A', 'text': '#333333', 'edge': '#EF9A9A'},
-    {'bg': '#E0F7FA', 'border': '#4DD0E1', 'text': '#333333', 'edge': '#4DD0E1'}
+    {'bg': '#FFEBEE', 'border': '#EF9A9A', 'text': '#333333', 'edge': '#EF9A9A'}
 ]
 
 class GraphicsSignals(QObject):
@@ -260,7 +260,7 @@ class MindMapWorkspace(QWidget):
         self.undo_stack = []
         self.redo_stack = []
         self.is_applying_state = False
-        self.is_dirty = False  # Devient True si des modifs non sauvegardées existent
+        self.is_dirty = False
 
         self.scene = MindMapScene(self)
         self.scene.setSceneRect(-5000, -5000, 10000, 10000)
@@ -361,7 +361,7 @@ class MindMapApp(QMainWindow):
         
         nc_layout.addWidget(self.create_separator())
         
-        for color, border in [('#60A5FA', '#3B82F6'), ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'), ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')]:
+        for color, border in [('#60A5FA', '#3B82F6'), ('#E0F7FA', '#4DD0E1'), ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'), ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')]:
             btn = QPushButton()
             btn.setFixedSize(22, 22)
             btn.setStyleSheet(f"background: {color}; border: 2px solid {border}; border-radius: 11px;")
@@ -463,12 +463,9 @@ class MindMapApp(QMainWindow):
             ws.view.centerOn(rect.center())
 
     def close_tab(self, index) -> bool:
-        """ Gère la fermeture d'un onglet et demande de sauvegarder si modifié """
         ws = self.tab_widget.widget(index)
         if ws and ws.is_dirty:
-            # On focus l'onglet concerné pour que l'utilisateur voit ce qu'il ferme
             self.tab_widget.setCurrentWidget(ws)
-            
             name = os.path.basename(ws.current_file_path) if ws.current_file_path else "[Nouveau Projet]"
             reply = QMessageBox.question(
                 self, 
@@ -480,12 +477,11 @@ class MindMapApp(QMainWindow):
             
             if reply == QMessageBox.StandardButton.Yes:
                 self.save_project()
-                if ws.is_dirty: # Si l'utilisateur a annulé le "Enregistrer sous"
+                if ws.is_dirty:
                     return False
             elif reply == QMessageBox.StandardButton.Cancel:
                 return False
 
-        # Procéder à la fermeture
         if self.tab_widget.count() > 1:
             self.tab_widget.removeTab(index)
         else:
@@ -494,15 +490,11 @@ class MindMapApp(QMainWindow):
         return True
 
     def closeEvent(self, event: QCloseEvent):
-        """ Intercepte la fermeture globale de l'application pour valider chaque onglet """
         while self.tab_widget.count() > 0:
-            # On tente de fermer le premier onglet à chaque fois
             if not self.close_tab(0):
-                event.ignore() # L'utilisateur a annulé
+                event.ignore()
                 return
-            # Si on vient de créer un projet vide suite à la fermeture du dernier onglet, on s'arrête
             if self.tab_widget.count() == 1 and not self.tab_widget.widget(0).is_dirty and self.tab_widget.widget(0).current_file_path is None:
-                # Vérification pour éviter une boucle infinie avec le comportement par défaut de close_tab
                 break
         event.accept()
 
@@ -514,13 +506,11 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws: return
         
-        # Déterminer le libellé de base de l'onglet
         if ws.current_file_path:
             base_title = os.path.basename(ws.current_file_path)
         else:
             base_title = "[Nouveau Projet]"
             
-        # Ajouter l'astérisque si le projet a des modifications non enregistrées
         suffix = " *" if ws.is_dirty else ""
         display_title = base_title + suffix
         
@@ -534,12 +524,10 @@ class MindMapApp(QMainWindow):
         ws.redo_stack.clear()
         if len(ws.undo_stack) > 41: ws.undo_stack.pop(0)
         
-        # Marquer l'onglet comme modifié si ce n'est pas le premier état à l'initialisation
         if len(ws.undo_stack) > 1:
             ws.is_dirty = True
             self.update_title()
 
-    # --- SYSTÈME DE SÉRIALISATION EN ARBRE CORRIGÉ ---
     def get_state(self):
         ws = self.current_workspace()
         if not ws: return {}
@@ -696,7 +684,6 @@ class MindMapApp(QMainWindow):
         ws.is_dirty = True
         self.update_title()
 
-    # --- INTERACTIONS GRAPHIQUES ---
     def on_selection_changed(self):
         ws = self.current_workspace()
         if not ws: 
@@ -752,7 +739,8 @@ class MindMapApp(QMainWindow):
         self.editor = QTextEdit(ws.view)
         
         if isinstance(item, NodeItem):
-            clean_text = item.label.replace('\n📄 Document joint', '').replace('🚨 ', '')
+            # Suppression des tags d'affichage pour l'édition brute du texte
+            clean_text = item.label.replace('\n📄 Document joint', '').replace('\n🔗 Lien URL', '').replace('🚨 ', '')
             view_pos = ws.view.mapFromScene(item.pos())
             w = int(item.rect.width())
             h = max(int(item.rect.height()), 40)
@@ -785,33 +773,6 @@ class MindMapApp(QMainWindow):
                 self.commit_edit()
                 return True
         return super().eventFilter(obj, event)
-    
-    def reposition_children_rec(self, parent_node):
-        ws = self.current_workspace()
-        if not ws: return
-
-        child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
-        if not child_edges:
-            return
-
-        parent_right_edge = parent_node.pos().x() + (parent_node.rect.width() / 2)
-        target_x = parent_right_edge + 120
-
-        first_child_y = parent_node.pos().y()
-        
-        for i, edge in enumerate(child_edges):
-            child = edge.dest_node
-            child.setPos(target_x, child.pos().y() if i > 0 else first_child_y)
-            
-            if i > 0:
-                prev_child = child_edges[i-1].dest_node
-                prev_bottom = prev_child.pos().y() + (prev_child.rect.height() / 2)
-                current_top_target = prev_bottom + 40 + (child.rect.height() / 2)
-                if child.pos().y() < current_top_target:
-                    child.setPos(child.pos().x(), current_top_target)
-            
-            edge.update_position()
-            self.reposition_children_rec(child)
 
     def commit_edit(self):
         if not hasattr(self, 'editor') or self.editor is None: return
@@ -820,10 +781,12 @@ class MindMapApp(QMainWindow):
         if isinstance(self.edit_item, NodeItem):
             if new_text:
                 if self.edit_item.label.startswith("🚨 "): new_text = "🚨 " + new_text
+                if self.edit_item.url_link: new_text += "\n🔗 Lien URL" # Ajout visuel clair de l'URL
                 if self.edit_item.file_path: new_text += "\n📄 Document joint"
+                
                 self.edit_item.label = new_text
                 self.edit_item.recalculate_size()
-                self.reposition_children_rec(self.edit_item)
+                # BUG RESOLU : Suppression de la ligne automatique de repositionnement des enfants
         else:
             self.edit_item.label = new_text
             self.edit_item.update()
@@ -1020,6 +983,8 @@ class MindMapApp(QMainWindow):
             url, ok = QInputDialog.getText(self, "Associer une URL", "Entrez l'adresse internet :", text=node.url_link or "https://")
             if ok and url.strip():
                 node.url_link = url.strip()
+                if "🔗 Lien URL" not in node.label:
+                    node.label += "\n🔗 Lien URL" # Indication textuelle claire
                 node.recalculate_size()
                 self.on_selection_changed()
                 node.update()
@@ -1033,7 +998,7 @@ class MindMapApp(QMainWindow):
             node = sel[0]
             node.file_path = None
             node.url_link = None
-            node.label = node.label.replace("\n📄 Document joint", "")
+            node.label = node.label.replace("\n📄 Document joint", "").replace("\n🔗 Lien URL", "")
             node.recalculate_size()
             self.on_selection_changed()
             node.update()
@@ -1050,7 +1015,6 @@ class MindMapApp(QMainWindow):
             elif node.file_path:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(node.file_path))
 
-    # --- LOGIQUE PROJETS & FICHIERS ---
     def new_project(self, force_empty=False):
         if force_empty or QMessageBox.question(self, "Nouveau", "Créer un nouveau projet dans un nouvel onglet ?") == QMessageBox.StandardButton.Yes:
             ws = MindMapWorkspace(self)
@@ -1063,7 +1027,6 @@ class MindMapApp(QMainWindow):
             self.tab_widget.setCurrentWidget(ws)
             self.save_state()
             
-            # Forcer is_dirty à False pour un projet vide tout juste créé
             ws.is_dirty = False 
             self.update_title()
 
@@ -1081,10 +1044,8 @@ class MindMapApp(QMainWindow):
         self.tab_widget.setCurrentWidget(ws)
         
         self.apply_state(state_str)
-        
-        # Initialisation de la pile d'annulation avec l'état brut chargé
         ws.undo_stack.append(state_str)
-        ws.is_dirty = False  # Fraîchement chargé, donc propre
+        ws.is_dirty = False
         
         self.settings.setValue("last_project_path", path)
         self.update_title()
@@ -1102,7 +1063,7 @@ class MindMapApp(QMainWindow):
         with open(ws.current_file_path, 'w', encoding='utf-8') as f:
             json.dump(self.get_state(), f, indent=2, ensure_ascii=False)
             
-        ws.is_dirty = False  # Changements enregistrés !
+        ws.is_dirty = False
         self.settings.setValue("last_project_path", ws.current_file_path)
         self.update_title()
 
@@ -1131,28 +1092,37 @@ class MindMapApp(QMainWindow):
                 ws.undo_stack.clear()
                 ws.redo_stack.clear()
                 
-                # Sauvegarde l'état initial du template
                 ws.undo_stack.append(state_str)
-                ws.is_dirty = True  # Considéré modifié par rapport à un fichier vierge
+                ws.is_dirty = True
                 self.update_title()
                 self.center_on_graph()
             else:
-                QMessageBox.warning(self, "Erreur", f"Le fichier template est introuvable :\n{template_path}")
+                QMessageBox.warning(self, "Erreur", f"Le fichier template is introuvable :\n{template_path}")
 
     def export_png(self):
+        """ BUG RESOLU : Export haute définition (HD) anti-flou """
         ws = self.current_workspace()
         if not ws: return
         path, _ = QFileDialog.getSaveFileName(self, "Exporter PNG", "ma_mindmap.png", "PNG (*.png)")
         if path:
             ws.scene.clearSelection()
             rect = ws.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
-            pixmap = QPixmap(int(rect.width()), int(rect.height()))
+            
+            # Utilisation du ratio de pixels matériel de l'écran pour le calcul HD
+            ratio = self.devicePixelRatio()
+            
+            # Définition de la taille physique de l'image multipliée par le ratio
+            pixmap = QPixmap(int(rect.width() * ratio), int(rect.height() * ratio))
+            pixmap.setDevicePixelRatio(ratio) # Dit à Qt de gérer le facteur de zoom
             pixmap.fill(QColor('#f8f9fa'))
+            
             painter = QPainter(pixmap)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            ws.scene.render(painter, target=QRectF(pixmap.rect()), source=rect)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            
+            ws.scene.render(painter, target=QRectF(0, 0, rect.width(), rect.height()), source=rect)
             painter.end()
-            pixmap.save(path)
+            pixmap.save(path, "PNG", 100) # Sauvegarde qualité max 100%
 
     def export_md(self):
         ws = self.current_workspace()
@@ -1165,7 +1135,7 @@ class MindMapApp(QMainWindow):
             
             output = []
             def build_tree(node, depth):
-                clean_label = node.label.replace('\n📄 Document joint', '').replace('\n', ' ')
+                clean_label = node.label.replace('\n📄 Document joint', '').replace('\n🔗 Lien URL', '').replace('\n', ' ')
                 additions = []
                 if node.file_path: additions.append(f"Fichier: {node.file_path}")
                 if node.url_link: additions.append(f"URL: {node.url_link}")

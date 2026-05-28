@@ -1,3 +1,0 @@
-- Liens courbes ou rectilignes
-- Un bouton où tout s'aligne sans se superposer
-- plusieurs autres format que urgent : fait, en cours
