@@ -11,7 +11,7 @@ from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, 
     QAction, QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon
 )
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings
+from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer
 
 # --- PALETTES DE COULEURS ---
 BRANCH_PALETTES = [
@@ -193,6 +193,7 @@ class MindMapScene(QGraphicsScene):
             self.signals.itemDoubleClicked.emit(event.scenePos())
         super().mouseDoubleClickEvent(event)
 
+
 class MindMapControlView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
@@ -257,7 +258,6 @@ class MindMapControlView(QGraphicsView):
 
 
 class MindMapWorkspace(QWidget):
-    """ Encapsule les données et la vue propre à un projet unique (un onglet) """
     def __init__(self, main_app, file_path=None):
         super().__init__()
         self.main_app = main_app
@@ -293,8 +293,6 @@ class MindMapApp(QMainWindow):
         
         self.setup_ui()
         self.setup_shortcuts()
-        
-        # Charger le dernier projet ou créer un projet vide par défaut
         self.load_last_project_on_startup()
 
     def current_workspace(self) -> MindMapWorkspace:
@@ -307,14 +305,12 @@ class MindMapApp(QMainWindow):
         return sep
 
     def setup_ui(self):
-        # Système d'onglets central
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabsClosable(True)
         self.tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         self.setCentralWidget(self.tab_widget)
 
-        # Menus
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("Fichier")
         file_menu.addAction("📁 Nouveau projet", lambda: self.new_project())
@@ -339,7 +335,6 @@ class MindMapApp(QMainWindow):
         self.template_combo.currentIndexChanged.connect(self.apply_template)
         menu_bar.setCornerWidget(self.template_combo, Qt.Corner.TopRightCorner)
 
-        # Barre de style flottante
         self.style_bar = QFrame(self)
         self.style_bar.setStyleSheet("""
             QFrame { background: white; border-radius: 20px; border: 1px solid #e2e8f0; }
@@ -348,12 +343,10 @@ class MindMapApp(QMainWindow):
         """)
         style_layout = QHBoxLayout(self.style_bar)
         
-        # Commandes de Nœuds
         self.node_controls = QWidget()
         nc_layout = QHBoxLayout(self.node_controls)
         nc_layout.setContentsMargins(0,0,0,0)
         
-        # Bouton GRAS
         btn_bold = QPushButton("B")
         btn_bold.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         btn_bold.setFixedSize(26, 26)
@@ -386,7 +379,6 @@ class MindMapApp(QMainWindow):
 
         nc_layout.addWidget(self.create_separator())
         
-        # Pièces jointes & URL
         btn_attach = QPushButton("📎 Fichier")
         btn_attach.clicked.connect(self.attach_file)
         nc_layout.addWidget(btn_attach)
@@ -407,7 +399,6 @@ class MindMapApp(QMainWindow):
         
         style_layout.addWidget(self.node_controls)
         
-        # Commandes de Relations (Liaisons existantes)
         self.edge_controls = QWidget()
         ec_layout = QHBoxLayout(self.edge_controls)
         ec_layout.setContentsMargins(0,0,0,0)
@@ -416,7 +407,6 @@ class MindMapApp(QMainWindow):
         ec_layout.addWidget(btn_edit_edge)
         style_layout.addWidget(self.edge_controls)
         
-        # NOUVEAU : Commandes Multi-sélection (Relier deux nœuds existants)
         self.connect_controls = QWidget()
         cc_layout = QHBoxLayout(self.connect_controls)
         cc_layout.setContentsMargins(0,0,0,0)
@@ -428,7 +418,6 @@ class MindMapApp(QMainWindow):
         
         self.style_bar.hide()
         
-        # Overlay d'aide
         self.overlay = QFrame(self)
         self.overlay.setStyleSheet("background: rgba(255,255,255,0.95); border-radius: 8px; border: 1px solid #ddd;")
         ol_layout = QVBoxLayout(self.overlay)
@@ -459,7 +448,6 @@ class MindMapApp(QMainWindow):
         self.style_bar.move(x, y)
         self.overlay.raise_()
 
-    # --- GESTION DES ONGLETS & PERSISTANCE ---
     def load_last_project_on_startup(self):
         last_path = self.settings.value("last_project_path", "")
         if last_path and os.path.exists(last_path):
@@ -467,9 +455,14 @@ class MindMapApp(QMainWindow):
         else:
             self.new_project(force_empty=True)
             
-        # 🌟 AJOUT : Centrage forcé sur le graphique au tout premier affichage
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(100, self.center_on_graph)
+
+    def center_on_graph(self):
+        ws = self.current_workspace()
+        if not ws: return
+        rect = ws.scene.itemsBoundingRect()
+        if not rect.isEmpty():
+            ws.view.centerOn(rect.center())
 
     def close_tab(self, index):
         if self.tab_widget.count() > 1:
@@ -494,26 +487,6 @@ class MindMapApp(QMainWindow):
             self.tab_widget.setTabText(self.tab_widget.currentIndex(), "[Nouveau Projet]")
         self.setWindowTitle(title)
 
-    # --- HISTORIQUE & ETATS (Adaptés aux espaces) ---
-    def get_state(self):
-        ws = self.current_workspace()
-        if not ws: return {'nodes': [], 'edges': []}
-        nodes, edges = [], []
-        for item in ws.scene.items():
-            if isinstance(item, NodeItem):
-                nodes.append({
-                    'id': item.node_id, 'label': item.label, 'x': item.pos().x(), 'y': item.pos().y(),
-                    'shape': item.shape_type, 'bg': item.bg_color.name(), 'border': item.border_color.name(),
-                    'font_color': item.font_color.name(), 'border_width': item.border_width, 
-                    'file_path': item.file_path, 'url_link': item.url_link, 'is_bold': item.is_bold
-                })
-            elif isinstance(item, EdgeItem):
-                edges.append({
-                    'id': item.edge_id, 'from': item.source_node.node_id, 'to': item.dest_node.node_id,
-                    'label': item.label, 'color': item.color.name()
-                })
-        return {'nodes': nodes, 'edges': edges}
-
     def save_state(self):
         ws = self.current_workspace()
         if not ws or ws.is_applying_state: return
@@ -521,36 +494,155 @@ class MindMapApp(QMainWindow):
         ws.redo_stack.clear()
         if len(ws.undo_stack) > 41: ws.undo_stack.pop(0)
 
-    def apply_state(self, state_str):
+    # --- SYSTÈME DE SÉRIALISATION EN ARBRE CORRIGÉ ---
+    def get_state(self):
+        """ Renvoie l'arbre complet avec la liste des liens transverses """
         ws = self.current_workspace()
-        if not ws: return
+        if not ws: return {}
+        
+        all_items = ws.scene.items()
+        nodes = [i for i in all_items if isinstance(i, NodeItem)]
+        edges = [i for i in all_items if isinstance(i, EdgeItem)]
+        
+        root = next((n for n in nodes if n.node_id == 'root'), None)
+        if not root and nodes:
+            root = nodes[0]
+        if not root:
+            return {}
+
+        # 1. On liste tous les edges "naturels" (arbre descendant) pour identifier les transverses
+        natural_edges = set()
+
+        def serialize_node(node):
+            data = {
+                "id": node.node_id,  # Sauvegarder l'ID est nécessaire pour mapper les cross-links
+                "label": node.label,
+                "x": node.pos().x(),
+                "y": node.pos().y(),
+                "shape": node.shape_type,
+                "bg": node.bg_color.name(),
+                "border": node.border_color.name(),
+                "font_color": node.font_color.name(),
+                "border_width": node.border_width,
+                "is_bold": node.is_bold,
+                "file_path": node.file_path,
+                "url_link": node.url_link,
+                "children": []
+            }
+            for edge in node.edges:
+                if edge.source_node == node:
+                    # Si le fils considère ce nœud comme son parent "principal" dans la hiérarchie
+                    # (pour éviter de dupliquer un nœud s'il est relié de manière transverse)
+                    child_edges = edge.dest_node.edges
+                    # On vérifie si c'est une relation descendante classique
+                    natural_edges.add(edge)
+                    child_data = serialize_node(edge.dest_node)
+                    if edge.label:
+                        child_data["edge_label"] = edge.label
+                    data["children"].append(child_data)
+            return data
+
+        tree_data = serialize_node(root)
+
+        # 2. On enregistre les liens manuels (ceux qui ne sont pas dans les branches naturelles)
+        cross_links_data = []
+        for edge in edges:
+            if edge not in natural_edges:
+                cross_links_data.append({
+                    "from": edge.source_node.node_id,
+                    "to": edge.dest_node.node_id,
+                    "label": edge.label,
+                    "color": edge.color.name()
+                })
+
+        tree_data["cross_links"] = cross_links_data
+        return tree_data
+
+    def apply_state(self, state_str):
+        """ Reconstruit le graphique à partir de l'arbre JSON et des liens transverses """
+        ws = self.current_workspace()
+        if not ws or not state_str.strip(): return
+        
         ws.is_applying_state = True
-        state = json.loads(state_str)
         ws.scene.clear()
         
-        node_map = {}
-        for nd in state['nodes']:
-            bg = nd.get('bg', '#60A5FA')
-            border = nd.get('border', '#3B82F6')
-            font_color = nd.get('font_color', '#ffffff')
+        try:
+            root_data = json.loads(state_str)
+        except Exception:
+            ws.is_applying_state = False
+            return
+
+        node_counter = [0]
+        edge_counter = [0]
+        created_nodes = {}  # Pour retrouver les nœuds par ID lors de la reconstruction des cross_links
+
+        def deserialize_node(data, parent_node=None):
+            if not data: return None
+            
+            node_counter[0] += 1
+            # Conserver l'ID du JSON s'il existe (pratique pour l'édition manuelle), sinon générer
+            node_id = data.get("id") or ('root' if parent_node is None else f"node_{node_counter[0]}")
+            
+            if "x" in data and "y" in data:
+                x, y = data["x"], data["y"]
+            else:
+                if parent_node:
+                    x, y = self.calculate_smart_position_for_data(ws, parent_node)
+                else:
+                    x, y = 0.0, 0.0
+
+            bg = data.get("bg")
+            border = data.get("border")
+            font_color = data.get("font_color")
+            
+            if parent_node and (not bg or not border):
+                bg = bg or parent_node.bg_color.name()
+                border = border or parent_node.border_color.name()
+                font_color = font_color or parent_node.font_color.name()
+            else:
+                bg = bg or '#60A5FA'
+                border = border or '#3B82F6'
+                font_color = font_color or '#ffffff'
 
             node = NodeItem(
-                nd['id'], nd['label'], nd['x'], nd['y'], nd['shape'], bg, border, font_color, 
-                nd.get('file_path'), nd.get('url_link'), nd.get('is_bold', False)
+                node_id, data["label"], x, y,
+                shape=data.get("shape", "box"), bg=bg, border=border, font_color=font_color,
+                file_path=data.get("file_path"), url_link=data.get("url_link"), is_bold=data.get("is_bold", False)
             )
-            node.border_width = nd.get('border_width', 1)
+            node.border_width = data.get("border_width", 1)
             node.signals.itemDoubleClicked.connect(self.start_inline_editing)
             node.signals.positionChanged.connect(self.save_state)
             ws.scene.addItem(node)
-            node_map[nd['id']] = node
             
-        for ed in state['edges']:
-            if ed['from'] in node_map and ed['to'] in node_map:
-                color = ed.get('color', '#A0AEC0')
-                edge = EdgeItem(ed['id'], node_map[ed['from']], node_map[ed['to']], ed.get('label', ''), color)
+            created_nodes[node_id] = node
+
+            if parent_node:
+                edge_counter[0] += 1
+                edge_id = f"edge_{edge_counter[0]}"
+                edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
+                edge = EdgeItem(edge_id, parent_node, node, data.get("edge_label", ""), color=edge_color)
                 edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
                 ws.scene.addItem(edge)
+
+            for child_data in data.get("children", []):
+                deserialize_node(child_data, node)
                 
+            return node
+
+        # Reconstruire l'arbre
+        deserialize_node(root_data)
+
+        # Reconstruire les liens transverses ("cross_links") s'il y en a
+        for cl in root_data.get("cross_links", []):
+            source = created_nodes.get(cl["from"])
+            dest = created_nodes.get(cl["to"])
+            if source and dest:
+                edge_counter[0] += 1
+                edge_id = f"edge_{edge_counter[0]}"
+                edge = EdgeItem(edge_id, source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"))
+                edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
+                ws.scene.addItem(edge)
+
         ws.is_applying_state = False
         self.on_selection_changed()
 
@@ -587,7 +679,6 @@ class MindMapApp(QMainWindow):
                 self.node_controls.hide()
                 self.edge_controls.show()
         elif len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
-            # Activation du panneau contextuel pour lier 2 noeuds séparés
             self.style_bar.show()
             self.node_controls.hide()
             self.edge_controls.hide()
@@ -598,8 +689,13 @@ class MindMapApp(QMainWindow):
     def on_bg_double_clicked(self, pos):
         ws = self.current_workspace()
         if not ws: return
-        node_id = f"node_{len(ws.scene.items())}"
-        node = NodeItem(node_id, "Nouvelle idée", pos.x(), pos.y(), bg='#FFF3E0', border='#FFB74D', font_color='#333333')
+        # S'il n'y a aucun noeud, on crée la racine
+        nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+        if not nodes:
+            node = NodeItem('root', "Nouvelle idée centrale", pos.x(), pos.y(), bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
+        else:
+            node = NodeItem(f"node_{len(nodes)+1}", "Nouvelle idée", pos.x(), pos.y(), bg='#FFF3E0', border='#FFB74D', font_color='#333333')
+            
         node.signals.itemDoubleClicked.connect(self.start_inline_editing)
         node.signals.positionChanged.connect(self.save_state)
         ws.scene.addItem(node)
@@ -707,6 +803,19 @@ class MindMapApp(QMainWindow):
                     
         self.save_state()
 
+    def calculate_smart_position_for_data(self, ws, parent_node):
+        """ Calcule la position d'un noeud lors d'un chargement manuel de texte """
+        target_x = parent_node.pos().x() + 220
+        child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
+        if child_edges:
+            lowest_y = parent_node.pos().y()
+            for e in child_edges:
+                if e.dest_node.pos().y() > lowest_y: lowest_y = e.dest_node.pos().y()
+            target_y = lowest_y + 75
+        else:
+            target_y = parent_node.pos().y()
+        return target_x, target_y
+
     def calculate_smart_position(self, parent_node):
         ws = self.current_workspace()
         target_x = parent_node.pos().x() + 220
@@ -765,15 +874,12 @@ class MindMapApp(QMainWindow):
         new_node.setSelected(True)
         self.start_inline_editing(new_node)
 
-    # --- NOUVELLE FONCTIONNALITÉ 5 : RELIER DEUX NOEUDS SÉPARÉS ---
     def connect_selected_nodes(self):
         ws = self.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
             node1, node2 = sel[0], sel[1]
-            
-            # Éviter de recréer un doublon si la connexion existe déjà
             already_linked = any(
                 (e.source_node == node1 and e.dest_node == node2) or 
                 (e.source_node == node2 and e.dest_node == node1) 
@@ -788,7 +894,6 @@ class MindMapApp(QMainWindow):
                 ws.scene.clearSelection()
                 edge.setSelected(True)
 
-    # --- STYLE : EN GRAS ---
     def toggle_bold(self):
         ws = self.current_workspace()
         if not ws: return
@@ -846,7 +951,6 @@ class MindMapApp(QMainWindow):
             node.recalculate_size()
             self.save_state()
 
-    # --- PIÈCES JOINTES & LIENS LIENS WEB ---
     def attach_file(self):
         ws = self.current_workspace()
         if not ws: return
@@ -901,7 +1005,7 @@ class MindMapApp(QMainWindow):
             elif node.file_path:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(node.file_path))
 
-    # --- LOGIQUE PROJETS, FICHIERS & EXPORTS ---
+    # --- LOGIQUE PROJETS & FICHIERS ---
     def new_project(self, force_empty=False):
         if force_empty or QMessageBox.question(self, "Nouveau", "Créer un nouveau projet dans un nouvel onglet ?") == QMessageBox.StandardButton.Yes:
             ws = MindMapWorkspace(self)
@@ -920,17 +1024,6 @@ class MindMapApp(QMainWindow):
         if path:
             self.load_project_from_path(path)
 
-    def center_on_graph(self):
-        ws = self.current_workspace()
-        if not ws: return
-        
-        # Récupère la zone englobant uniquement les éléments dessinés
-        rect = ws.scene.itemsBoundingRect()
-        
-        # Si la scène n'est pas vide, on centre la vue sur le milieu de cette zone
-        if not rect.isEmpty():
-            ws.view.centerOn(rect.center())
-
     def load_project_from_path(self, path):
         with open(path, 'r', encoding='utf-8') as f:
             state_str = f.read()
@@ -944,8 +1037,6 @@ class MindMapApp(QMainWindow):
         
         self.settings.setValue("last_project_path", path)
         self.update_title()
-        
-        # 🌟 AJOUT : Centrer la vue dès que le projet est chargé
         self.center_on_graph()
 
     def save_project(self, force_save_as=False):
@@ -958,7 +1049,7 @@ class MindMapApp(QMainWindow):
             ws.current_file_path = path
             
         with open(ws.current_file_path, 'w', encoding='utf-8') as f:
-            json.dump(self.get_state(), f, indent=2)
+            json.dump(self.get_state(), f, indent=2, ensure_ascii=False)
             
         self.settings.setValue("last_project_path", ws.current_file_path)
         self.update_title()
@@ -988,6 +1079,7 @@ class MindMapApp(QMainWindow):
                 ws.undo_stack.clear()
                 ws.redo_stack.clear()
                 self.save_state()
+                self.center_on_graph()
             else:
                 QMessageBox.warning(self, "Erreur", f"Le fichier template est introuvable :\n{template_path}")
 
