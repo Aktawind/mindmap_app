@@ -88,17 +88,13 @@ class NodeItem(QGraphicsItem):
         painter.setPen(pen)
         painter.setBrush(QBrush(self.bg_color))
 
-        if self.shape_type == 'ellipse':
-            painter.drawEllipse(self.rect)
-        else:
-            painter.drawRoundedRect(self.rect, 6, 6)
+        # On dessine TOUJOURS un rectangle arrondi par défaut
+        painter.drawRoundedRect(self.rect, 6, 6)
 
         painter.setPen(QPen(self.font_color))
         font = QFont('Segoe UI', 11)
         if self.is_bold:
             font.setBold(True)
-        if self.url_link:
-            font.setUnderline(True)
         painter.setFont(font)
         painter.drawText(self.rect, int(Qt.AlignmentFlag.AlignCenter), self.label)
 
@@ -335,7 +331,7 @@ class MindMapApp(QMainWindow):
         self.template_combo.addItem("🧠 Brain Dump (3 parties)", "brain_dump.json")
         self.template_combo.addItem("🚀 Guide Onboarding Technique", "onboarding_technique.json")
         self.template_combo.addItem("🎨 Hub Multi-Passions", "hub_passions.json")
-        self.template_combo.addItem("✈️ Organisation d'un Événement/Voyage", "organisation_voyage.json")
+        self.template_combo.addItem("✈️ Organisation d'un Voyage", "organisation_voyage.json")
         self.template_combo.addItem("🗣️ Préparation Réunion/Entretien", "preparation_reunion.json")
         self.template_combo.addItem("🏁 Rétrospective de Fin de Projet", "retro_projet.json")
         self.template_combo.addItem("☀️ Daily Capsule (Point du matin)", "daily_capsule.json")
@@ -379,14 +375,6 @@ class MindMapApp(QMainWindow):
         btn_urgent.clicked.connect(self.toggle_urgent)
         nc_layout.addWidget(btn_urgent)
         
-        btn_rect = QPushButton("Rectangle")
-        btn_rect.clicked.connect(lambda: self.change_shape('box'))
-        nc_layout.addWidget(btn_rect)
-        
-        btn_oval = QPushButton("Ovale")
-        btn_oval.clicked.connect(lambda: self.change_shape('ellipse'))
-        nc_layout.addWidget(btn_oval)
-
         nc_layout.addWidget(self.create_separator())
         
         btn_attach = QPushButton("📎 Fichier")
@@ -597,7 +585,7 @@ class MindMapApp(QMainWindow):
                 x, y = data["x"], data["y"]
             else:
                 if parent_node:
-                    x, y = self.calculate_smart_position_for_data(ws, parent_node)
+                    x, y = self.calculate_smart_position(ws, parent_node)
                 else:
                     x, y = 0.0, 0.0
 
@@ -758,6 +746,41 @@ class MindMapApp(QMainWindow):
                 self.commit_edit()
                 return True
         return super().eventFilter(obj, event)
+    
+    def reposition_children_rec(self, parent_node):
+        """ Repositionne récursivement les enfants pour éviter les chevauchements dus à la taille du texte """
+        ws = self.current_workspace()
+        if not ws: return
+
+        child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
+        if not child_edges:
+            return
+
+        # Calcul de la position X de départ pour les enfants (marge à droite du parent)
+        parent_right_edge = parent_node.pos().x() + (parent_node.rect.width() / 2)
+        target_x = parent_right_edge + 120  # 120 pixels d'espace constant
+
+        # On aligne ou distribue verticalement les enfants
+        first_child_y = parent_node.pos().y()
+        
+        for i, edge in enumerate(child_edges):
+            child = edge.dest_node
+            # On propage le X calculé
+            child.setPos(target_x, child.pos().y() if i > 0 else first_child_y)
+            
+            # S'il y a plusieurs enfants, on s'assures qu'ils ne se marchent pas dessus verticalement
+            if i > 0:
+                prev_child = child_edges[i-1].dest_node
+                prev_bottom = prev_child.pos().y() + (prev_child.rect.height() / 2)
+                current_top_target = prev_bottom + 40 + (child.rect.height() / 2) # 40px d'espace vertical
+                if child.pos().y() < current_top_target:
+                    child.setPos(child.pos().x(), current_top_target)
+            
+            # On met à jour l'alignement de la ligne d'attache
+            edge.update_position()
+            
+            # On applique la règle récursivement aux enfants de cet enfant
+            self.reposition_children_rec(child)
 
     def commit_edit(self):
         if not hasattr(self, 'editor') or self.editor is None: return
@@ -769,6 +792,9 @@ class MindMapApp(QMainWindow):
                 if self.edit_item.file_path: new_text += "\n📄 Document joint"
                 self.edit_item.label = new_text
                 self.edit_item.recalculate_size()
+                
+                # --- REPOSITIONNEMENT DYNAMIQUE APRÈS ÉDITION ---
+                self.reposition_children_rec(self.edit_item)
         else:
             self.edit_item.label = new_text
             self.edit_item.update()
@@ -813,22 +839,11 @@ class MindMapApp(QMainWindow):
                     
         self.save_state()
 
-    def calculate_smart_position_for_data(self, ws, parent_node):
-        """ Calcule la position d'un noeud lors d'un chargement manuel de texte """
-        target_x = parent_node.pos().x() + 220
-        child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
-        if child_edges:
-            lowest_y = parent_node.pos().y()
-            for e in child_edges:
-                if e.dest_node.pos().y() > lowest_y: lowest_y = e.dest_node.pos().y()
-            target_y = lowest_y + 75
-        else:
-            target_y = parent_node.pos().y()
-        return target_x, target_y
-
-    def calculate_smart_position(self, parent_node):
-        ws = self.current_workspace()
-        target_x = parent_node.pos().x() + 220
+    def calculate_smart_position(self, ws, parent_node):
+        # On démarre du bord droit réel du nœud parent
+        parent_right_edge = parent_node.pos().x() + (parent_node.rect.width() / 2)
+        target_x = parent_right_edge + 120
+        
         child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
         
         if child_edges:
@@ -841,6 +856,7 @@ class MindMapApp(QMainWindow):
             target_y = parent_node.pos().y()
 
         overlap = True
+        # On cherche uniquement les nœuds présents dans le workspace (ws) actuel
         all_nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
         
         while overlap:
@@ -933,15 +949,6 @@ class MindMapApp(QMainWindow):
                 edge.color = QColor(edge_col)
                 edge.update()
                 self.apply_color_hierarchy(edge.dest_node, bg, border, text_col, edge_col)
-
-    def change_shape(self, shape_type):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            sel[0].shape_type = shape_type
-            sel[0].update()
-            self.save_state()
 
     def toggle_urgent(self):
         if hasattr(self, 'editor') and self.editor is not None: return
