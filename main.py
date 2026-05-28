@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, 
-    QAction, QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon
+    QAction, QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon, QCloseEvent
 )
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer
 
@@ -88,7 +88,6 @@ class NodeItem(QGraphicsItem):
         painter.setPen(pen)
         painter.setBrush(QBrush(self.bg_color))
 
-        # On dessine TOUJOURS un rectangle arrondi par défaut
         painter.drawRoundedRect(self.rect, 6, 6)
 
         painter.setPen(QPen(self.font_color))
@@ -261,6 +260,7 @@ class MindMapWorkspace(QWidget):
         self.undo_stack = []
         self.redo_stack = []
         self.is_applying_state = False
+        self.is_dirty = False  # Devient True si des modifs non sauvegardées existent
 
         self.scene = MindMapScene(self)
         self.scene.setSceneRect(-5000, -5000, 10000, 10000)
@@ -462,12 +462,49 @@ class MindMapApp(QMainWindow):
         if not rect.isEmpty():
             ws.view.centerOn(rect.center())
 
-    def close_tab(self, index):
+    def close_tab(self, index) -> bool:
+        """ Gère la fermeture d'un onglet et demande de sauvegarder si modifié """
+        ws = self.tab_widget.widget(index)
+        if ws and ws.is_dirty:
+            # On focus l'onglet concerné pour que l'utilisateur voit ce qu'il ferme
+            self.tab_widget.setCurrentWidget(ws)
+            
+            name = os.path.basename(ws.current_file_path) if ws.current_file_path else "[Nouveau Projet]"
+            reply = QMessageBox.question(
+                self, 
+                "Modifications non enregistrées",
+                f"Le projet '{name}' a été modifié.\nVoulez-vous enregistrer les modifications avant de fermer ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self.save_project()
+                if ws.is_dirty: # Si l'utilisateur a annulé le "Enregistrer sous"
+                    return False
+            elif reply == QMessageBox.StandardButton.Cancel:
+                return False
+
+        # Procéder à la fermeture
         if self.tab_widget.count() > 1:
             self.tab_widget.removeTab(index)
         else:
             self.new_project(force_empty=True)
             self.tab_widget.removeTab(0)
+        return True
+
+    def closeEvent(self, event: QCloseEvent):
+        """ Intercepte la fermeture globale de l'application pour valider chaque onglet """
+        while self.tab_widget.count() > 0:
+            # On tente de fermer le premier onglet à chaque fois
+            if not self.close_tab(0):
+                event.ignore() # L'utilisateur a annulé
+                return
+            # Si on vient de créer un projet vide suite à la fermeture du dernier onglet, on s'arrête
+            if self.tab_widget.count() == 1 and not self.tab_widget.widget(0).is_dirty and self.tab_widget.widget(0).current_file_path is None:
+                # Vérification pour éviter une boucle infinie avec le comportement par défaut de close_tab
+                break
+        event.accept()
 
     def on_tab_changed(self, index):
         self.update_title()
@@ -476,14 +513,19 @@ class MindMapApp(QMainWindow):
     def update_title(self):
         ws = self.current_workspace()
         if not ws: return
-        title = "Mindy - MindMap App"
+        
+        # Déterminer le libellé de base de l'onglet
         if ws.current_file_path:
-            title += f" - {os.path.basename(ws.current_file_path)}"
-            self.tab_widget.setTabText(self.tab_widget.currentIndex(), os.path.basename(ws.current_file_path))
+            base_title = os.path.basename(ws.current_file_path)
         else:
-            title += " - [Nouveau Projet]"
-            self.tab_widget.setTabText(self.tab_widget.currentIndex(), "[Nouveau Projet]")
-        self.setWindowTitle(title)
+            base_title = "[Nouveau Projet]"
+            
+        # Ajouter l'astérisque si le projet a des modifications non enregistrées
+        suffix = " *" if ws.is_dirty else ""
+        display_title = base_title + suffix
+        
+        self.tab_widget.setTabText(self.tab_widget.currentIndex(), display_title)
+        self.setWindowTitle(f"Mindy - MindMap App - {display_title}")
 
     def save_state(self):
         ws = self.current_workspace()
@@ -491,10 +533,14 @@ class MindMapApp(QMainWindow):
         ws.undo_stack.append(json.dumps(self.get_state()))
         ws.redo_stack.clear()
         if len(ws.undo_stack) > 41: ws.undo_stack.pop(0)
+        
+        # Marquer l'onglet comme modifié si ce n'est pas le premier état à l'initialisation
+        if len(ws.undo_stack) > 1:
+            ws.is_dirty = True
+            self.update_title()
 
     # --- SYSTÈME DE SÉRIALISATION EN ARBRE CORRIGÉ ---
     def get_state(self):
-        """ Renvoie l'arbre complet avec la liste des liens transverses """
         ws = self.current_workspace()
         if not ws: return {}
         
@@ -508,12 +554,11 @@ class MindMapApp(QMainWindow):
         if not root:
             return {}
 
-        # 1. On liste tous les edges "naturels" (arbre descendant) pour identifier les transverses
         natural_edges = set()
 
         def serialize_node(node):
             data = {
-                "id": node.node_id,  # Sauvegarder l'ID est nécessaire pour mapper les cross-links
+                "id": node.node_id,
                 "label": node.label,
                 "x": node.pos().x(),
                 "y": node.pos().y(),
@@ -529,10 +574,6 @@ class MindMapApp(QMainWindow):
             }
             for edge in node.edges:
                 if edge.source_node == node:
-                    # Si le fils considère ce nœud comme son parent "principal" dans la hiérarchie
-                    # (pour éviter de dupliquer un nœud s'il est relié de manière transverse)
-                    child_edges = edge.dest_node.edges
-                    # On vérifie si c'est une relation descendante classique
                     natural_edges.add(edge)
                     child_data = serialize_node(edge.dest_node)
                     if edge.label:
@@ -542,7 +583,6 @@ class MindMapApp(QMainWindow):
 
         tree_data = serialize_node(root)
 
-        # 2. On enregistre les liens manuels (ceux qui ne sont pas dans les branches naturelles)
         cross_links_data = []
         for edge in edges:
             if edge not in natural_edges:
@@ -557,7 +597,6 @@ class MindMapApp(QMainWindow):
         return tree_data
 
     def apply_state(self, state_str):
-        """ Reconstruit le graphique à partir de l'arbre JSON et des liens transverses """
         ws = self.current_workspace()
         if not ws or not state_str.strip(): return
         
@@ -572,13 +611,12 @@ class MindMapApp(QMainWindow):
 
         node_counter = [0]
         edge_counter = [0]
-        created_nodes = {}  # Pour retrouver les nœuds par ID lors de la reconstruction des cross_links
+        created_nodes = {}
 
         def deserialize_node(data, parent_node=None):
             if not data: return None
             
             node_counter[0] += 1
-            # Conserver l'ID du JSON s'il existe (pratique pour l'édition manuelle), sinon générer
             node_id = data.get("id") or ('root' if parent_node is None else f"node_{node_counter[0]}")
             
             if "x" in data and "y" in data:
@@ -627,10 +665,8 @@ class MindMapApp(QMainWindow):
                 
             return node
 
-        # Reconstruire l'arbre
         deserialize_node(root_data)
 
-        # Reconstruire les liens transverses ("cross_links") s'il y en a
         for cl in root_data.get("cross_links", []):
             source = created_nodes.get(cl["from"])
             dest = created_nodes.get(cl["to"])
@@ -649,12 +685,16 @@ class MindMapApp(QMainWindow):
         if not ws or len(ws.undo_stack) <= 1: return
         ws.redo_stack.append(ws.undo_stack.pop())
         self.apply_state(ws.undo_stack[-1])
+        ws.is_dirty = True
+        self.update_title()
 
     def redo(self):
         ws = self.current_workspace()
         if not ws or not ws.redo_stack: return
         ws.undo_stack.append(ws.redo_stack.pop())
         self.apply_state(ws.undo_stack[-1])
+        ws.is_dirty = True
+        self.update_title()
 
     # --- INTERACTIONS GRAPHIQUES ---
     def on_selection_changed(self):
@@ -687,7 +727,6 @@ class MindMapApp(QMainWindow):
     def on_bg_double_clicked(self, pos):
         ws = self.current_workspace()
         if not ws: return
-        # S'il n'y a aucun noeud, on crée la racine
         nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
         if not nodes:
             node = NodeItem('root', "Nouvelle idée centrale", pos.x(), pos.y(), bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
@@ -748,7 +787,6 @@ class MindMapApp(QMainWindow):
         return super().eventFilter(obj, event)
     
     def reposition_children_rec(self, parent_node):
-        """ Repositionne récursivement les enfants pour éviter les chevauchements dus à la taille du texte """
         ws = self.current_workspace()
         if not ws: return
 
@@ -756,30 +794,23 @@ class MindMapApp(QMainWindow):
         if not child_edges:
             return
 
-        # Calcul de la position X de départ pour les enfants (marge à droite du parent)
         parent_right_edge = parent_node.pos().x() + (parent_node.rect.width() / 2)
-        target_x = parent_right_edge + 120  # 120 pixels d'espace constant
+        target_x = parent_right_edge + 120
 
-        # On aligne ou distribue verticalement les enfants
         first_child_y = parent_node.pos().y()
         
         for i, edge in enumerate(child_edges):
             child = edge.dest_node
-            # On propage le X calculé
             child.setPos(target_x, child.pos().y() if i > 0 else first_child_y)
             
-            # S'il y a plusieurs enfants, on s'assures qu'ils ne se marchent pas dessus verticalement
             if i > 0:
                 prev_child = child_edges[i-1].dest_node
                 prev_bottom = prev_child.pos().y() + (prev_child.rect.height() / 2)
-                current_top_target = prev_bottom + 40 + (child.rect.height() / 2) # 40px d'espace vertical
+                current_top_target = prev_bottom + 40 + (child.rect.height() / 2)
                 if child.pos().y() < current_top_target:
                     child.setPos(child.pos().x(), current_top_target)
             
-            # On met à jour l'alignement de la ligne d'attache
             edge.update_position()
-            
-            # On applique la règle récursivement aux enfants de cet enfant
             self.reposition_children_rec(child)
 
     def commit_edit(self):
@@ -792,8 +823,6 @@ class MindMapApp(QMainWindow):
                 if self.edit_item.file_path: new_text += "\n📄 Document joint"
                 self.edit_item.label = new_text
                 self.edit_item.recalculate_size()
-                
-                # --- REPOSITIONNEMENT DYNAMIQUE APRÈS ÉDITION ---
                 self.reposition_children_rec(self.edit_item)
         else:
             self.edit_item.label = new_text
@@ -839,8 +868,8 @@ class MindMapApp(QMainWindow):
                     
         self.save_state()
 
-    def calculate_smart_position(self, ws, parent_node):
-        # On démarre du bord droit réel du nœud parent
+    def calculate_smart_position(self, parent_node):
+        ws = self.current_workspace()
         parent_right_edge = parent_node.pos().x() + (parent_node.rect.width() / 2)
         target_x = parent_right_edge + 120
         
@@ -856,7 +885,6 @@ class MindMapApp(QMainWindow):
             target_y = parent_node.pos().y()
 
         overlap = True
-        # On cherche uniquement les nœuds présents dans le workspace (ws) actuel
         all_nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
         
         while overlap:
@@ -1034,6 +1062,9 @@ class MindMapApp(QMainWindow):
             self.tab_widget.addTab(ws, "[Nouveau Projet]")
             self.tab_widget.setCurrentWidget(ws)
             self.save_state()
+            
+            # Forcer is_dirty à False pour un projet vide tout juste créé
+            ws.is_dirty = False 
             self.update_title()
 
     def load_project(self):
@@ -1050,7 +1081,10 @@ class MindMapApp(QMainWindow):
         self.tab_widget.setCurrentWidget(ws)
         
         self.apply_state(state_str)
-        self.save_state()
+        
+        # Initialisation de la pile d'annulation avec l'état brut chargé
+        ws.undo_stack.append(state_str)
+        ws.is_dirty = False  # Fraîchement chargé, donc propre
         
         self.settings.setValue("last_project_path", path)
         self.update_title()
@@ -1068,6 +1102,7 @@ class MindMapApp(QMainWindow):
         with open(ws.current_file_path, 'w', encoding='utf-8') as f:
             json.dump(self.get_state(), f, indent=2, ensure_ascii=False)
             
+        ws.is_dirty = False  # Changements enregistrés !
         self.settings.setValue("last_project_path", ws.current_file_path)
         self.update_title()
 
@@ -1095,7 +1130,11 @@ class MindMapApp(QMainWindow):
                 self.apply_state(state_str)
                 ws.undo_stack.clear()
                 ws.redo_stack.clear()
-                self.save_state()
+                
+                # Sauvegarde l'état initial du template
+                ws.undo_stack.append(state_str)
+                ws.is_dirty = True  # Considéré modifié par rapport à un fichier vierge
+                self.update_title()
                 self.center_on_graph()
             else:
                 QMessageBox.warning(self, "Erreur", f"Le fichier template est introuvable :\n{template_path}")
