@@ -1,69 +1,218 @@
 {
   "id": "root",
   "label": "🚀 Guide de démarrage : [Nom du Projet / Banc]",
-  "x": 0.0,
-  "y": 0.0,
+  "x": -55.54499999999999,
+  "y": 33.06249999999999,
   "shape": "box",
   "bg": "#319795",
   "border": "#234e52",
   "font_color": "#ffffff",
   "border_width": 2,
   "is_bold": true,
+  "file_path": null,
+  "url_link": null,
   "children": [
     {
       "id": "docs",
       "label": "📄 1. Documentation essentielle",
-      "x": -300.0,
-      "y": -120.0,
+      "x": -535.405,
+      "y": 29.442499999999953,
+      "shape": "box",
       "bg": "#e6fffa",
       "border": "#4fd1c5",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Manuel Utilisateur", "file_path": "C:/Chemin/Vers/Manuel.pdf" },
-        { "label": "Spécifications Techniques / Architecture" }
+        {
+          "id": "node_3",
+          "label": "Manuel Utilisateur",
+          "x": -448.97749999999996,
+          "y": -65.77750000000002,
+          "shape": "box",
+          "bg": "#e6fffa",
+          "border": "#4fd1c5",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": "C:/Chemin/Vers/Manuel.pdf",
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_4",
+          "label": "Spécifications Techniques / Architecture",
+          "x": -702.8974999999999,
+          "y": -64.8375,
+          "shape": "box",
+          "bg": "#e6fffa",
+          "border": "#4fd1c5",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     },
     {
       "id": "env",
       "label": "💻 2. Configuration de l'environnement",
-      "x": 0.0,
-      "y": -180.0,
+      "x": -56.86749999999999,
+      "y": -128.4225,
+      "shape": "box",
       "bg": "#ebf8ff",
       "border": "#63b3ed",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "id": "scripts", "label": "Installer les dépendances (Python/C++)" },
-        { "label": "Vérifier les licences (ex: LabView, IDE)" }
+        {
+          "id": "scripts",
+          "label": "Installer les dépendances (Python/C++)",
+          "x": 222.64499999999995,
+          "y": -238.19000000000003,
+          "shape": "box",
+          "bg": "#ebf8ff",
+          "border": "#63b3ed",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": [
+            {
+              "id": "referent_technique",
+              "label": "Référent Code / Backend : [Nom]",
+              "x": 432.92249999999996,
+              "y": -54.98749999999998,
+              "shape": "box",
+              "bg": "#f3e5f5",
+              "border": "#ce93d8",
+              "font_color": "#333333",
+              "border_width": 1,
+              "is_bold": false,
+              "file_path": null,
+              "url_link": null,
+              "children": [],
+              "edge_label": "Si erreur d'installation"
+            }
+          ]
+        },
+        {
+          "id": "node_7",
+          "label": "Vérifier les licences (ex: LabView, IDE)",
+          "x": -117.23749999999995,
+          "y": -235.92749999999998,
+          "shape": "box",
+          "bg": "#ebf8ff",
+          "border": "#63b3ed",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     },
     {
       "id": "run",
       "label": "🏃 3. Premiers pas & Validation",
-      "x": 300.0,
-      "y": -120.0,
+      "x": -215.77499999999998,
+      "y": 185.49749999999995,
+      "shape": "box",
       "bg": "#feebc8",
       "border": "#fbd38d",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Lancer le script de test d'affichage" },
-        { "label": "Exécuter une séquence de test à vide" }
+        {
+          "id": "node_9",
+          "label": "Lancer le script de test d'affichage",
+          "x": -72.47999999999996,
+          "y": 327.0049999999999,
+          "shape": "box",
+          "bg": "#feebc8",
+          "border": "#fbd38d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_10",
+          "label": "Exécuter une séquence de test à vide",
+          "x": -355.4949999999999,
+          "y": 263.1424999999999,
+          "shape": "box",
+          "bg": "#feebc8",
+          "border": "#fbd38d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     },
     {
       "id": "team",
       "label": "👥 4. Qui contacter en cas de blocage ?",
-      "x": 0.0,
-      "y": 150.0,
+      "x": 477.4224999999999,
+      "y": 33.62000000000003,
+      "shape": "box",
       "bg": "#f3e5f5",
       "border": "#ce93d8",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "id": "referent_technique", "label": "Référent Code / Backend : [Nom]" },
-        { "label": "Chef de projet : [Nom]" }
+        {
+          "id": "referent_technique",
+          "label": "Référent Code / Backend : [Nom]",
+          "x": 432.92249999999996,
+          "y": -54.98749999999998,
+          "shape": "box",
+          "bg": "#f3e5f5",
+          "border": "#ce93d8",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_13",
+          "label": "Chef de projet : [Nom]",
+          "x": 700.0674999999999,
+          "y": -54.04749999999993,
+          "shape": "box",
+          "bg": "#f3e5f5",
+          "border": "#ce93d8",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     }
   ],
-  "cross_links": [
-    { "from": "scripts", "to": "referent_technique", "label": "Si erreur d'installation", "color": "#ce93d8" }
-  ]
+  "cross_links": []
 }

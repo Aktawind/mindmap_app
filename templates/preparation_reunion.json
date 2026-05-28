@@ -7,29 +7,86 @@
   "bg": "#4a90e2",
   "border": "#357abd",
   "font_color": "#ffffff",
+  "border_width": 1,
   "is_bold": true,
+  "file_path": null,
+  "url_link": null,
   "children": [
     {
+      "id": "node_2",
       "label": "🎯 Mon Objectif",
       "x": -250.0,
       "y": -100.0,
+      "shape": "box",
       "bg": "#e6fffa",
       "border": "#4fd1c5",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Le résultat idéal en sortant de la pièce" }
+        {
+          "id": "node_3",
+          "label": "Le résultat idéal en sortant de la pièce",
+          "x": -124.0,
+          "y": -190.0,
+          "shape": "box",
+          "bg": "#e6fffa",
+          "border": "#4fd1c5",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     },
     {
+      "id": "node_4",
       "label": "💬 Points clés à aborder",
       "x": 250.0,
       "y": -100.0,
+      "shape": "box",
       "bg": "#ebf8ff",
       "border": "#63b3ed",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Argument 1 (Faits / Chiffres)" },
-        { "label": "Argument 2 (Solutions proposées)" }
+        {
+          "id": "node_5",
+          "label": "Argument 1 (Faits / Chiffres)",
+          "x": 475.0,
+          "y": -162.0,
+          "shape": "box",
+          "bg": "#ebf8ff",
+          "border": "#63b3ed",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_6",
+          "label": "Argument 2 (Solutions proposées)",
+          "x": 466.0,
+          "y": -25.0,
+          "shape": "box",
+          "bg": "#ebf8ff",
+          "border": "#63b3ed",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     },
     {
@@ -37,27 +94,94 @@
       "label": "⚠️ Objections possibles (Anticipation)",
       "x": -250.0,
       "y": 120.0,
+      "shape": "box",
       "bg": "#ffebee",
       "border": "#ef9a9a",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "id": "reponse_obj", "label": "Si on me dit [X] -> Ma réponse : [Y]" }
+        {
+          "id": "reponse_obj",
+          "label": "Si on me dit [X] -> Ma réponse : [Y]",
+          "x": -195.0,
+          "y": 243.0,
+          "shape": "box",
+          "bg": "#ffebee",
+          "border": "#ef9a9a",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "reponse_obj",
+          "label": "Si on me dit [X] -> Ma réponse : [Y]",
+          "x": -195.0,
+          "y": 243.0,
+          "shape": "box",
+          "bg": "#ffebee",
+          "border": "#ef9a9a",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": [],
+          "edge_label": "Stratégie"
+        }
       ]
     },
     {
+      "id": "node_9",
       "label": "📝 Notes & Décisions (À remplir pendant)",
       "x": 250.0,
       "y": 120.0,
+      "shape": "box",
       "bg": "#fff3e0",
       "border": "#ffb74d",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Actions décidées" },
-        { "label": "Prochaine échéance / Date du prochain point" }
+        {
+          "id": "node_10",
+          "label": "Actions décidées",
+          "x": 526.0,
+          "y": 120.0,
+          "shape": "box",
+          "bg": "#fff3e0",
+          "border": "#ffb74d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_11",
+          "label": "Prochaine échéance / Date du prochain point",
+          "x": 526.0,
+          "y": 195.0,
+          "shape": "box",
+          "bg": "#fff3e0",
+          "border": "#ffb74d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     }
   ],
-  "cross_links": [
-    { "from": "objections", "to": "reponse_obj", "label": "Stratégie", "color": "#e53e3e" }
-  ]
+  "cross_links": []
 }

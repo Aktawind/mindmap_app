@@ -7,31 +7,148 @@
   "bg": "#2d3748",
   "border": "#4a5568",
   "font_color": "#ffffff",
+  "border_width": 1,
   "is_bold": true,
+  "file_path": null,
+  "url_link": null,
   "children": [
     {
+      "id": "node_2",
       "label": "🟢 Ce qui a super bien marché",
       "x": -250.0,
       "y": -120.0,
+      "shape": "box",
       "bg": "#e8f5e9",
       "border": "#81c784",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Les points forts techniques ou organisationnels" },
-        { "label": "Ce dont on est fiers" }
+        {
+          "id": "node_3",
+          "label": "Les points forts techniques ou organisationnels",
+          "x": -127.5,
+          "y": -212.0,
+          "shape": "box",
+          "bg": "#e8f5e9",
+          "border": "#81c784",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_4",
+          "label": "Ce dont on est fiers",
+          "x": -343.5,
+          "y": -27.0,
+          "shape": "box",
+          "bg": "#e8f5e9",
+          "border": "#81c784",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     },
     {
       "id": "problemes",
       "label": "🔴 Ce qui a posé problème / Les frictions",
-      "x": 250.0,
-      "y": -120.0,
+      "x": 345.0,
+      "y": -19.0,
+      "shape": "box",
       "bg": "#ffebee",
       "border": "#ef9a9a",
       "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Les imprévus / Les pertes de temps" },
-        { "label": "Les manques (outils, communication, docs)" }
+        {
+          "id": "node_6",
+          "label": "Les imprévus / Les pertes de temps",
+          "x": 462.0,
+          "y": -84.0,
+          "shape": "box",
+          "bg": "#ffebee",
+          "border": "#ef9a9a",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_7",
+          "label": "Les manques (outils, communication, docs)",
+          "x": 553.0,
+          "y": 59.0,
+          "shape": "box",
+          "bg": "#ffebee",
+          "border": "#ef9a9a",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "lecons",
+          "label": "💡 Leçons apprises pour le PROCHAIN projet",
+          "x": 0.0,
+          "y": 150.0,
+          "shape": "box",
+          "bg": "#fff3e0",
+          "border": "#ffb74d",
+          "font_color": "#333333",
+          "border_width": 2,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": [
+            {
+              "id": "node_9",
+              "label": "Règle n°1 à appliquer dès le départ",
+              "x": -73.5,
+              "y": 213.0,
+              "shape": "box",
+              "bg": "#fff3e0",
+              "border": "#ffb74d",
+              "font_color": "#333333",
+              "border_width": 1,
+              "is_bold": false,
+              "file_path": null,
+              "url_link": null,
+              "children": []
+            },
+            {
+              "id": "node_10",
+              "label": "Amélioration technique à automatiser",
+              "x": 285.5,
+              "y": 225.0,
+              "shape": "box",
+              "bg": "#fff3e0",
+              "border": "#ffb74d",
+              "font_color": "#333333",
+              "border_width": 1,
+              "is_bold": false,
+              "file_path": null,
+              "url_link": null,
+              "children": []
+            }
+          ],
+          "edge_label": "Action corrective"
+        }
       ]
     },
     {
@@ -39,17 +156,47 @@
       "label": "💡 Leçons apprises pour le PROCHAIN projet",
       "x": 0.0,
       "y": 150.0,
+      "shape": "box",
       "bg": "#fff3e0",
       "border": "#ffb74d",
       "font_color": "#333333",
       "border_width": 2,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
       "children": [
-        { "label": "Règle n°1 à appliquer dès le départ" },
-        { "label": "Amélioration technique à automatiser" }
+        {
+          "id": "node_9",
+          "label": "Règle n°1 à appliquer dès le départ",
+          "x": -73.5,
+          "y": 213.0,
+          "shape": "box",
+          "bg": "#fff3e0",
+          "border": "#ffb74d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "node_10",
+          "label": "Amélioration technique à automatiser",
+          "x": 285.5,
+          "y": 225.0,
+          "shape": "box",
+          "bg": "#fff3e0",
+          "border": "#ffb74d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
       ]
     }
   ],
-  "cross_links": [
-    { "from": "problemes", "to": "lecons", "label": "Action corrective", "color": "#ffb74d" }
-  ]
+  "cross_links": []
 }
