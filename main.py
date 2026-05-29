@@ -24,7 +24,7 @@ from view_scene import MindMapWorkspace
 class MindMapApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Mindy - MindMap App")
+        self.setWindowTitle("Mindy")
         self.settings = QSettings("MindyApp", "MindMapEditor")
         self._clipboard_node = None
         
@@ -332,7 +332,7 @@ class MindMapApp(QMainWindow):
         suffix = " *" if ws.is_dirty else ""
         display_title = base_title + suffix
         self.tab_widget.setTabText(self.tab_widget.currentIndex(), display_title)
-        self.setWindowTitle(f"Mindy - MindMap App - {display_title}")
+        self.setWindowTitle(f"Mindy - {display_title}")
 
     def change_global_routing(self, index):
         ws = self.current_workspace()
