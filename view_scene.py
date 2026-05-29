@@ -12,6 +12,7 @@ class MindMapScene(QGraphicsScene):
         self.setBackgroundBrush(QColor('#f8f9fa'))
         self.signals = GraphicsSignals()
         self.line_routing_mode = 'curved'
+        self.snap_to_grid = False
 
     def mouseDoubleClickEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())

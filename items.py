@@ -154,6 +154,17 @@ class NodeItem(QGraphicsItem):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            scene = self.scene()
+            if scene and getattr(scene, 'snap_to_grid', False):
+                grid_size = 20
+                new_pos = value
+                x = round(new_pos.x() / grid_size) * grid_size
+                y = round(new_pos.y() / grid_size) * grid_size
+                
+                self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
+                self.setPos(x, y)
+                self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+
             for edge in self.edges:
                 edge.update_position()
             self.signals.positionChanged.emit()
@@ -187,41 +198,67 @@ class EdgeItem(QGraphicsPathItem):
             return
 
         scene = self.scene()
+        # Récupération du mode (par défaut 'curved' si non défini)
         mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
 
-        s_center = self.source_node.pos()
-        d_center = self.dest_node.pos()
+        # Récupération des centres des deux nœuds
+        start_center = self.source_node.pos()
+        end_center = self.dest_node.pos()
 
-        w_s = self.source_node.rect.width() / 2
-        w_d = self.dest_node.rect.width() / 2
+        # Fonction pour projeter l'ancrage à 360° sur la bordure d'un nœud
+        def get_border_intersection(node, target_pos):
+            dx = target_pos.x() - node.pos().x()
+            dy = target_pos.y() - node.pos().y()
 
-        # Ancrage latéral intelligent (gauche/droite) pour s'aligner avec le rendu horizontal
-        if d_center.x() >= s_center.x():
-            start = QPointF(s_center.x() + w_s, s_center.y())
-            end = QPointF(d_center.x() - w_d, d_center.y())
-            # Recul de 2px pour rendre la pointe de la flèche parfaitement visible devant le nœud
-            start = QPointF(start.x() + 2, start.y())
-            end = QPointF(end.x() - 2, end.y())
-        else:
-            start = QPointF(s_center.x() - w_s, s_center.y())
-            end = QPointF(d_center.x() + w_d, d_center.y())
-            start = QPointF(start.x() - 2, start.y())
-            end = QPointF(end.x() + 2, end.y())
+            if dx == 0 and dy == 0:
+                return node.pos()
+
+            half_w = node.rect.width() / 2
+            half_h = node.rect.height() / 2
+
+            # Calcul du ratio d'échelle vers les bordures du rectangle
+            ratio_x = half_w / abs(dx) if dx != 0 else float('inf')
+            ratio_y = half_h / abs(dy) if dy != 0 else float('inf')
+            scale = min(ratio_x, ratio_y)
+
+            # Renvoie le point exact sur la bordure
+            return QPointF(node.pos().x() + dx * scale, node.pos().y() + dy * scale)
+
+        # 1. Calcul des points d'attache précis sur le périmètre
+        start = get_border_intersection(self.source_node, end_center)
+        end = get_border_intersection(self.dest_node, start_center)
 
         path = QPainterPath()
         path.moveTo(start)
-
+        
+        # 2. Routage selon le mode (Orthogonal ou Courbe initiale)
         if mode == 'orthogonal':
-            mid_x = (start.x() + end.x()) / 2
-            path.lineTo(mid_x, start.y())
-            path.lineTo(mid_x, end.y())
+            # On détermine l'orientation dominante entre les deux nœuds
+            dx = abs(end_center.x() - start_center.x())
+            dy = abs(end_center.y() - start_center.y())
+            
+            if dy > dx:
+                # Alignement plutôt vertical (haut / bas) : coude sur l'axe Y
+                mid_y = start.y() + (end.y() - start.y()) / 2
+                path.lineTo(start.x(), mid_y)
+                path.lineTo(end.x(), mid_y)
+            else:
+                # Alignement plutôt horizontal (gauche / droite) : coude sur l'axe X
+                mid_x = start.x() + (end.x() - start.x()) / 2
+                path.lineTo(mid_x, start.y())
+                path.lineTo(mid_x, end.y())
+                
             path.lineTo(end)
         else:
-            ctrl_x = (start.x() + end.x()) / 2
-            path.cubicTo(ctrl_x, start.y(), ctrl_x, end.y(), end.x(), end.y())
-
+            # Mode courbe initial (les points de contrôle s'alignent sur l'axe horizontal)
+            ctrl_x1 = start.x() + (end.x() - start.x()) / 2
+            ctrl_y1 = start.y()
+            ctrl_x2 = start.x() + (end.x() - start.x()) / 2
+            ctrl_y2 = end.y()
+            
+            path.cubicTo(ctrl_x1, ctrl_y1, ctrl_x2, ctrl_y2, end.x(), end.y())
+        
         self.setPath(path)
-        self.update()
 
     def shape(self):
         stroker = QPainterPathStroker()

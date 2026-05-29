@@ -2,23 +2,31 @@
 import sys
 import os
 import json
+import math
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QFileDialog, QMessageBox, QWidget, 
-    QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QComboBox, 
-    QTextEdit, QTabWidget, QInputDialog
+    QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsItem, 
+    QGraphicsPathItem, QFileDialog, 
+    QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
+    QFrame, QComboBox, QTextEdit, QTabWidget, QInputDialog
 )
-from PyQt6.QtGui import QFont, QKeySequence, QDesktopServices, QPixmap, QShortcut, QIcon, QColor, QPainter, QCloseEvent
-from PyQt6.QtCore import Qt, QTimer, QUrl, QSettings, QRectF
+from PyQt6.QtGui import (
+    QPainter, QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, 
+    QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon, QCloseEvent, QPolygonF, QPageLayout, QPageSize
+)
+from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer, QPointF, QMarginsF
+from PyQt6.QtPrintSupport import QPrinter
 
-# On importe nos modules locaux
-from items import NodeItem, EdgeItem, BRANCH_PALETTES
-from view_scene import MindMapWorkspace, MindMapScene
+from items import NodeItem, EdgeItem
+from signals import GraphicsSignals
+from view_scene import MindMapWorkspace
+
 
 class MindMapApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Mindy - MindMap App")
         self.settings = QSettings("MindyApp", "MindMapEditor")
+        self._clipboard_node = None
         
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
@@ -54,16 +62,29 @@ class MindMapApp(QMainWindow):
         file_menu.addAction("💾 Enregistrer sous...", lambda: self.save_project(force_save_as=True))
         
         edit_menu = menu_bar.addMenu("Édition")
-        edit_menu.addAction("↩️ Annuler", self.undo).setShortcut("Ctrl+Z")
-        edit_menu.addAction("↪️ Rétablir", self.redo).setShortcut("Ctrl+Y")
+        edit_menu.addAction("↩️ Annuler", self.undo).setShortcut(QKeySequence("Ctrl+Z"))
+        edit_menu.addAction("↪️ Rétablir", self.redo).setShortcut(QKeySequence("Ctrl+Y"))
+        edit_menu.addSeparator()
+        edit_menu.addAction("📋 Copier l'élément", self.copy_selected).setShortcut(QKeySequence("Ctrl+C"))
+        edit_menu.addAction("📥 Coller l'élément", self.paste_node).setShortcut(QKeySequence("Ctrl+V"))
         
         export_menu = menu_bar.addMenu("Exporter")
-        export_menu.addAction("Exporter en Image", self.export_png)
+        export_menu.addAction("Exporter en Image PNG", self.export_png)
+        export_menu.addAction("Exporter en PDF Vectoriel", self.export_pdf)
         export_menu.addAction("Exporter en Markdown", self.export_md)
 
         self.header_right_widget = QWidget()
         hr_layout = QHBoxLayout(self.header_right_widget)
         hr_layout.setContentsMargins(0, 0, 10, 0)
+
+        self.btn_snap = QPushButton(" 🧲 Aimant Grille ")
+        self.btn_snap.setCheckable(True)
+        self.btn_snap.setStyleSheet("""
+            QPushButton { padding: 6px 15px; border: 1px solid #ccc; border-radius: 4px; background: #f1f5f9; }
+            QPushButton:checked { background: #3B82F6; color: white; border-color: #2563EB; font-weight: bold; }
+        """)
+        self.btn_snap.clicked.connect(self.toggle_snap_to_grid)
+        hr_layout.addWidget(self.btn_snap)
         
         self.routing_combo = QComboBox()
         self.routing_combo.addItem("Branches Courbes", "curved")
@@ -81,23 +102,26 @@ class MindMapApp(QMainWindow):
         self.template_combo.addItem("🚀 Onboarding Technique", "onboarding_technique.json")
         self.template_combo.addItem("🎨 Hub Multi-Passions", "hub_passions.json")
         self.template_combo.addItem("✈️ Organisation d'un Voyage", "organisation_voyage.json")
-        self.template_combo.addItem("🗣️ Préparation Réunion/Entretien", "preparation_reunion.json")
+        self.template_combo.addItem("🗣️ Préparation Réunion", "preparation_reunion.json")
         self.template_combo.addItem("🏁 Rétrospective de Fin de Projet", "retro_projet.json")
         self.template_combo.addItem("☀️ Daily Capsule", "daily_capsule.json")
         self.template_combo.addItem("🔋 Santé Mentale et Énergie", "sante_mentale_energie.json")
         self.template_combo.addItem("🚨 Urgence Colère", "urgence_colere.json")
-        self.template_combo.setStyleSheet("margin: 2px 10px; padding: 2px 10px; border: 1px solid #ccc; border-radius: 4px;")
+        self.template_combo.setStyleSheet("""
+            QComboBox { border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 5px; background: white; }
+        """)
         self.template_combo.currentIndexChanged.connect(self.apply_template)
         hr_layout.addWidget(self.template_combo)
         
         menu_bar.setCornerWidget(self.header_right_widget, Qt.Corner.TopRightCorner)
 
         self.style_bar = QFrame(self)
+        self.style_bar.setObjectName("StyleBar") # <-- On lui donne un nom unique
         self.style_bar.setStyleSheet("""
-            QFrame { background: white; border-radius: 20px; border: 1px solid #e2e8f0; }
-            QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 12px; }
-            QPushButton:hover { background: #e2e8f0; }
-            QComboBox { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px; border-radius: 8px; min-width: 110px; }
+            #StyleBar { background: white; border-radius: 20px; border: 1px solid #e2e8f0; }
+            #StyleBar QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 12px; }
+            #StyleBar QPushButton:hover { background: #e2e8f0; }
+            #StyleBar QComboBox { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px; border-radius: 8px; min-width: 110px; }
         """)
         style_layout = QHBoxLayout(self.style_bar)
         
@@ -196,7 +220,7 @@ class MindMapApp(QMainWindow):
         self.overlay = QFrame(self)
         self.overlay.setStyleSheet("background: rgba(255,255,255,0.95); border-radius: 8px; border: 1px solid #ddd;")
         ol_layout = QVBoxLayout(self.overlay)
-        lbl = QLabel("<b>Commandes :</b><br>- Double-clic vide : Nouveau nœud<br>- Double-clic : Éditer le texte<br>- Sélect + Tab : Ajouter une branche<br>- Ctrl + Clic : Sélectionner 2 nœuds<br>- Suppr : Supprimer l'élément")
+        lbl = QLabel("<b>Commandes :</b><br>- Double-clic vide : Nouveau nœud<br>- Double-clic : Éditer le texte<br>- Sélect + Tab : Ajouter une branche<br>- Ctrl+C / Ctrl+V : Copier/Coller<br>- Ctrl + Clic : Sélectionner 2 nœuds<br>- Suppr : Supprimer l'élément")
         lbl.setFont(QFont("Segoe UI", 9))
         ol_layout.addWidget(lbl)
         self.overlay.resize(230, 140)
@@ -214,11 +238,27 @@ class MindMapApp(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self.reposition_style_bar()
+        self.overlay.raise_()
+
+    def reposition_style_bar(self):
         self.style_bar.adjustSize()
         x = (self.width() - self.style_bar.width()) // 2
         y = self.height() - self.style_bar.height() - 30
         self.style_bar.move(x, y)
-        self.overlay.raise_()
+
+    def toggle_snap_to_grid(self, checked):
+        ws = self.current_workspace()
+        if not ws: return
+        ws.scene.snap_to_grid = checked
+        if checked:
+            for item in ws.scene.items():
+                if isinstance(item, NodeItem):
+                    x = round(item.pos().x() / 20) * 20
+                    y = round(item.pos().y() / 20) * 20
+                    item.setPos(x, y)
+            ws.scene.update()
+            self.save_state()
 
     def load_last_project_on_startup(self):
         last_path = self.settings.value("last_project_path", "")
@@ -279,6 +319,10 @@ class MindMapApp(QMainWindow):
                 self.routing_combo.blockSignals(True)
                 self.routing_combo.setCurrentIndex(idx)
                 self.routing_combo.blockSignals(False)
+            
+            self.btn_snap.blockSignals(True)
+            self.btn_snap.setChecked(getattr(ws.scene, 'snap_to_grid', False))
+            self.btn_snap.blockSignals(False)
         self.on_selection_changed()
 
     def update_title(self):
@@ -353,6 +397,7 @@ class MindMapApp(QMainWindow):
 
         tree_data = serialize_node(root)
         tree_data["global_line_routing"] = ws.scene.line_routing_mode
+        tree_data["snap_to_grid"] = getattr(ws.scene, 'snap_to_grid', False)
 
         cross_links_data = []
         for edge in edges:
@@ -382,6 +427,17 @@ class MindMapApp(QMainWindow):
             return
 
         ws.scene.line_routing_mode = root_data.get("global_line_routing", "curved")
+        ws.scene.snap_to_grid = root_data.get("snap_to_grid", False)
+        
+        self.btn_snap.blockSignals(True)
+        self.btn_snap.setChecked(ws.scene.snap_to_grid)
+        self.btn_snap.blockSignals(False)
+
+        idx = self.routing_combo.findData(ws.scene.line_routing_mode)
+        if idx != -1:
+            self.routing_combo.blockSignals(True)
+            self.routing_combo.setCurrentIndex(idx)
+            self.routing_combo.blockSignals(False)
         
         node_counter = [0]
         edge_counter = [0]
@@ -402,7 +458,6 @@ class MindMapApp(QMainWindow):
             if status == "none" and raw_label.startswith("🚨 "):
                 status = "urgent"
 
-            # Rétrocompatibilité : Nettoyage des anciennes mentions textuelles de fichiers/liens
             clean_label = raw_label.replace("\n📄 Document joint", "").replace("\n🔗 Lien URL", "")
 
             node = NodeItem(
@@ -458,6 +513,58 @@ class MindMapApp(QMainWindow):
         ws.is_dirty = True
         self.update_title()
 
+    def copy_selected(self):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            src = sel[0]
+            self._clipboard_node = {
+                "label": src.label,
+                "shape": src.shape_type,
+                "bg": src.bg_color.name(),
+                "border": src.border_color.name(),
+                "font_color": src.font_color.name(),
+                "is_bold": src.is_bold,
+                "status": src.status,
+                "notes": getattr(src, 'notes', ''),
+                "file_path": src.file_path,
+                "url_link": src.url_link
+            }
+
+    def paste_node(self):
+        ws = self.current_workspace()
+        if not ws or not self._clipboard_node: return
+        
+        data = self._clipboard_node
+        new_id = f"node_paste_{len(ws.scene.items())}"
+        
+        center = ws.view.mapToScene(ws.view.viewport().rect().center())
+        x, y = center.x(), center.y()
+        
+        if getattr(ws.scene, 'snap_to_grid', False):
+            x = round(x / 20) * 20
+            y = round(y / 20) * 20
+
+        new_node = NodeItem(
+            new_id, data["label"], x, y,
+            shape=data["shape"], bg=data["bg"], border=data["border"], font_color=data["font_color"]
+        )
+        new_node.is_bold = data["is_bold"]
+        new_node.status = data["status"]
+        if hasattr(new_node, 'notes'): new_node.notes = data["notes"]
+        new_node.file_path = data["file_path"]
+        new_node.url_link = data["url_link"]
+        
+        new_node.signals.itemDoubleClicked.connect(self.start_inline_editing)
+        new_node.signals.positionChanged.connect(self.save_state)
+        
+        ws.scene.addItem(new_node)
+        self.save_state()
+        
+        ws.scene.clearSelection()
+        new_node.setSelected(True)
+
     def on_selection_changed(self):
         ws = self.current_workspace()
         if not ws: 
@@ -490,11 +597,13 @@ class MindMapApp(QMainWindow):
                 self.arrow_combo.blockSignals(True)
                 self.arrow_combo.setCurrentIndex(self.arrow_combo.findData(sel[0].arrow_dir))
                 self.arrow_combo.blockSignals(False)
+            self.reposition_style_bar()
         elif len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
             self.style_bar.show()
             self.node_controls.hide()
             self.edge_controls.hide()
             self.connect_controls.show()
+            self.reposition_style_bar()
         else:
             self.style_bar.hide()
 
@@ -533,10 +642,16 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws: return
         nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+        
+        x, y = pos.x(), pos.y()
+        if getattr(ws.scene, 'snap_to_grid', False):
+            x = round(x / 20) * 20
+            y = round(y / 20) * 20
+
         if not nodes:
-            node = NodeItem('root', "Nouvelle idée centrale", pos.x(), pos.y(), bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
+            node = NodeItem('root', "Nouvelle idée centrale", x, y, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
         else:
-            node = NodeItem(f"node_{len(nodes)+1}", "Nouvelle idée", pos.x(), pos.y(), bg='#FFF3E0', border='#FFB74D', font_color='#333333')
+            node = NodeItem(f"node_{len(nodes)+1}", "Nouvelle idée", x, y, bg='#FFF3E0', border='#FFB74D', font_color='#333333')
             
         node.signals.itemDoubleClicked.connect(self.start_inline_editing)
         node.signals.positionChanged.connect(self.save_state)
@@ -594,18 +709,23 @@ class MindMapApp(QMainWindow):
     def commit_edit(self):
         if not hasattr(self, 'editor') or self.editor is None: return
         new_text = self.editor.toPlainText().strip()
+        changed = False
         
         if isinstance(self.edit_item, NodeItem):
-            if new_text:
+            if new_text and self.edit_item.label != new_text:
                 self.edit_item.label = new_text
                 self.edit_item.recalculate_size()
+                changed = True
         else:
-            self.edit_item.label = new_text
-            self.edit_item.update()
+            if self.edit_item.label != new_text:
+                self.edit_item.label = new_text
+                self.edit_item.update()
+                changed = True
             
         self.editor.deleteLater()
         self.editor = None
-        self.save_state()
+        if changed:
+            self.save_state()
 
     def on_tab_pressed(self):
         if hasattr(self, 'editor') and self.editor is not None: return
@@ -678,6 +798,10 @@ class MindMapApp(QMainWindow):
         new_id = f"node_{len(ws.scene.items())}"
         
         t_x, t_y = self.calculate_smart_position(parent_node)
+        if getattr(ws.scene, 'snap_to_grid', False):
+            t_x = round(t_x / 20) * 20
+            t_y = round(t_y / 20) * 20
+
         bg, border, text_col, edge_col = parent_node.bg_color.name(), parent_node.border_color.name(), parent_node.font_color.name(), '#A0AEC0'
         child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
         
@@ -817,8 +941,10 @@ class MindMapApp(QMainWindow):
             self.update_title()
 
     def load_project(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Ouvrir", "", "JSON (*.json)")
-        if path: self.load_project_from_path(path)
+        paths, _ = QFileDialog.getOpenFileNames(self, "Ouvrir un ou plusieurs projets", "", "JSON (*.json)")
+        if paths:
+            for path in paths:
+                self.load_project_from_path(path)
 
     def load_project_from_path(self, path):
         with open(path, 'r', encoding='utf-8') as f:
@@ -887,10 +1013,8 @@ class MindMapApp(QMainWindow):
             ws.scene.clearSelection()
             rect = ws.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
             
-            # Récupérer le ratio de l'écran actuel
             ratio = self.devicePixelRatioF() if hasattr(self, 'devicePixelRatioF') else self.devicePixelRatio()
             
-            # Créer un pixmap à la taille physique (pixel réel)
             pixmap = QPixmap(int(rect.width() * ratio), int(rect.height() * ratio))
             pixmap.setDevicePixelRatio(ratio)
             pixmap.fill(QColor('#f8f9fa'))
@@ -900,15 +1024,64 @@ class MindMapApp(QMainWindow):
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
             
-            # CRUCIAL : On adapte l'échelle du painter pour dessiner avec la haute résolution
             painter.scale(ratio, ratio)
-            
-            # On ajuste la zone cible pour correspondre à la taille logique (sans le ratio)
             target_rect = QRectF(0, 0, rect.width(), rect.height())
             
             ws.scene.render(painter, target=target_rect, source=rect)
             painter.end()
             pixmap.save(path, "PNG", 100)
+
+    def export_pdf(self):
+        ws = self.current_workspace()
+        if not ws: return
+        
+        path, _ = QFileDialog.getSaveFileName(self, "Exporter PDF Vectoriel", "ma_mindmap.pdf", "PDF (*.pdf)")
+        if path:
+            ws.scene.clearSelection()
+            
+            # 1. On récupère les dimensions réelles occupées par le graphe (avec marge)
+            rect = ws.scene.itemsBoundingRect().adjusted(-40, -40, 40, 40)
+            if rect.isEmpty(): return
+            
+            # 2. Utiliser ScreenResolution au lieu de HighResolution pour garder le bon ratio polices/formes
+            printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
+            printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+            printer.setOutputFileName(path)
+            
+            # 3. Choix de l'orientation de la page
+            layout = QPageLayout()
+            if rect.width() > rect.height():
+                layout.setOrientation(QPageLayout.Orientation.Landscape)
+            else:
+                layout.setOrientation(QPageLayout.Orientation.Portrait)
+                
+            layout.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+            layout.setMargins(QMarginsF(10, 10, 10, 10))
+            printer.setPageLayout(layout)
+                
+            painter = QPainter(printer)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+            
+            # 4. Obtenir la zone de la page disponible en pixels de résolution logique
+            page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
+            
+            # 5. Calculer le ratio global pour que tout rentre proportionnellement
+            scale_x = page_rect.width() / rect.width()
+            scale_y = page_rect.height() / rect.height()
+            scale = min(scale_x, scale_y)
+            
+            # 6. Définir un rectangle cible centré sur la page A4 qui respecte EXACTEMENT les proportions du graphe
+            target_w = rect.width() * scale
+            target_h = rect.height() * scale
+            target_x = page_rect.left() + (page_rect.width() - target_w) / 2.0
+            target_y = page_rect.top() + (page_rect.height() - target_h) / 2.0
+            
+            target_rect = QRectF(target_x, target_y, target_w, target_h)
+            
+            # 7. C'est scene.render() qui va gérer la mise à l'échelle harmonieuse des polices et des formes
+            ws.scene.render(painter, target=target_rect, source=rect)
+            painter.end()
 
     def export_md(self):
         ws = self.current_workspace()
@@ -940,4 +1113,6 @@ if __name__ == '__main__':
     app.setFont(QFont("Segoe UI", 10))
     window = MindMapApp()
     window.show()
+    # Forcer la mise à jour géométrique initiale de la barre de boutons dès l'affichage
+    QTimer.singleShot(50, window.reposition_style_bar)
     sys.exit(app.exec())
