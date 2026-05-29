@@ -198,63 +198,75 @@ class EdgeItem(QGraphicsPathItem):
             return
 
         scene = self.scene()
-        # Récupération du mode (par défaut 'curved' si non défini)
         mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
 
-        # Récupération des centres des deux nœuds
         start_center = self.source_node.pos()
         end_center = self.dest_node.pos()
 
-        # Fonction pour projeter l'ancrage à 360° sur la bordure d'un nœud
+        # Fonction modifiée pour renvoyer le point ET la face d'intersection
         def get_border_intersection(node, target_pos):
             dx = target_pos.x() - node.pos().x()
             dy = target_pos.y() - node.pos().y()
 
             if dx == 0 and dy == 0:
-                return node.pos()
+                return node.pos(), "center"
 
             half_w = node.rect.width() / 2
             half_h = node.rect.height() / 2
 
-            # Calcul du ratio d'échelle vers les bordures du rectangle
             ratio_x = half_w / abs(dx) if dx != 0 else float('inf')
             ratio_y = half_h / abs(dy) if dy != 0 else float('inf')
-            scale = min(ratio_x, ratio_y)
+            
+            # Détermination de la face touchée (gauche/droite vs haut/bas)
+            if ratio_x < ratio_y:
+                scale = ratio_x
+                side = "right" if dx > 0 else "left"
+            else:
+                scale = ratio_y
+                side = "bottom" if dy > 0 else "top"
 
-            # Renvoie le point exact sur la bordure
-            return QPointF(node.pos().x() + dx * scale, node.pos().y() + dy * scale)
+            return QPointF(node.pos().x() + dx * scale, node.pos().y() + dy * scale), side
 
-        # 1. Calcul des points d'attache précis sur le périmètre
-        start = get_border_intersection(self.source_node, end_center)
-        end = get_border_intersection(self.dest_node, start_center)
+        # 1. Calcul des points d'attache et récupération des faces concernées
+        start, start_side = get_border_intersection(self.source_node, end_center)
+        end, end_side = get_border_intersection(self.dest_node, start_center)
 
         path = QPainterPath()
         path.moveTo(start)
         
-        # 2. Routage selon le mode (Orthogonal ou Courbe initiale)
+        # 2. Routage selon le mode
         if mode == 'orthogonal':
-            # On détermine l'orientation dominante entre les deux nœuds
             dx = abs(end_center.x() - start_center.x())
             dy = abs(end_center.y() - start_center.y())
             
             if dy > dx:
-                # Alignement plutôt vertical (haut / bas) : coude sur l'axe Y
                 mid_y = start.y() + (end.y() - start.y()) / 2
                 path.lineTo(start.x(), mid_y)
                 path.lineTo(end.x(), mid_y)
             else:
-                # Alignement plutôt horizontal (gauche / droite) : coude sur l'axe X
                 mid_x = start.x() + (end.x() - start.x()) / 2
                 path.lineTo(mid_x, start.y())
                 path.lineTo(mid_x, end.y())
                 
             path.lineTo(end)
         else:
-            # Mode courbe initial (les points de contrôle s'alignent sur l'axe horizontal)
-            ctrl_x1 = start.x() + (end.x() - start.x()) / 2
-            ctrl_y1 = start.y()
-            ctrl_x2 = start.x() + (end.x() - start.x()) / 2
-            ctrl_y2 = end.y()
+            # --- MODE COURBE DYNAMIQUE ET PERPENDICULAIRE ---
+            dx = end.x() - start.x()
+            dy = end.y() - start.y()
+            
+            # Point de contrôle 1 (départ du nœud parent)
+            ctrl_x1, ctrl_y1 = start.x(), start.y()
+            if start_side in ('left', 'right'):
+                ctrl_x1 += dx / 2  # Pousse horizontalement
+            else:
+                ctrl_y1 += dy / 2  # Pousse verticalement (perpendiculaire !)
+
+            # Point de contrôle 2 (arrivée sur le nœud enfant)
+            ctrl_x2, ctrl_y2 = end.x(), end.y()
+            if end_side in ('left', 'right'):
+                ctrl_x2 -= dx / 2  # Arrive horizontalement
+            else:
+                ctrl_y2 -= dy / 2  # Arrive verticalement (perpendiculaire !)
             
             path.cubicTo(ctrl_x1, ctrl_y1, ctrl_x2, ctrl_y2, end.x(), end.y())
         
