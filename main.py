@@ -1,17 +1,18 @@
 import sys
 import os
 import json
+import math
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsItem, 
-    QGraphicsPathItem, QMenu, QMenuBar, QFileDialog, 
+    QGraphicsPathItem, QFileDialog, 
     QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QFrame, QComboBox, QTextEdit, QTabWidget, QInputDialog
 )
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, 
-    QAction, QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon, QCloseEvent
+    QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon, QCloseEvent, QPolygonF
 )
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer
+from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer, QPointF
 
 # --- PALETTES DE COULEURS ---
 BRANCH_PALETTES = [
@@ -28,7 +29,7 @@ class GraphicsSignals(QObject):
     positionChanged = pyqtSignal()
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', file_path=None, url_link=None, is_bold=False):
+    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', file_path=None, url_link=None, is_bold=False, status='none'):
         super().__init__()
         self.node_id = node_id
         self.label = label
@@ -39,6 +40,7 @@ class NodeItem(QGraphicsItem):
         self.file_path = file_path
         self.url_link = url_link
         self.is_bold = is_bold
+        self.status = status 
         self.border_width = 1
         
         self.setPos(x, y)
@@ -64,38 +66,106 @@ class NodeItem(QGraphicsItem):
         if self.is_bold:
             font.setBold(True)
         fm = QFontMetrics(font)
-        lines = self.label.split('\n')
+        
+        display_label = self.label
+        if self.status == 'urgent' and not display_label.startswith("🚨 "): display_label = "🚨 " + display_label
+        elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
+        elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
+
+        # Ajout discret des icônes à la fin du texte pour le calcul de la taille
+        if self.file_path: display_label += " 📄"
+        if self.url_link: display_label += " 🔗"
+
+        lines = display_label.split('\n')
         max_width = max(fm.horizontalAdvance(line) for line in lines) if lines else 0
         total_height = fm.height() * len(lines) if lines else fm.height()
+        
         width = max(max_width + 30, 100)
         height = max(total_height + 20, 40)
+        
+        if self.shape_type == 'diamond':
+            width = int(width * 1.1)
+            height = int(height * 1.7)
+        elif self.shape_type == 'ellipse':
+            height = max(total_height + 35, 55)
+
         self.rect = QRectF(-width/2, -height/2, width, height)
         self.prepareGeometryChange()
 
     def boundingRect(self):
-        padding = self.border_width + 4
+        padding = self.border_width + 6
         return self.rect.adjusted(-padding, -padding, padding, padding)
 
-    def paint(self, painter, option, widget=None):
+    def paint(self, painter):
+        final_bg = self.bg_color
+        final_border = self.border_color
+        final_text_color = self.font_color
+        b_width = self.border_width
+
+        if self.status == 'urgent':
+            final_border = QColor("#E53E3E")
+            b_width = 3
+        elif self.status == 'progress':
+            final_bg = QColor("#FEF3C7")
+            final_border = QColor("#D97706")
+            final_text_color = QColor("#92400E")
+        elif self.status == 'done':
+            final_bg = QColor("#D1FAE5")
+            final_border = QColor("#059669")
+            final_text_color = QColor("#065F46")
+
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(0, 0, 0, 15))
-        painter.drawRoundedRect(self.rect.translated(2, 2), 5, 5)
+        shadow_rect = self.rect.translated(2, 2)
+        if self.shape_type == 'ellipse':
+            painter.drawEllipse(shadow_rect)
+        elif self.shape_type == 'diamond':
+            path = QPainterPath()
+            path.moveTo(shadow_rect.left() + shadow_rect.width()/2, shadow_rect.top())
+            path.lineTo(shadow_rect.right(), shadow_rect.top() + shadow_rect.height()/2)
+            path.lineTo(shadow_rect.left() + shadow_rect.width()/2, shadow_rect.bottom())
+            path.lineTo(shadow_rect.left(), shadow_rect.top() + shadow_rect.height()/2)
+            path.closeSubpath()
+            painter.drawPath(path)
+        else:
+            painter.drawRoundedRect(shadow_rect, 6, 6)
 
-        pen = QPen(self.border_color, self.border_width)
+        pen = QPen(final_border, b_width)
         if self.isSelected():
-            pen.setWidth(self.border_width + 2)
-            pen.setColor(self.border_color.darker(150))
+            pen.setWidth(b_width + 2)
+            pen.setColor(final_border.darker(150))
         painter.setPen(pen)
-        painter.setBrush(QBrush(self.bg_color))
+        painter.setBrush(QBrush(final_bg))
 
-        painter.drawRoundedRect(self.rect, 6, 6)
+        if self.shape_type == 'ellipse':
+            painter.drawEllipse(self.rect)
+        elif self.shape_type == 'diamond':
+            path = QPainterPath()
+            path.moveTo(self.rect.left() + self.rect.width()/2, self.rect.top())
+            path.lineTo(self.rect.right(), self.rect.top() + self.rect.height()/2)
+            path.lineTo(self.rect.left() + self.rect.width()/2, self.rect.bottom())
+            path.lineTo(self.rect.left(), self.rect.top() + self.rect.height()/2)
+            path.closeSubpath()
+            painter.drawPath(path)
+        else:
+            painter.drawRoundedRect(self.rect, 6, 6)
 
-        painter.setPen(QPen(self.font_color))
+        painter.setPen(QPen(final_text_color))
         font = QFont('Segoe UI', 11)
         if self.is_bold:
             font.setBold(True)
         painter.setFont(font)
-        painter.drawText(self.rect, int(Qt.AlignmentFlag.AlignCenter), self.label)
+        
+        display_label = self.label
+        if self.status == 'urgent' and not display_label.startswith("🚨 "): display_label = "🚨 " + display_label
+        elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
+        elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
+
+        # Ajout discret des icônes uniquement à l'affichage
+        if self.file_path: display_label += " 📄"
+        if self.url_link: display_label += " 🔗"
+
+        painter.drawText(self.rect, int(Qt.AlignmentFlag.AlignCenter), display_label)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
@@ -110,63 +180,116 @@ class NodeItem(QGraphicsItem):
 
 
 class EdgeItem(QGraphicsPathItem):
-    def __init__(self, edge_id, source_node, dest_node, label="", color='#A0AEC0'):
+    def __init__(self, edge_id, source_node, dest_node, label="", color='#A0AEC0', arrow_dir="none"):
         super().__init__()
         self.edge_id = edge_id
         self.source_node = source_node
         self.dest_node = dest_node
         self.label = label
         self.color = QColor(color)
-        
+        self.arrow_dir = arrow_dir
+
         self.source_node.add_edge(self)
         self.dest_node.add_edge(self)
-        
+
         self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setZValue(0)
         self.signals = GraphicsSignals()
         self.update_position()
 
     def update_position(self):
-        if not self.source_node or not self.dest_node: return
-        start = self.source_node.pos()
-        end = self.dest_node.pos()
-        
+        if not self.source_node or not self.dest_node:
+            return
+
+        scene = self.scene()
+        mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
+
+        s_center = self.source_node.pos()
+        d_center = self.dest_node.pos()
+
+        w_s = self.source_node.rect.width() / 2
+        w_d = self.dest_node.rect.width() / 2
+
+        # Ancrage latéral intelligent (gauche/droite) pour s'aligner avec le rendu horizontal
+        if d_center.x() >= s_center.x():
+            start = QPointF(s_center.x() + w_s, s_center.y())
+            end = QPointF(d_center.x() - w_d, d_center.y())
+            # Recul de 2px pour rendre la pointe de la flèche parfaitement visible devant le nœud
+            start = QPointF(start.x() + 2, start.y())
+            end = QPointF(end.x() - 2, end.y())
+        else:
+            start = QPointF(s_center.x() - w_s, s_center.y())
+            end = QPointF(d_center.x() + w_d, d_center.y())
+            start = QPointF(start.x() - 2, start.y())
+            end = QPointF(end.x() + 2, end.y())
+
         path = QPainterPath()
         path.moveTo(start)
-        ctrl_x1 = start.x() + (end.x() - start.x()) / 2
-        ctrl_y1 = start.y()
-        ctrl_x2 = start.x() + (end.x() - start.x()) / 2
-        ctrl_y2 = end.y()
-        path.cubicTo(ctrl_x1, ctrl_y1, ctrl_x2, ctrl_y2, end.x(), end.y())
-        
+
+        if mode == 'orthogonal':
+            mid_x = (start.x() + end.x()) / 2
+            path.lineTo(mid_x, start.y())
+            path.lineTo(mid_x, end.y())
+            path.lineTo(end)
+        else:
+            ctrl_x = (start.x() + end.x()) / 2
+            path.cubicTo(ctrl_x, start.y(), ctrl_x, end.y(), end.x(), end.y())
+
         self.setPath(path)
+        self.update()
 
     def shape(self):
-        path_stroker = QPainterPathStroker()
-        path_stroker.setWidth(20) 
-        return path_stroker.createStroke(self.path())
+        stroker = QPainterPathStroker()
+        stroker.setWidth(20)
+        return stroker.createStroke(self.path())
+
+    def _draw_arrow(self, painter, tip, angle, color):
+        size = 12
+        p1 = tip - QPointF(math.cos(angle - math.pi/6)*size,
+                           math.sin(angle - math.pi/6)*size)
+        p2 = tip - QPointF(math.cos(angle + math.pi/6)*size,
+                           math.sin(angle + math.pi/6)*size)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(color))
+        painter.drawPolygon(QPolygonF([tip, p1, p2]))
 
     def paint(self, painter, option, widget=None):
         pen = QPen(self.color, 3)
         if self.isSelected():
             pen.setColor(QColor('#4A90E2'))
             pen.setWidth(4)
+
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawPath(self.path())
+
+        path = self.path()
+        painter.drawPath(path)
+
+        color = pen.color()
+
+        if self.arrow_dir in ("forward", "both") and path.length() > 0:
+            tip = path.pointAtPercent(1.0)
+            prev = path.pointAtPercent(0.97)
+            angle = math.atan2(tip.y()-prev.y(), tip.x()-prev.x())
+            self._draw_arrow(painter, tip, angle, color)
+
+        if self.arrow_dir in ("backward", "both") and path.length() > 0:
+            tip = path.pointAtPercent(0.0)
+            nxt = path.pointAtPercent(0.03)
+            angle = math.atan2(tip.y()-nxt.y(), tip.x()-nxt.x())
+            self._draw_arrow(painter, tip, angle, color)
 
         if self.label:
-            center = self.path().pointAtPercent(0.5)
+            center = path.pointAtPercent(0.5)
             font = QFont('Segoe UI', 10)
             fm = QFontMetrics(font)
-            rect = fm.boundingRect(self.label)
-            rect = QRectF(rect)
+            rect = QRectF(fm.boundingRect(self.label))
             rect.moveTo(center.x() - rect.width()/2, center.y() - rect.height()/2)
-            
+
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(248, 249, 250, 220))
             painter.drawRoundedRect(rect.adjusted(-4, -2, 4, 2), 3, 3)
-            
+
             painter.setPen(QPen(QColor('#4A5568')))
             painter.setFont(font)
             painter.drawText(rect, int(Qt.AlignmentFlag.AlignCenter), self.label)
@@ -175,12 +298,12 @@ class EdgeItem(QGraphicsPathItem):
         self.signals.itemDoubleClicked.emit(self)
         super().mouseDoubleClickEvent(event)
 
-
 class MindMapScene(QGraphicsScene):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setBackgroundBrush(QColor('#f8f9fa'))
         self.signals = GraphicsSignals()
+        self.line_routing_mode = 'curved'
 
     def mouseDoubleClickEvent(self, event):
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
@@ -285,7 +408,7 @@ class MindMapApp(QMainWindow):
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
-        self.resize(1500, 850)
+        self.resize(1600, 900)
         
         self.setup_ui()
         self.setup_shortcuts()
@@ -309,7 +432,7 @@ class MindMapApp(QMainWindow):
 
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("Fichier")
-        file_menu.addAction("📁 Nouveau projet", lambda: self.new_project())
+        file_menu.addAction("📄 Nouveau projet", lambda: self.new_project())
         file_menu.addSeparator()
         file_menu.addAction("📂 Ouvrir un projet", self.load_project)
         file_menu.addAction("💾 Enregistrer", self.save_project).setShortcut("Ctrl+S")
@@ -323,29 +446,43 @@ class MindMapApp(QMainWindow):
         export_menu.addAction("Exporter en Image", self.export_png)
         export_menu.addAction("Exporter en Markdown", self.export_md)
 
+        self.header_right_widget = QWidget()
+        hr_layout = QHBoxLayout(self.header_right_widget)
+        hr_layout.setContentsMargins(0, 0, 10, 0)
+        
+        self.routing_combo = QComboBox()
+        self.routing_combo.addItem("Branches Courbes", "curved")
+        self.routing_combo.addItem("Branches Droites", "orthogonal")
+        self.routing_combo.setStyleSheet("padding: 2px 5px; border: 1px solid #ccc; border-radius: 4px;")
+        self.routing_combo.currentIndexChanged.connect(self.change_global_routing)
+        hr_layout.addWidget(self.routing_combo)
+
         self.template_combo = QComboBox()
         self.template_combo.addItem("Choisir un template...")
-        self.template_combo.addItem("🎯 Cadrage d'Idée / Projet", "cadrage_idee.json")
+        self.template_combo.addItem("🎯 Cadrage d'Idée", "cadrage_idee.json")
         self.template_combo.addItem("🔍 Résolution de Problème", "resolution_probleme.json")
-        self.template_combo.addItem("⏳ Organiser son temps (Eisenhower)", "gestion_temps.json")
-        self.template_combo.addItem("🧠 Brain Dump (3 parties)", "brain_dump.json")
-        self.template_combo.addItem("🚀 Guide Onboarding Technique", "onboarding_technique.json")
+        self.template_combo.addItem("⏳ Organisation des priorités", "gestion_temps.json")
+        self.template_combo.addItem("🧠 Brain Dump", "brain_dump.json")
+        self.template_combo.addItem("🚀 Onboarding Technique", "onboarding_technique.json")
         self.template_combo.addItem("🎨 Hub Multi-Passions", "hub_passions.json")
         self.template_combo.addItem("✈️ Organisation d'un Voyage", "organisation_voyage.json")
         self.template_combo.addItem("🗣️ Préparation Réunion/Entretien", "preparation_reunion.json")
         self.template_combo.addItem("🏁 Rétrospective de Fin de Projet", "retro_projet.json")
-        self.template_combo.addItem("☀️ Daily Capsule (Point du matin)", "daily_capsule.json")
-        self.template_combo.addItem("🔋 Santé Mentale & Énergie", "sante_mentale_energie.json")
-        self.template_combo.addItem("🚨 Urgence Colère & Agacement", "urgence_colere.json")
+        self.template_combo.addItem("☀️ Daily Capsule", "daily_capsule.json")
+        self.template_combo.addItem("🔋 Santé Mentale et Énergie", "sante_mentale_energie.json")
+        self.template_combo.addItem("🚨 Urgence Colère", "urgence_colere.json")
         self.template_combo.setStyleSheet("margin: 2px 10px; padding: 2px 10px; border: 1px solid #ccc; border-radius: 4px;")
         self.template_combo.currentIndexChanged.connect(self.apply_template)
-        menu_bar.setCornerWidget(self.template_combo, Qt.Corner.TopRightCorner)
+        hr_layout.addWidget(self.template_combo)
+        
+        menu_bar.setCornerWidget(self.header_right_widget, Qt.Corner.TopRightCorner)
 
         self.style_bar = QFrame(self)
         self.style_bar.setStyleSheet("""
             QFrame { background: white; border-radius: 20px; border: 1px solid #e2e8f0; }
             QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 12px; }
             QPushButton:hover { background: #e2e8f0; }
+            QComboBox { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px; border-radius: 8px; min-width: 110px; }
         """)
         style_layout = QHBoxLayout(self.style_bar)
         
@@ -353,28 +490,41 @@ class MindMapApp(QMainWindow):
         nc_layout = QHBoxLayout(self.node_controls)
         nc_layout.setContentsMargins(0,0,0,0)
         
-        btn_bold = QPushButton("B")
-        btn_bold.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        btn_bold.setFixedSize(26, 26)
+        btn_bold = QPushButton("Bold")
+        btn_bold.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        btn_bold.setFixedSize(38, 26)
+        btn_bold.setStyleSheet("QPushButton { padding: 0px; margin: 0px; }")
         btn_bold.clicked.connect(self.toggle_bold)
         nc_layout.addWidget(btn_bold)
         
         nc_layout.addWidget(self.create_separator())
         
-        for color, border in [('#60A5FA', '#3B82F6'), ('#E0F7FA', '#4DD0E1'), ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'), ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')]:
+        self.shape_combo = QComboBox()
+        self.shape_combo.addItem("Rectangle", "box")
+        self.shape_combo.addItem("Losange", "diamond")
+        self.shape_combo.addItem("Ellipse", "ellipse")
+        self.shape_combo.currentIndexChanged.connect(self.on_shape_combo_changed)
+        nc_layout.addWidget(self.shape_combo)
+        
+        nc_layout.addWidget(self.create_separator())
+
+        self.status_combo = QComboBox()
+        self.status_combo.addItem("⚪ Aucun statut", "none")
+        self.status_combo.addItem("🚨 Urgent", "urgent")
+        self.status_combo.addItem("⏳ En cours", "progress")
+        self.status_combo.addItem("✅ Terminé", "done")
+        self.status_combo.currentIndexChanged.connect(self.on_status_combo_changed)
+        nc_layout.addWidget(self.status_combo)
+
+        nc_layout.addWidget(self.create_separator())
+        
+        for color, border in [('#60A5FA', '#3B82F6'), ('#E0F7FA', '#4DD0E1'), ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'), ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')]:            
             btn = QPushButton()
             btn.setFixedSize(22, 22)
             btn.setStyleSheet(f"background: {color}; border: 2px solid {border}; border-radius: 11px;")
             btn.clicked.connect(lambda checked, c=color, b=border: self.change_color(c, b))
             nc_layout.addWidget(btn)
             
-        nc_layout.addWidget(self.create_separator())
-        
-        btn_urgent = QPushButton("🚨 Urgent")
-        btn_urgent.setStyleSheet("background: #FFF5F5; border: 1px solid #FEB2B2; color: #C53030; font-weight: bold;")
-        btn_urgent.clicked.connect(self.toggle_urgent)
-        nc_layout.addWidget(btn_urgent)
-        
         nc_layout.addWidget(self.create_separator())
         
         btn_attach = QPushButton("📎 Fichier")
@@ -400,15 +550,27 @@ class MindMapApp(QMainWindow):
         self.edge_controls = QWidget()
         ec_layout = QHBoxLayout(self.edge_controls)
         ec_layout.setContentsMargins(0,0,0,0)
-        btn_edit_edge = QPushButton("📝 Nommer la relation")
+        
+        btn_edit_edge = QPushButton("Texte de branche")
         btn_edit_edge.clicked.connect(self.edit_selected_edge)
         ec_layout.addWidget(btn_edit_edge)
+        
+        ec_layout.addWidget(self.create_separator())
+        
+        self.arrow_combo = QComboBox()
+        self.arrow_combo.addItem("➖ Aucune flèche", "none")
+        self.arrow_combo.addItem("➡️ Flèche Avant", "forward")
+        self.arrow_combo.addItem("⬅️ Flèche Arrière", "backward")
+        self.arrow_combo.addItem("↔️ Double flèche", "both")
+        self.arrow_combo.currentIndexChanged.connect(self.on_arrow_combo_changed)
+        ec_layout.addWidget(self.arrow_combo)
+        
         style_layout.addWidget(self.edge_controls)
         
         self.connect_controls = QWidget()
         cc_layout = QHBoxLayout(self.connect_controls)
         cc_layout.setContentsMargins(0,0,0,0)
-        btn_connect = QPushButton("🔗 Relier les 2 nœuds")
+        btn_connect = QPushButton("Relier les nœuds")
         btn_connect.setStyleSheet("background: #EBF8FF; border: 1px solid #90CDF4; color: #2B6CB0; font-weight: bold;")
         btn_connect.clicked.connect(self.connect_selected_nodes)
         cc_layout.addWidget(btn_connect)
@@ -434,9 +596,6 @@ class MindMapApp(QMainWindow):
         
         self.shortcut_bs = QShortcut(QKeySequence(Qt.Key.Key_Backspace), self)
         self.shortcut_bs.activated.connect(self.delete_selected)
-        
-        self.shortcut_u = QShortcut(QKeySequence(Qt.Key.Key_U), self)
-        self.shortcut_u.activated.connect(self.toggle_urgent)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -474,11 +633,9 @@ class MindMapApp(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Yes
             )
-            
             if reply == QMessageBox.StandardButton.Yes:
                 self.save_project()
-                if ws.is_dirty:
-                    return False
+                if ws.is_dirty: return False
             elif reply == QMessageBox.StandardButton.Cancel:
                 return False
 
@@ -500,22 +657,35 @@ class MindMapApp(QMainWindow):
 
     def on_tab_changed(self, index):
         self.update_title()
+        ws = self.current_workspace()
+        if ws:
+            idx = self.routing_combo.findData(ws.scene.line_routing_mode)
+            if idx != -1:
+                self.routing_combo.blockSignals(True)
+                self.routing_combo.setCurrentIndex(idx)
+                self.routing_combo.blockSignals(False)
         self.on_selection_changed()
 
     def update_title(self):
         ws = self.current_workspace()
         if not ws: return
-        
-        if ws.current_file_path:
-            base_title = os.path.basename(ws.current_file_path)
-        else:
-            base_title = "[Nouveau Projet]"
-            
+        base_title = os.path.basename(ws.current_file_path) if ws.current_file_path else "[Nouveau Projet]"
         suffix = " *" if ws.is_dirty else ""
         display_title = base_title + suffix
-        
         self.tab_widget.setTabText(self.tab_widget.currentIndex(), display_title)
         self.setWindowTitle(f"Mindy - MindMap App - {display_title}")
+
+    def change_global_routing(self, index):
+        ws = self.current_workspace()
+        if not ws: return
+        mode = self.routing_combo.itemData(index)
+        ws.scene.line_routing_mode = mode
+        
+        for item in ws.scene.items():
+            if isinstance(item, EdgeItem):
+                item.update_position()
+        ws.scene.update()
+        self.save_state()
 
     def save_state(self):
         ws = self.current_workspace()
@@ -523,7 +693,6 @@ class MindMapApp(QMainWindow):
         ws.undo_stack.append(json.dumps(self.get_state()))
         ws.redo_stack.clear()
         if len(ws.undo_stack) > 41: ws.undo_stack.pop(0)
-        
         if len(ws.undo_stack) > 1:
             ws.is_dirty = True
             self.update_title()
@@ -536,11 +705,8 @@ class MindMapApp(QMainWindow):
         nodes = [i for i in all_items if isinstance(i, NodeItem)]
         edges = [i for i in all_items if isinstance(i, EdgeItem)]
         
-        root = next((n for n in nodes if n.node_id == 'root'), None)
-        if not root and nodes:
-            root = nodes[0]
-        if not root:
-            return {}
+        root = next((n for n in nodes if n.node_id == 'root'), None) or (nodes[0] if nodes else None)
+        if not root: return {}
 
         natural_edges = set()
 
@@ -556,6 +722,7 @@ class MindMapApp(QMainWindow):
                 "font_color": node.font_color.name(),
                 "border_width": node.border_width,
                 "is_bold": node.is_bold,
+                "status": node.status,
                 "file_path": node.file_path,
                 "url_link": node.url_link,
                 "children": []
@@ -564,12 +731,13 @@ class MindMapApp(QMainWindow):
                 if edge.source_node == node:
                     natural_edges.add(edge)
                     child_data = serialize_node(edge.dest_node)
-                    if edge.label:
-                        child_data["edge_label"] = edge.label
+                    if edge.label: child_data["edge_label"] = edge.label
+                    child_data["edge_arrow_dir"] = edge.arrow_dir
                     data["children"].append(child_data)
             return data
 
         tree_data = serialize_node(root)
+        tree_data["global_line_routing"] = ws.scene.line_routing_mode
 
         cross_links_data = []
         for edge in edges:
@@ -578,7 +746,8 @@ class MindMapApp(QMainWindow):
                     "from": edge.source_node.node_id,
                     "to": edge.dest_node.node_id,
                     "label": edge.label,
-                    "color": edge.color.name()
+                    "color": edge.color.name(),
+                    "arrow_dir": edge.arrow_dir
                 })
 
         tree_data["cross_links"] = cross_links_data
@@ -597,60 +766,51 @@ class MindMapApp(QMainWindow):
             ws.is_applying_state = False
             return
 
+        ws.scene.line_routing_mode = root_data.get("global_line_routing", "curved")
+        
         node_counter = [0]
         edge_counter = [0]
         created_nodes = {}
 
         def deserialize_node(data, parent_node=None):
             if not data: return None
-            
             node_counter[0] += 1
             node_id = data.get("id") or ('root' if parent_node is None else f"node_{node_counter[0]}")
             
-            if "x" in data and "y" in data:
-                x, y = data["x"], data["y"]
-            else:
-                if parent_node:
-                    x, y = self.calculate_smart_position(ws, parent_node)
-                else:
-                    x, y = 0.0, 0.0
+            x, y = data.get("x", 0.0), data.get("y", 0.0)
+            bg = data.get("bg", '#60A5FA')
+            border = data.get("border", '#3B82F6')
+            font_color = data.get("font_color", '#ffffff')
 
-            bg = data.get("bg")
-            border = data.get("border")
-            font_color = data.get("font_color")
-            
-            if parent_node and (not bg or not border):
-                bg = bg or parent_node.bg_color.name()
-                border = border or parent_node.border_color.name()
-                font_color = font_color or parent_node.font_color.name()
-            else:
-                bg = bg or '#60A5FA'
-                border = border or '#3B82F6'
-                font_color = font_color or '#ffffff'
+            status = data.get("status", "none")
+            raw_label = data.get("label", "")
+            if status == "none" and raw_label.startswith("🚨 "):
+                status = "urgent"
+
+            # Rétrocompatibilité : Nettoyage des anciennes mentions textuelles de fichiers/liens
+            clean_label = raw_label.replace("\n📄 Document joint", "").replace("\n🔗 Lien URL", "")
 
             node = NodeItem(
-                node_id, data["label"], x, y,
+                node_id, clean_label, x, y,
                 shape=data.get("shape", "box"), bg=bg, border=border, font_color=font_color,
-                file_path=data.get("file_path"), url_link=data.get("url_link"), is_bold=data.get("is_bold", False)
+                file_path=data.get("file_path"), url_link=data.get("url_link"), 
+                is_bold=data.get("is_bold", False), status=status
             )
             node.border_width = data.get("border_width", 1)
             node.signals.itemDoubleClicked.connect(self.start_inline_editing)
             node.signals.positionChanged.connect(self.save_state)
             ws.scene.addItem(node)
-            
             created_nodes[node_id] = node
 
             if parent_node:
                 edge_counter[0] += 1
-                edge_id = f"edge_{edge_counter[0]}"
                 edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
-                edge = EdgeItem(edge_id, parent_node, node, data.get("edge_label", ""), color=edge_color)
+                edge = EdgeItem(f"edge_{edge_counter[0]}", parent_node, node, data.get("edge_label", ""), color=edge_color, arrow_dir=data.get("edge_arrow_dir", "none"))
                 edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
                 ws.scene.addItem(edge)
 
             for child_data in data.get("children", []):
                 deserialize_node(child_data, node)
-                
             return node
 
         deserialize_node(root_data)
@@ -660,8 +820,7 @@ class MindMapApp(QMainWindow):
             dest = created_nodes.get(cl["to"])
             if source and dest:
                 edge_counter[0] += 1
-                edge_id = f"edge_{edge_counter[0]}"
-                edge = EdgeItem(edge_id, source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"))
+                edge = EdgeItem(f"edge_{edge_counter[0]}", source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"), arrow_dir=cl.get("arrow_dir", "none"))
                 edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
                 ws.scene.addItem(edge)
 
@@ -700,9 +859,22 @@ class MindMapApp(QMainWindow):
                 has_links = bool(sel[0].file_path or sel[0].url_link)
                 self.btn_open.setVisible(has_links)
                 self.btn_detach.setVisible(has_links)
+                
+                self.shape_combo.blockSignals(True)
+                self.shape_combo.setCurrentIndex(self.shape_combo.findData(sel[0].shape_type))
+                self.shape_combo.blockSignals(False)
+                
+                self.status_combo.blockSignals(True)
+                self.status_combo.setCurrentIndex(self.status_combo.findData(sel[0].status))
+                self.status_combo.blockSignals(False)
+                
             elif isinstance(sel[0], EdgeItem):
                 self.node_controls.hide()
                 self.edge_controls.show()
+                
+                self.arrow_combo.blockSignals(True)
+                self.arrow_combo.setCurrentIndex(self.arrow_combo.findData(sel[0].arrow_dir))
+                self.arrow_combo.blockSignals(False)
         elif len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
             self.style_bar.show()
             self.node_controls.hide()
@@ -710,6 +882,37 @@ class MindMapApp(QMainWindow):
             self.connect_controls.show()
         else:
             self.style_bar.hide()
+
+    def on_shape_combo_changed(self, index):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            sel[0].shape_type = self.shape_combo.itemData(index)
+            sel[0].recalculate_size()
+            sel[0].update()
+            self.save_state()
+
+    def on_status_combo_changed(self, index):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            node = sel[0]
+            node.label = node.label.replace("🚨 ", "").replace("⏳ ", "").replace("✅ ", "")
+            node.status = self.status_combo.itemData(index)
+            node.recalculate_size()
+            node.update()
+            self.save_state()
+
+    def on_arrow_combo_changed(self, index):
+        ws = self.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], EdgeItem):
+            sel[0].arrow_dir = self.arrow_combo.itemData(index)
+            sel[0].update()
+            self.save_state()
 
     def on_bg_double_clicked(self, pos):
         ws = self.current_workspace()
@@ -739,8 +942,7 @@ class MindMapApp(QMainWindow):
         self.editor = QTextEdit(ws.view)
         
         if isinstance(item, NodeItem):
-            # Suppression des tags d'affichage pour l'édition brute du texte
-            clean_text = item.label.replace('\n📄 Document joint', '').replace('\n🔗 Lien URL', '').replace('🚨 ', '')
+            clean_text = item.label.replace('🚨 ', '').replace('⏳ ', '').replace('✅ ', '')
             view_pos = ws.view.mapFromScene(item.pos())
             w = int(item.rect.width())
             h = max(int(item.rect.height()), 40)
@@ -780,13 +982,8 @@ class MindMapApp(QMainWindow):
         
         if isinstance(self.edit_item, NodeItem):
             if new_text:
-                if self.edit_item.label.startswith("🚨 "): new_text = "🚨 " + new_text
-                if self.edit_item.url_link: new_text += "\n🔗 Lien URL" # Ajout visuel clair de l'URL
-                if self.edit_item.file_path: new_text += "\n📄 Document joint"
-                
                 self.edit_item.label = new_text
                 self.edit_item.recalculate_size()
-                # BUG RESOLU : Suppression de la ligne automatique de repositionnement des enfants
         else:
             self.edit_item.label = new_text
             self.edit_item.update()
@@ -813,57 +1010,57 @@ class MindMapApp(QMainWindow):
         for item in sel:
             if isinstance(item, NodeItem):
                 for edge in list(item.edges):
-                    if edge in edge.source_node.edges:
-                        edge.source_node.edges.remove(edge)
-                    if edge in edge.dest_node.edges:
-                        edge.dest_node.edges.remove(edge)
-                    if edge.scene() == ws.scene:
-                        ws.scene.removeItem(edge)
-                if item.scene() == ws.scene:
-                    ws.scene.removeItem(item)
+                    if edge in edge.source_node.edges: edge.source_node.edges.remove(edge)
+                    if edge in edge.dest_node.edges: edge.dest_node.edges.remove(edge)
+                    if edge.scene() == ws.scene: ws.scene.removeItem(edge)
+                if item.scene() == ws.scene: ws.scene.removeItem(item)
             elif isinstance(item, EdgeItem):
-                if item in item.source_node.edges:
-                    item.source_node.edges.remove(item)
-                if item in item.dest_node.edges:
-                    item.dest_node.edges.remove(item)
-                if item.scene() == ws.scene:
-                    ws.scene.removeItem(item)
+                if item in item.source_node.edges: item.source_node.edges.remove(item)
+                if item in item.dest_node.edges: item.dest_node.edges.remove(item)
+                if item.scene() == ws.scene: ws.scene.removeItem(item)
                     
         self.save_state()
 
     def calculate_smart_position(self, parent_node):
         ws = self.current_workspace()
+        if not ws or not parent_node:
+            return 150, 0
+            
         parent_right_edge = parent_node.pos().x() + (parent_node.rect.width() / 2)
-        target_x = parent_right_edge + 120
+        target_x = parent_right_edge + 150
         
         child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
-        
         if child_edges:
             lowest_y = parent_node.pos().y()
             for e in child_edges:
-                if e.dest_node.pos().y() > lowest_y:
+                if e.dest_node.pos().y() > lowest_y: 
                     lowest_y = e.dest_node.pos().y()
-            target_y = lowest_y + 75
+            target_y = lowest_y + 85
         else:
             target_y = parent_node.pos().y()
 
         overlap = True
         all_nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
         
-        while overlap:
+        if len(all_nodes) <= 1:
+            return target_x, target_y
+
+        iterations = 0
+        while overlap and iterations < 100:
             overlap = False
+            iterations += 1
             for n in all_nodes:
-                if abs(n.pos().x() - target_x) < 160 and abs(n.pos().y() - target_y) < 55:
-                    target_y += 75
+                if n == parent_node: 
+                    continue
+                if abs(n.pos().x() - target_x) < 180 and abs(n.pos().y() - target_y) < 65:
+                    target_y += 85
                     overlap = True
                     break
-                    
         return target_x, target_y
 
     def add_child_node(self, parent_node):
         ws = self.current_workspace()
         new_id = f"node_{len(ws.scene.items())}"
-        edge_id = f"edge_{len(ws.scene.items())}"
         
         t_x, t_y = self.calculate_smart_position(parent_node)
         bg, border, text_col, edge_col = parent_node.bg_color.name(), parent_node.border_color.name(), parent_node.font_color.name(), '#A0AEC0'
@@ -880,7 +1077,7 @@ class MindMapApp(QMainWindow):
         new_node.signals.itemDoubleClicked.connect(self.start_inline_editing)
         new_node.signals.positionChanged.connect(self.save_state)
         
-        edge = EdgeItem(edge_id, parent_node, new_node, "", color=edge_col)
+        edge = EdgeItem(f"edge_{len(ws.scene.items())}", parent_node, new_node, "", color=edge_col)
         edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
         
         ws.scene.addItem(new_node)
@@ -903,8 +1100,7 @@ class MindMapApp(QMainWindow):
                 for e in node1.edges
             )
             if not already_linked:
-                edge_id = f"edge_{len(ws.scene.items())}"
-                edge = EdgeItem(edge_id, node1, node2, "", color='#A0AEC0')
+                edge = EdgeItem(f"edge_{len(ws.scene.items())}", node1, node2, "", color='#A0AEC0')
                 edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
                 ws.scene.addItem(edge)
                 self.save_state()
@@ -941,24 +1137,6 @@ class MindMapApp(QMainWindow):
                 edge.update()
                 self.apply_color_hierarchy(edge.dest_node, bg, border, text_col, edge_col)
 
-    def toggle_urgent(self):
-        if hasattr(self, 'editor') and self.editor is not None: return
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            node = sel[0]
-            if node.label.startswith("🚨 "):
-                node.label = node.label.replace("🚨 ", "")
-                node.border_color = QColor(node.bg_color).darker(120)
-                node.border_width = 1
-            else:
-                node.label = "🚨 " + node.label
-                node.border_color = QColor("#E53E3E")
-                node.border_width = 3
-            node.recalculate_size()
-            self.save_state()
-
     def attach_file(self):
         ws = self.current_workspace()
         if not ws: return
@@ -968,10 +1146,9 @@ class MindMapApp(QMainWindow):
             if path:
                 node = sel[0]
                 node.file_path = path
-                if "📄 Document joint" not in node.label:
-                    node.label += "\n📄 Document joint"
                 node.recalculate_size()
                 self.on_selection_changed()
+                node.update()
                 self.save_state()
 
     def attach_url(self):
@@ -983,8 +1160,6 @@ class MindMapApp(QMainWindow):
             url, ok = QInputDialog.getText(self, "Associer une URL", "Entrez l'adresse internet :", text=node.url_link or "https://")
             if ok and url.strip():
                 node.url_link = url.strip()
-                if "🔗 Lien URL" not in node.label:
-                    node.label += "\n🔗 Lien URL" # Indication textuelle claire
                 node.recalculate_size()
                 self.on_selection_changed()
                 node.update()
@@ -998,7 +1173,6 @@ class MindMapApp(QMainWindow):
             node = sel[0]
             node.file_path = None
             node.url_link = None
-            node.label = node.label.replace("\n📄 Document joint", "").replace("\n🔗 Lien URL", "")
             node.recalculate_size()
             self.on_selection_changed()
             node.update()
@@ -1010,10 +1184,8 @@ class MindMapApp(QMainWindow):
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             node = sel[0]
-            if node.url_link:
-                QDesktopServices.openUrl(QUrl(node.url_link))
-            elif node.file_path:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(node.file_path))
+            if node.url_link: QDesktopServices.openUrl(QUrl(node.url_link))
+            elif node.file_path: QDesktopServices.openUrl(QUrl.fromLocalFile(node.file_path))
 
     def new_project(self, force_empty=False):
         if force_empty or QMessageBox.question(self, "Nouveau", "Créer un nouveau projet dans un nouvel onglet ?") == QMessageBox.StandardButton.Yes:
@@ -1026,14 +1198,12 @@ class MindMapApp(QMainWindow):
             self.tab_widget.addTab(ws, "[Nouveau Projet]")
             self.tab_widget.setCurrentWidget(ws)
             self.save_state()
-            
             ws.is_dirty = False 
             self.update_title()
 
     def load_project(self):
         path, _ = QFileDialog.getOpenFileName(self, "Ouvrir", "", "JSON (*.json)")
-        if path:
-            self.load_project_from_path(path)
+        if path: self.load_project_from_path(path)
 
     def load_project_from_path(self, path):
         with open(path, 'r', encoding='utf-8') as f:
@@ -1076,11 +1246,7 @@ class MindMapApp(QMainWindow):
         self.template_combo.setCurrentIndex(0)
         
         if QMessageBox.question(self, "Template", "Charger ce template remplacera la mind map de l'onglet actuel. Continuer ?") == QMessageBox.StandardButton.Yes:
-            if getattr(sys, 'frozen', False):
-                base_dir = sys._MEIPASS
-            else:
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-                
+            base_dir = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
             template_path = os.path.join(base_dir, "templates", filename)
             
             if os.path.exists(template_path):
@@ -1091,16 +1257,14 @@ class MindMapApp(QMainWindow):
                 self.apply_state(state_str)
                 ws.undo_stack.clear()
                 ws.redo_stack.clear()
-                
                 ws.undo_stack.append(state_str)
                 ws.is_dirty = True
                 self.update_title()
                 self.center_on_graph()
             else:
-                QMessageBox.warning(self, "Erreur", f"Le fichier template is introuvable :\n{template_path}")
+                QMessageBox.warning(self, "Erreur", f"Fichier template introuvable :\n{template_path}")
 
     def export_png(self):
-        """ BUG RESOLU : Export haute définition (HD) anti-flou """
         ws = self.current_workspace()
         if not ws: return
         path, _ = QFileDialog.getSaveFileName(self, "Exporter PNG", "ma_mindmap.png", "PNG (*.png)")
@@ -1108,21 +1272,28 @@ class MindMapApp(QMainWindow):
             ws.scene.clearSelection()
             rect = ws.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
             
-            # Utilisation du ratio de pixels matériel de l'écran pour le calcul HD
-            ratio = self.devicePixelRatio()
+            # Récupérer le ratio de l'écran actuel
+            ratio = self.devicePixelRatioF() if hasattr(self, 'devicePixelRatioF') else self.devicePixelRatio()
             
-            # Définition de la taille physique de l'image multipliée par le ratio
+            # Créer un pixmap à la taille physique (pixel réel)
             pixmap = QPixmap(int(rect.width() * ratio), int(rect.height() * ratio))
-            pixmap.setDevicePixelRatio(ratio) # Dit à Qt de gérer le facteur de zoom
+            pixmap.setDevicePixelRatio(ratio)
             pixmap.fill(QColor('#f8f9fa'))
             
             painter = QPainter(pixmap)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
             
-            ws.scene.render(painter, target=QRectF(0, 0, rect.width(), rect.height()), source=rect)
+            # CRUCIAL : On adapte l'échelle du painter pour dessiner avec la haute résolution
+            painter.scale(ratio, ratio)
+            
+            # On ajuste la zone cible pour correspondre à la taille logique (sans le ratio)
+            target_rect = QRectF(0, 0, rect.width(), rect.height())
+            
+            ws.scene.render(painter, target=target_rect, source=rect)
             painter.end()
-            pixmap.save(path, "PNG", 100) # Sauvegarde qualité max 100%
+            pixmap.save(path, "PNG", 100)
 
     def export_md(self):
         ws = self.current_workspace()
@@ -1135,7 +1306,7 @@ class MindMapApp(QMainWindow):
             
             output = []
             def build_tree(node, depth):
-                clean_label = node.label.replace('\n📄 Document joint', '').replace('\n🔗 Lien URL', '').replace('\n', ' ')
+                clean_label = node.label.replace('\n', ' ')
                 additions = []
                 if node.file_path: additions.append(f"Fichier: {node.file_path}")
                 if node.url_link: additions.append(f"URL: {node.url_link}")
@@ -1143,12 +1314,10 @@ class MindMapApp(QMainWindow):
                 
                 output.append(f"{'  ' * depth}- {clean_label}{link_str}")
                 children = [e.dest_node for e in node.edges if e.source_node == node]
-                for child in children:
-                    build_tree(child, depth + 1)
+                for child in children: build_tree(child, depth + 1)
                     
             build_tree(root, 0)
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write("\n".join(output))
+            with open(path, 'w', encoding='utf-8') as f: f.write("\n".join(output))
 
 
 if __name__ == '__main__':
