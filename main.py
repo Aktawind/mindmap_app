@@ -20,6 +20,8 @@ from items import NodeItem, EdgeItem
 from signals import GraphicsSignals
 from view_scene import MindMapWorkspace
 
+from items import BRANCH_PALETTES
+
 
 class MindMapApp(QMainWindow):
     def __init__(self):
@@ -27,6 +29,9 @@ class MindMapApp(QMainWindow):
         self.setWindowTitle("Mindy")
         self.settings = QSettings("MindyApp", "MindMapEditor")
         self._clipboard_node = None
+
+        self.current_workspace_path = None
+        self.workspace_files = []
         
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
@@ -36,6 +41,14 @@ class MindMapApp(QMainWindow):
         self.setup_ui()
         self.setup_shortcuts()
         self.load_last_project_on_startup()
+        # --- À la toute fin de __init__(self) ---
+        self.new_project()  # Crée un espace de base par défaut
+        
+        # Recharger automatiquement le dernier espace de workspace fermé
+        last_workspace = self.settings.value("last_workspace_path", "")
+        if last_workspace and os.path.exists(last_workspace):
+            # On passe directement le chemin à load_workspace
+            QTimer.singleShot(100, lambda: self.load_workspace(last_workspace))
 
     def current_workspace(self) -> MindMapWorkspace:
         return self.tab_widget.currentWidget()
@@ -54,12 +67,40 @@ class MindMapApp(QMainWindow):
         self.setCentralWidget(self.tab_widget)
 
         menu_bar = self.menuBar()
+
+        workspace_toolbar = self.addToolBar("workspace")
+        workspace_toolbar.setMovable(False)
+        workspace_toolbar.setStyleSheet("""
+            QToolBar { background: #F1F5F9; border-bottom: 1px solid #CBD5E1; padding: 4px; spacing: 8px; }
+            QPushButton { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 4px 8px; font-size: 12px; }
+            QPushButton:hover { background: #E2E8F0; }
+            QLabel { font-size: 11px; color: #475569; font-weight: bold; }
+        """)
+
+        # Label d'information sur la workspace active
+        self.lbl_workspace_status = QLabel("📂 Espace de travail : Aucun")
+        workspace_toolbar.addWidget(self.lbl_workspace_status)
+        workspace_toolbar.addSeparator()
+
+        btn_add_to_coll = QPushButton("➕ Inclure cet onglet")
+        btn_remove_from_coll = QPushButton("❌ Retirer cet onglet")
+        workspace_toolbar.addSeparator()
+        workspace_toolbar.addWidget(btn_add_to_coll)
+        workspace_toolbar.addWidget(btn_remove_from_coll)
+        btn_add_to_coll.clicked.connect(self.add_current_tab_to_workspace)
+        btn_remove_from_coll.clicked.connect(self.remove_current_tab_from_workspace)
+
         file_menu = menu_bar.addMenu("Fichier")
-        file_menu.addAction("📄 Nouveau projet", lambda: self.new_project())
+        file_menu.addAction("📄 Nouveau mindmap", lambda: self.new_project())
         file_menu.addSeparator()
-        file_menu.addAction("📂 Ouvrir un projet", self.load_project)
+        file_menu.addAction("📂 Ouvrir un mindmap", self.load_project)
         file_menu.addAction("💾 Enregistrer", self.save_project).setShortcut("Ctrl+S")
         file_menu.addAction("💾 Enregistrer sous...", lambda: self.save_project(force_save_as=True))
+
+        file_menu.addSeparator()
+        workspace_menu = file_menu.addMenu("Espaces de travail")
+        workspace_menu.addAction("📄 Nouvel espace de travail", self.new_workspace)
+        workspace_menu.addAction("📂 Ouvrir un espace de travail", self.load_workspace)
         
         edit_menu = menu_bar.addMenu("Édition")
         edit_menu.addAction("↩️ Annuler", self.undo).setShortcut(QKeySequence("Ctrl+Z"))
@@ -84,14 +125,14 @@ class MindMapApp(QMainWindow):
             QPushButton:checked { background: #3B82F6; color: white; border-color: #2563EB; font-weight: bold; }
         """)
         self.btn_snap.clicked.connect(self.toggle_snap_to_grid)
-        hr_layout.addWidget(self.btn_snap)
+        workspace_toolbar.addWidget(self.btn_snap)
         
         self.routing_combo = QComboBox()
         self.routing_combo.addItem("Branches Courbes", "curved")
         self.routing_combo.addItem("Branches Droites", "orthogonal")
         self.routing_combo.setStyleSheet("padding: 2px 5px; border: 1px solid #ccc; border-radius: 4px;")
         self.routing_combo.currentIndexChanged.connect(self.change_global_routing)
-        hr_layout.addWidget(self.routing_combo)
+        workspace_toolbar.addWidget(self.routing_combo)
 
         self.template_combo = QComboBox()
         self.template_combo.addItem("Choisir un template...")
@@ -111,8 +152,8 @@ class MindMapApp(QMainWindow):
             QComboBox { border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 5px; background: white; }
         """)
         self.template_combo.currentIndexChanged.connect(self.apply_template)
-        hr_layout.addWidget(self.template_combo)
-        
+        workspace_toolbar.addWidget(self.template_combo)
+
         menu_bar.setCornerWidget(self.header_right_widget, Qt.Corner.TopRightCorner)
 
         self.style_bar = QFrame(self)
@@ -224,7 +265,7 @@ class MindMapApp(QMainWindow):
         lbl.setFont(QFont("Segoe UI", 9))
         ol_layout.addWidget(lbl)
         self.overlay.resize(230, 140)
-        self.overlay.move(20, 60)
+        self.overlay.move(20, 100)
 
     def setup_shortcuts(self):
         self.shortcut_tab = QShortcut(QKeySequence(Qt.Key.Key_Tab), self)
@@ -301,13 +342,28 @@ class MindMapApp(QMainWindow):
             self.tab_widget.removeTab(0)
         return True
 
-    def closeEvent(self, event: QCloseEvent):
-        while self.tab_widget.count() > 0:
-            if not self.close_tab(0):
-                event.ignore()
-                return
-            if self.tab_widget.count() == 1 and not self.tab_widget.widget(0).is_dirty and self.tab_widget.widget(0).current_file_path is None:
-                break
+    def closeEvent(self, event):
+        # Sauvegarder la workspace active actuelle pour le prochain démarrage
+        if self.current_workspace_path:
+            self.settings.setValue("last_workspace_path", self.current_workspace_path)
+        else:
+            self.settings.setValue("last_workspace_path", "")
+
+        # Votre vérification existante des onglets modifiés...
+        for i in range(self.tab_widget.count()):
+            ws = self.tab_widget.widget(i)
+            if ws and ws.is_dirty:
+                reply = QMessageBox.question(
+                    self, "Enregistrer ?",
+                    f"Le projet '{self.tab_widget.tabText(i)}' a été modifié. Enregistrer avant de quitter ?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.tab_widget.setCurrentIndex(i)
+                    self.save_project()
+                elif reply == QMessageBox.StandardButton.Cancel:
+                    event.ignore()
+                    return
         event.accept()
 
     def on_tab_changed(self, index):
@@ -324,6 +380,7 @@ class MindMapApp(QMainWindow):
             self.btn_snap.setChecked(getattr(ws.scene, 'snap_to_grid', False))
             self.btn_snap.blockSignals(False)
         self.on_selection_changed()
+        self.update_workspace_ui()
 
     def update_title(self):
         ws = self.current_workspace()
@@ -332,7 +389,13 @@ class MindMapApp(QMainWindow):
         suffix = " *" if ws.is_dirty else ""
         display_title = base_title + suffix
         self.tab_widget.setTabText(self.tab_widget.currentIndex(), display_title)
-        self.setWindowTitle(f"Mindy - {display_title}")
+        
+        # Ajout du nom de l'espace de travail dans le titre de la fenêtre si présente
+        if self.current_workspace_path:
+            workspace_name = os.path.basename(self.current_workspace_path)
+            self.setWindowTitle(f"Mindy [{workspace_name}] - {display_title}")
+        else:
+            self.setWindowTitle(f"Mindy - {display_title}")
 
     def change_global_routing(self, index):
         ws = self.current_workspace()
@@ -917,6 +980,132 @@ class MindMapApp(QMainWindow):
             node.update()
             self.save_state()
 
+    # =========================================================================
+    # GESTION DES workspaceS DE PROJETS (MULTIPLES JSON)
+    # =========================================================================
+
+    # =========================================================================
+    # GESTION AUTOMATIQUE DES workspaceS (BARRE D'OUTILS HAUT)
+    # =========================================================================
+
+    def update_workspace_ui(self):
+        """ Met à jour le texte de la barre d'outils pour afficher la workspace active """
+        if self.current_workspace_path:
+            name = os.path.basename(self.current_workspace_path)
+            count = len(self.workspace_files)
+            self.lbl_workspace_status.setText(f"📁 Workspace :  {name} ({count} carte{'s' if count > 1 else ''})")
+        else:
+            self.lbl_workspace_status.setText("📁 Workspace : Aucun")
+
+    def auto_save_workspace(self):
+        """ Écrit instantanément les modifications dans le fichier .mindy """
+        if not self.current_workspace_path:
+            return
+        
+        data = {
+            "version": "1.0",
+            "files": self.workspace_files
+        }
+        try:
+            with open(self.current_workspace_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            self.update_workspace_ui()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur Sauvegarde", f"Impossible de mettre à jour la workspace :\n{str(e)}")
+
+    def new_workspace(self):
+        """ Crée un nouveau fichier de workspace vide et nettoie l'espace """
+        path, _ = QFileDialog.getSaveFileName(self, "Créer une nouvelle workspace", "MaSessionDuMatin.mindy", "workspace Mindy (*.mindy)")
+        if not path:
+            return
+
+        self.current_workspace_path = path
+        self.workspace_files = []
+
+        # Nettoyage propre des onglets actuels
+        self.tab_widget.blockSignals(True)
+        try:
+            self.tab_widget.clear()
+        finally:
+            self.tab_widget.blockSignals(False)
+
+        self.new_project() # Ouvre un premier onglet vierge
+        self.auto_save_workspace()
+        self.update_title()
+
+    def load_workspace(self):
+        """ Ouvre une workspace et charge tous les onglets associés """
+        path, _ = QFileDialog.getOpenFileName(self, "Ouvrir une workspace", "", "workspace Mindy (*.mindy)")
+        if not path:
+            return
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            file_paths = data.get("files", [])
+
+            # Fermer tous les onglets existants
+            self.tab_widget.blockSignals(True)
+            try:
+                self.tab_widget.clear()
+            finally:
+                self.tab_widget.blockSignals(False)
+
+            self.current_workspace_path = path
+            self.workspace_files = []
+
+            # Charger les fichiers valides
+            for f_path in file_paths:
+                if os.path.exists(f_path):
+                    self.load_project_from_path(f_path)
+                    self.workspace_files.append(f_path)
+
+            # Si la workspace était vide, on met une carte vierge
+            if not self.workspace_files:
+                self.new_project()
+
+            self.update_workspace_ui()
+            self.update_title()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur Chargement", f"Impossible de charger la workspace :\n{str(e)}")
+
+    def add_current_tab_to_workspace(self):
+        """ Ajoute la carte active à la playlist et sauvegarde immédiatement """
+        if not self.current_workspace_path:
+            QMessageBox.warning(self, "Attention", "Veuillez d'abord ouvrir ou créer une workspace avec les boutons de gauche.")
+            return
+
+        ws = self.current_workspace()
+        if not ws: return
+
+        if not ws.current_file_path:
+            QMessageBox.warning(self, "Action requise", "Sauvegardez d'abord ce fichier JSON sur votre disque (Ctrl+S) avant de l'ajouter.")
+            return
+
+        if ws.current_file_path in self.workspace_files:
+            QMessageBox.information(self, "Information", "Cette carte est déjà incluse dans la workspace.")
+            return
+
+        self.workspace_files.append(ws.current_file_path)
+        self.auto_save_workspace() # Sauvegarde automatique instantanée
+
+    def remove_current_tab_from_workspace(self):
+        """ Enlève la carte active de la workspace (sans fermer l'onglet) """
+        if not self.current_workspace_path:
+            return
+
+        ws = self.current_workspace()
+        if not ws or not ws.current_file_path: 
+            return
+
+        if ws.current_file_path in self.workspace_files:
+            self.workspace_files.remove(ws.current_file_path)
+            self.auto_save_workspace() # Sauvegarde automatique instantanée
+        else:
+            QMessageBox.warning(self, "Action impossible", "Ce fichier ne fait pas partie de la workspace.")
+
     def open_file(self):
         ws = self.current_workspace()
         if not ws: return
@@ -1008,7 +1197,11 @@ class MindMapApp(QMainWindow):
     def export_png(self):
         ws = self.current_workspace()
         if not ws: return
-        path, _ = QFileDialog.getSaveFileName(self, "Exporter PNG", "ma_mindmap.png", "PNG (*.png)")
+        default_name = "ma_mindmap.png"
+        if ws.current_file_path:
+            base = os.path.splitext(os.path.basename(ws.current_file_path))[0]
+            default_name = f"{base}.png"
+        path, _ = QFileDialog.getSaveFileName(self, "Exporter PNG", default_name, "PNG (*.png)")
         if path:
             ws.scene.clearSelection()
             rect = ws.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
@@ -1035,7 +1228,12 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws: return
         
-        path, _ = QFileDialog.getSaveFileName(self, "Exporter PDF Vectoriel", "ma_mindmap.pdf", "PDF (*.pdf)")
+        default_name = "ma_mindmap.pdf"
+        if ws.current_file_path:
+            base = os.path.splitext(os.path.basename(ws.current_file_path))[0]
+            default_name = f"{base}.pdf"
+            
+        path, _ = QFileDialog.getSaveFileName(self, "Exporter PDF Vectoriel", default_name, "PDF (*.pdf)")
         if path:
             ws.scene.clearSelection()
             
@@ -1086,7 +1284,12 @@ class MindMapApp(QMainWindow):
     def export_md(self):
         ws = self.current_workspace()
         if not ws: return
-        path, _ = QFileDialog.getSaveFileName(self, "Exporter Markdown", "ma_mindmap.md", "Markdown (*.md)")
+        default_name = "ma_mindmap.md"
+        if ws.current_file_path:
+            base = os.path.splitext(os.path.basename(ws.current_file_path))[0]
+            default_name = f"{base}.md"
+            
+        path, _ = QFileDialog.getSaveFileName(self, "Exporter Markdown", default_name, "Markdown (*.md)")
         if path:
             nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
             root = next((n for n in nodes if n.node_id == 'root'), nodes[0] if nodes else None)
