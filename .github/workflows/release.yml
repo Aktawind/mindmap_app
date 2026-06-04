@@ -28,12 +28,9 @@ jobs:
 
     - name: Compiler l'application
       run: |
-        # --add-data "dossier_source;dossier_destination_dans_exe"
-        if (Test-Path "icon.ico") {
-          pyinstaller --noconsole --onefile --icon=icon.ico --add-data "templates;templates" --name=Mindy main.py
-        } else {
-          pyinstaller --noconsole --onefile --add-data "templates;templates" --name=Mindy main.py
-        }
+        pyinstaller --noconsole --onefile --icon=icon.ico --add-data "templates;templates" --name=Mindy main.py
+        pyinstaller --name "Mindy" --noconfirm --onedir --windowed --icon="icon.ico" --add-data "icon.ico;." --add-data "templates;templates" main.py
+
       shell: pwsh
 
     - name: Créer l'archive Zip avec le nom du TAG
