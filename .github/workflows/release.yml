@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*' # Se déclenche uniquement pour les tags commençant par v (ex: v1.0.0)
+  workflow_dispatch: # Permet de déclencher manuellement le workflow depuis l'interface GitHub
 
 jobs:
   build-and-release:
@@ -13,9 +14,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Configurer Python
-      uses: actions/with-python@v5
+      uses: actions/setup-python@v5
       with:
-        python-level: '3.12'
+        python-version: '3.12'
 
     - name: Installer les dépendances
       run: |
