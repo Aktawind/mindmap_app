@@ -28,21 +28,21 @@ jobs:
 
     - name: Compiler l'application (PyInstaller)
       run: |
-        pyinstaller --noconsole --onefile --name=Mindy main.py
-
-    - name: Intégrer l'icône si elle existe
-      run: |
-        if (Test-Path "icon.ico") { Copy-Item "icon.ico" "dist/" }
+        # On vérifie si l'icône existe, si oui on l'intègre au coeur de l'EXE, sinon compilation normale
+        if (Test-Path "icon.ico") {
+          pyinstaller --noconsole --onefile --icon=icon.ico --name=Mindy main.py
+        } else {
+          pyinstaller --noconsole --onefile --name=Mindy main.py
+        }
       shell: pwsh
 
     - name: Créer l'archive Zip avec le nom du TAG
       run: |
-        # Si c'est un tag (ex: v1.0.1), on prend le tag. Si c'est un lancement manuel, on met 'manual'
         $VERSION = if ("${{ github.ref_name }}" -ne "") { "${{ github.ref_name }}" } else { "manual" }
         $ZIP_NAME = "Mindy_$VERSION.zip"
         
-        # On compresse le dossier dist dans le ZIP directement à la racine du projet
-        Compress-Archive -Path dist/* -DestinationPath "./$ZIP_NAME"
+        # On compresse uniquement le fichier Mindy.exe généré dans dist, rien d'autre !
+        Compress-Archive -Path dist/Mindy.exe -DestinationPath "./$ZIP_NAME"
       shell: pwsh
 
     - name: Créer la Release GitHub et téléverser l'artefact
