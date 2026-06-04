@@ -23,12 +23,10 @@ from view_scene import MindMapWorkspace
 from items import BRANCH_PALETTES
 
 def resource_path(relative_path):
-    """ Récupère le chemin absolu d'une ressource, fonctionne pour le dev et pour PyInstaller """
     try:
-        # PyInstaller crée un dossier temporaire _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, relative_path)
 
 
@@ -388,27 +386,41 @@ class MindMapApp(QMainWindow):
         return True
 
     def closeEvent(self, event):
-        # Mémoriser l'espace actuel pour la prochaine réouverture
-        if hasattr(self, 'current_workspace_path') and self.current_workspace_path:
-            self.settings.setValue("last_workspace_path", self.current_workspace_path)
-        else:
-            self.settings.setValue("last_workspace_path", "")
-            
-        # Ton code existant pour vérifier si des onglets ne sont pas sauvegardés...
+        """Gère la fermeture de l'application et force la sauvegarde des onglets non enregistrés."""
+        # On boucle sur tous les onglets pour vérifier s'il y a des modifications en cours
         for i in range(self.tab_widget.count()):
             ws = self.tab_widget.widget(i)
-            if ws and ws.is_dirty:
+            
+            # Si l'onglet a été modifié (is_dirty)
+            if hasattr(ws, 'is_dirty') and ws.is_dirty:
+                # On active l'onglet visuellement pour que l'utilisateur voie ce qu'il sauvegarde
+                self.tab_widget.setCurrentIndex(i)
+                
+                name = ws.current_file_path if ws.current_file_path else f"Sans titre {i+1}"
                 reply = QMessageBox.question(
-                    self, "Enregistrer ?",
-                    f"Le projet '{self.tab_widget.tabText(i)}' a été modifié. Enregistrer avant de quitter ?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                    self, 
+                    'Enregistrer les modifications',
+                    f"Le document '{os.path.basename(name)}' a été modifié.\nVoulez-vous enregistrer les modifications ?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.Yes
                 )
+
                 if reply == QMessageBox.StandardButton.Yes:
-                    self.tab_widget.setCurrentIndex(i)
-                    self.save_project()
+                    # --- CRUCIAL : On force la sauvegarde immédiate ---
+                    # On appelle ta méthode de sauvegarde (ajuste le nom si elle s'appelle autrement, ex: self.save_file)
+                    saved = self.save_project() 
+                    
+                    # Si la sauvegarde a été annulée par l'utilisateur dans le prompt de fichier, on stoppe la fermeture
+                    if not saved:
+                        event.ignore()
+                        return
+                        
                 elif reply == QMessageBox.StandardButton.Cancel:
+                    # L'utilisateur a cliqué sur Annuler : on stoppe complètement la fermeture
                     event.ignore()
                     return
+
+        # Si tout est sauvegardé ou que l'utilisateur a dit "Non", on accepte la fermeture
         event.accept()
 
     def on_tab_changed(self, index):
@@ -1235,11 +1247,11 @@ class MindMapApp(QMainWindow):
 
     def save_project(self, force_save_as=False):
         ws = self.current_workspace()
-        if not ws: return
+        if not ws: return False
         
         if not ws.current_file_path or force_save_as:
             path, _ = QFileDialog.getSaveFileName(self, "Enregistrer", "ma_mindmap.json", "JSON (*.json)")
-            if not path: return
+            if not path: return False
             ws.current_file_path = path
             
         with open(ws.current_file_path, 'w', encoding='utf-8') as f:
@@ -1248,6 +1260,7 @@ class MindMapApp(QMainWindow):
         ws.is_dirty = False
         self.settings.setValue("last_project_path", ws.current_file_path)
         self.update_title()
+        return True
 
     def apply_template(self, index):
         if index == 0: return
@@ -1393,19 +1406,8 @@ class MindMapApp(QMainWindow):
 
 
 if __name__ == '__main__':
-    import ctypes
-    try:
-        # Assigne un identifiant unique à ton application pour que Windows la gère à part
-        myappid = 'monentreprise.my_mindmap_app.v1.0' 
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-    except Exception:
-        pass
-
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
-    icon_path = resource_path('icon.png') 
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
     window = MindMapApp()
     window.show()
     # Forcer la mise à jour géométrique initiale de la barre de boutons dès l'affichage
