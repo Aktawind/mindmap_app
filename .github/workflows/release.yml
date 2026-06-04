@@ -6,6 +6,9 @@ on:
       - 'v*' # Se déclenche uniquement pour les tags commençant par v (ex: v1.0.0)
   workflow_dispatch: # Permet de déclencher manuellement le workflow depuis l'interface GitHub
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: windows-latest 
@@ -25,20 +28,28 @@ jobs:
 
     - name: Compiler l'application (PyInstaller)
       run: |
-        pyinstaller --name "Mindy" --noconfirm --onedir --windowed --icon="icon.ico" --add-data "icon.ico;." --add-data "templates;templates" main.py
+        pyinstaller --noconsole --onefile --name=Mindy main.py
 
-    - name: Créer l'archive Zip
-      id: package
+    - name: Intégrer l'icône si elle existe
       run: |
-        $TAG_NAME = "${{ github.ref_name }}"
-        $ZIP_NAME = "Mindy_$TAG_NAME.zip"
-        echo "zip_name=$ZIP_NAME" >> $env:GITHUB_OUTPUT
+        if (Test-Path "icon.ico") { Copy-Item "icon.ico" "dist/" }
+      shell: pwsh
+
+    - name: Créer l'archive Zip avec le nom du TAG
+      run: |
+        # Si c'est un tag (ex: v1.0.1), on prend le tag. Si c'est un lancement manuel, on met 'manual'
+        $VERSION = if ("${{ github.ref_name }}" -ne "") { "${{ github.ref_name }}" } else { "manual" }
+        $ZIP_NAME = "Mindy_$VERSION.zip"
+        
+        # On compresse le dossier dist dans le ZIP directement à la racine du projet
+        Compress-Archive -Path dist/* -DestinationPath "./$ZIP_NAME"
       shell: pwsh
 
     - name: Créer la Release GitHub et téléverser l'artefact
       uses: softprops/action-gh-release@v2
       with:
-        files: ${{ steps.package.outputs.zip_name }}
+        # On demande à l'action de prendre n'importe quel fichier .zip présent à la racine
+        files: ./*.zip
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
         generate_release_notes: true 
