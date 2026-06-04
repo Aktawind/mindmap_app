@@ -22,6 +22,8 @@ from view_scene import MindMapWorkspace
 
 from items import BRANCH_PALETTES
 
+APP_VERSION  = "1.0.6"
+
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -33,7 +35,7 @@ def resource_path(relative_path):
 class MindMapApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Mindy")
+        self.setWindowTitle(f"Mindy {APP_VERSION }")
         self.settings = QSettings("MindyApp", "MindMapEditor")
         self._clipboard_node = None
 
@@ -127,6 +129,9 @@ class MindMapApp(QMainWindow):
         export_menu.addAction("Exporter en Image PNG", self.export_png)
         export_menu.addAction("Exporter en PDF Vectoriel", self.export_pdf)
         export_menu.addAction("Exporter en Markdown", self.export_md)
+
+        about_menu = menu_bar.addMenu("À propos")
+        about_menu = about_menu.addAction("À propos de Mindy", self.show_about_dialog)
 
         self.header_right_widget = QWidget()
         hr_layout = QHBoxLayout(self.header_right_widget)
@@ -1261,6 +1266,29 @@ class MindMapApp(QMainWindow):
         self.settings.setValue("last_project_path", ws.current_file_path)
         self.update_title()
         return True
+    
+    def show_about_dialog(self):
+        """Affiche la boîte de dialogue 'À propos' de l'application."""
+        about_text = f"""
+        <h3>Mindy — Éditeur de Mind Mapping</h3>
+        <p><b>Version :</b> v{APP_VERSION }</p>
+        <p><b>Développeur :</b> Audrey DEAL</p>
+        <hr>
+        <p>Mindy est une application intuitive conçue pour structurer vos idées, 
+        créer des cartes mentales fluides et exporter vos projets dans des formats variés.</p>
+        
+        <p><b>Fonctionnalités clés :</b></p>
+        <ul>
+            <li>Routage de lignes dynamique</li>
+            <li>Gestion multi-onglets et espace de travail</li>
+            <li>Système de Snap to Grid</li>
+            <li>Ajout de pièces jointes et de liens URL sur les nœuds</li>
+        </ul>
+        <br>
+        <p><small>© 2026 Mindy App. Tous droits réservés.</small></p>
+        """
+        
+        QMessageBox.about(self, "À propos de Mindy", about_text)
 
     def apply_template(self, index):
         if index == 0: return
