@@ -1,0 +1,46 @@
+name: Génération de la Release Mindy
+
+on:
+  push:
+    tags:
+      - 'v*' # Se déclenche uniquement pour les tags commençant par v (ex: v1.0.0)
+  workflow_dispatch: # Permet de déclencher manuellement le workflow depuis l'interface GitHub
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest 
+    steps:
+    - name: Récupérer le code source
+      uses: actions/checkout@v4
+
+    - name: Configurer Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Installer les dépendances
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 PyInstaller
+
+    - name: Compiler l'application (PyInstaller)
+      run: |
+        pyinstaller --name "Mindy" --noconfirm --onedir --windowed --icon="icon.ico" --add-data "icon.ico;." --add-data "templates;templates" main.py
+
+    - name: Créer l'archive Zip
+      id: package
+      run: |
+        $TAG_NAME = "${{ github.ref_name }}"
+        $ZIP_NAME = "Mindy_$TAG_NAME.zip"
+        echo "zip_name=$ZIP_NAME" >> $env:GITHUB_OUTPUT
+      shell: pwsh
+
+    - name: Créer la Release GitHub et téléverser l'artefact
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ steps.package.outputs.zip_name }}
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        generate_release_notes: true 
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
