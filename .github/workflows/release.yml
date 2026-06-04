@@ -28,9 +28,8 @@ jobs:
 
     - name: Compiler l'application
       run: |
-        pyinstaller --noconsole --onefile --icon=icon.ico --add-data "templates;templates" --name=Mindy main.py
-        pyinstaller --name "Mindy" --noconfirm --onedir --windowed --icon="icon.ico" --add-data "icon.ico;." --add-data "templates;templates" main.py
-
+        # Remplacement de --onedir par --onefile
+        pyinstaller --name "Mindy" --noconfirm --onefile --windowed --icon="icon.ico" --add-data "icon.ico;." --add-data "templates;templates" main.py
       shell: pwsh
 
     - name: Créer l'archive Zip avec le nom du TAG
@@ -38,14 +37,13 @@ jobs:
         $VERSION = if ("${{ github.ref_name }}" -ne "") { "${{ github.ref_name }}" } else { "manual" }
         $ZIP_NAME = "Mindy_$VERSION.zip"
         
-        # On compresse uniquement le fichier Mindy.exe généré dans dist, rien d'autre !
+        # Ici, comme c'est du --onefile, dist/Mindy.exe contient TOUT à l'intérieur
         Compress-Archive -Path dist/Mindy.exe -DestinationPath "./$ZIP_NAME"
       shell: pwsh
 
     - name: Créer la Release GitHub et téléverser l'artefact
       uses: softprops/action-gh-release@v2
       with:
-        # On demande à l'action de prendre n'importe quel fichier .zip présent à la racine
         files: ./*.zip
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
