@@ -76,6 +76,10 @@ class MindMapApp(QMainWindow):
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
         self.setCentralWidget(self.tab_widget)
 
+        self.add_tab_button = QPushButton("➕ Ajouter un onglet")
+        self.add_tab_button.clicked.connect(self.new_project)
+        self.tab_widget.setCornerWidget(self.add_tab_button, Qt.Corner.TopRightCorner)
+
         menu_bar = self.menuBar()
 
         workspace_toolbar = self.addToolBar("workspace")
@@ -92,8 +96,10 @@ class MindMapApp(QMainWindow):
         workspace_toolbar.addWidget(self.lbl_workspace_status)
         workspace_toolbar.addSeparator()
 
-        btn_add_to_coll = QPushButton("➕ Inclure cet onglet")
-        btn_remove_from_coll = QPushButton("❌ Retirer cet onglet")
+        btn_add_to_coll = QPushButton("➕")
+        btn_add_to_coll.setToolTip("Inclure l'onglet actuel dans l'espace de travail")
+        btn_remove_from_coll = QPushButton("❌")
+        btn_remove_from_coll.setToolTip("Retirer l'onglet actuel de l'espace de travail")
         workspace_toolbar.addSeparator()
         workspace_toolbar.addWidget(btn_add_to_coll)
         workspace_toolbar.addWidget(btn_remove_from_coll)
@@ -136,13 +142,17 @@ class MindMapApp(QMainWindow):
         """)
         self.btn_snap.clicked.connect(self.toggle_snap_to_grid)
         workspace_toolbar.addWidget(self.btn_snap)
+
+        # Crée le bouton et active le mode "Toggle" (mémorisable)
+        self.btn_toggle_routing = QPushButton("Liens courbes")
+        self.btn_toggle_routing.setCheckable(True)
+        self.btn_toggle_routing.setStyleSheet("""
+            QPushButton { padding: 6px 15px; border: 1px solid #ccc; border-radius: 4px; background: #ffffff; font-weight: bold; }
+        """)
+        self.btn_toggle_routing.clicked.connect(self.toggle_line_routing)
+        workspace_toolbar.addWidget(self.btn_toggle_routing)
         
-        self.routing_combo = QComboBox()
-        self.routing_combo.addItem("Branches Courbes", "curved")
-        self.routing_combo.addItem("Branches Droites", "orthogonal")
-        self.routing_combo.setStyleSheet("padding: 2px 5px; border: 1px solid #ccc; border-radius: 4px;")
-        self.routing_combo.currentIndexChanged.connect(self.change_global_routing)
-        workspace_toolbar.addWidget(self.routing_combo)
+  
 
         self.template_combo = QComboBox()
         self.template_combo.addItem("Choisir un template...")
@@ -277,6 +287,31 @@ class MindMapApp(QMainWindow):
         self.overlay.resize(230, 140)
         self.overlay.move(20, 100)
 
+    def update_routing_button_ui(self):
+        if self.btn_toggle_routing.isChecked():
+            self.btn_toggle_routing.setText("Liens courbes")
+        else:
+            self.btn_toggle_routing.setText("Liens droits")
+
+    def toggle_line_routing(self, checked):
+        """Bascule le mode de routage des lignes en fonction de l'état du bouton."""
+        ws = self.tab_widget.currentWidget()
+        if ws and hasattr(ws, 'scene'):
+            # Si coché -> 'curved' (courbe), sinon -> 'orthogonal' (lignes droites/perpendiculaires)
+            ws.scene.line_routing_mode = 'curved' if checked else 'orthogonal'
+            
+            # Met à jour le texte et le helper du bouton
+            self.update_routing_button_ui()
+            
+            # Force chaque ligne à recalculer son tracé
+            from items import EdgeItem
+            for item in ws.scene.items():
+                if isinstance(item, EdgeItem):
+                    item.update_position()
+            
+            # Rafraîchit l'affichage de la scène
+            ws.scene.update()
+
     def setup_shortcuts(self):
         self.shortcut_tab = QShortcut(QKeySequence(Qt.Key.Key_Tab), self)
         self.shortcut_tab.activated.connect(self.on_tab_pressed)
@@ -380,12 +415,12 @@ class MindMapApp(QMainWindow):
         self.update_title()
         ws = self.current_workspace()
         if ws:
-            idx = self.routing_combo.findData(ws.scene.line_routing_mode)
-            if idx != -1:
-                self.routing_combo.blockSignals(True)
-                self.routing_combo.setCurrentIndex(idx)
-                self.routing_combo.blockSignals(False)
-            
+            is_curved = (ws.scene.line_routing_mode == 'curved')
+            self.btn_toggle_routing.blockSignals(True)
+            self.btn_toggle_routing.setChecked(is_curved)
+            self.btn_toggle_routing.blockSignals(False)
+            self.update_routing_button_ui()
+
             self.btn_snap.blockSignals(True)
             self.btn_snap.setChecked(getattr(ws.scene, 'snap_to_grid', False))
             self.btn_snap.blockSignals(False)
@@ -528,11 +563,10 @@ class MindMapApp(QMainWindow):
         self.btn_snap.setChecked(ws.scene.snap_to_grid)
         self.btn_snap.blockSignals(False)
 
-        idx = self.routing_combo.findData(ws.scene.line_routing_mode)
-        if idx != -1:
-            self.routing_combo.blockSignals(True)
-            self.routing_combo.setCurrentIndex(idx)
-            self.routing_combo.blockSignals(False)
+        is_curved = (ws.scene.line_routing_mode == 'curved')
+        self.btn_toggle_routing.blockSignals(True)
+        self.btn_toggle_routing.setChecked(is_curved)
+        self.btn_toggle_routing.blockSignals(False)
         
         node_counter = [0]
         edge_counter = [0]
@@ -1165,18 +1199,17 @@ class MindMapApp(QMainWindow):
             elif node.file_path: QDesktopServices.openUrl(QUrl.fromLocalFile(node.file_path))
 
     def new_project(self, force_empty=False):
-        if force_empty or QMessageBox.question(self, "Nouveau", "Créer un nouveau projet dans un nouvel onglet ?") == QMessageBox.StandardButton.Yes:
-            ws = MindMapWorkspace(self)
-            root = NodeItem('root', 'Nouveau noeud', 0, 0, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
-            root.signals.itemDoubleClicked.connect(self.start_inline_editing)
-            root.signals.positionChanged.connect(self.save_state)
-            ws.scene.addItem(root)
-            
-            self.tab_widget.addTab(ws, "[Nouveau Projet]")
-            self.tab_widget.setCurrentWidget(ws)
-            self.save_state()
-            ws.is_dirty = False 
-            self.update_title()
+        ws = MindMapWorkspace(self)
+        root = NodeItem('root', 'Nouveau noeud', 0, 0, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
+        root.signals.itemDoubleClicked.connect(self.start_inline_editing)
+        root.signals.positionChanged.connect(self.save_state)
+        ws.scene.addItem(root)
+        
+        self.tab_widget.addTab(ws, "[Nouveau Projet]")
+        self.tab_widget.setCurrentWidget(ws)
+        self.save_state()
+        ws.is_dirty = False 
+        self.update_title()
 
     def load_project(self):
         paths, _ = QFileDialog.getOpenFileNames(self, "Ouvrir un ou plusieurs projets", "", "JSON (*.json)")
