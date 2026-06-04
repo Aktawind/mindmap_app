@@ -41,14 +41,15 @@ class MindMapApp(QMainWindow):
         self.setup_ui()
         self.setup_shortcuts()
         self.load_last_project_on_startup()
-        # --- À la toute fin de __init__(self) ---
-        self.new_project()  # Crée un espace de base par défaut
         
-        # Recharger automatiquement le dernier espace de workspace fermé
-        last_workspace = self.settings.value("last_workspace_path", "")
+        last_workspace = self.settings.value("last_collection_path", "")
+        
         if last_workspace and os.path.exists(last_workspace):
-            # On passe directement le chemin à load_workspace
+            # Si un espace existait, on le charge directement (sans créer de projet vierge avant)
             QTimer.singleShot(100, lambda: self.load_workspace(last_workspace))
+        else:
+            # S'il n'y a aucun historique, ALORS SEULEMENT on ouvre un projet vierge par défaut
+            self.new_project()
 
     def current_workspace(self) -> MindMapWorkspace:
         return self.tab_widget.currentWidget()
@@ -343,13 +344,13 @@ class MindMapApp(QMainWindow):
         return True
 
     def closeEvent(self, event):
-        # Sauvegarder la workspace active actuelle pour le prochain démarrage
-        if self.current_workspace_path:
+        # Mémoriser l'espace actuel pour la prochaine réouverture
+        if hasattr(self, 'current_workspace_path') and self.current_workspace_path:
             self.settings.setValue("last_workspace_path", self.current_workspace_path)
         else:
             self.settings.setValue("last_workspace_path", "")
-
-        # Votre vérification existante des onglets modifiés...
+            
+        # Ton code existant pour vérifier si des onglets ne sont pas sauvegardés...
         for i in range(self.tab_widget.count()):
             ws = self.tab_widget.widget(i)
             if ws and ws.is_dirty:
@@ -431,8 +432,10 @@ class MindMapApp(QMainWindow):
         if not root: return {}
 
         natural_edges = set()
+        serialized_node_ids = set()
 
         def serialize_node(node):
+            serialized_node_ids.add(node.node_id)
             data = {
                 "id": node.node_id,
                 "label": node.label,
@@ -461,6 +464,26 @@ class MindMapApp(QMainWindow):
         tree_data = serialize_node(root)
         tree_data["global_line_routing"] = ws.scene.line_routing_mode
         tree_data["snap_to_grid"] = getattr(ws.scene, 'snap_to_grid', False)
+
+        orphan_nodes_data = []
+        for node in nodes:
+            if node.node_id not in serialized_node_ids:
+                orphan_nodes_data.append({
+                    "id": node.node_id,
+                    "label": node.label,
+                    "x": node.pos().x(),
+                    "y": node.pos().y(),
+                    "shape": node.shape_type,
+                    "bg": node.bg_color.name(),
+                    "border": node.border_color.name(),
+                    "font_color": node.font_color.name(),
+                    "border_width": node.border_width,
+                    "is_bold": node.is_bold,
+                    "status": node.status,
+                    "file_path": node.file_path,
+                    "url_link": node.url_link
+                })
+        tree_data["orphan_nodes"] = orphan_nodes_data
 
         cross_links_data = []
         for edge in edges:
@@ -547,6 +570,21 @@ class MindMapApp(QMainWindow):
             return node
 
         deserialize_node(root_data)
+
+        for orphan in root_data.get("orphan_nodes", []):
+            node_id = orphan.get("id")
+            node = NodeItem(
+                node_id, orphan.get("label", ""), orphan.get("x", 0.0), orphan.get("y", 0.0),
+                shape=orphan.get("shape", "box"), bg=orphan.get("bg", '#60A5FA'),
+                border=orphan.get("border", '#3B82F6'), font_color=orphan.get("font_color", '#ffffff'),
+                file_path=orphan.get("file_path"), url_link=orphan.get("url_link"),
+                is_bold=orphan.get("is_bold", False), status=orphan.get("status", "none")
+            )
+            node.border_width = orphan.get("border_width", 1)
+            node.signals.itemDoubleClicked.connect(self.start_inline_editing)
+            node.signals.positionChanged.connect(self.save_state)
+            ws.scene.addItem(node)
+            created_nodes[node_id] = node
 
         for cl in root_data.get("cross_links", []):
             source = created_nodes.get(cl["from"])
@@ -902,12 +940,13 @@ class MindMapApp(QMainWindow):
                 for e in node1.edges
             )
             if not already_linked:
-                edge = EdgeItem(f"edge_{len(ws.scene.items())}", node1, node2, "", color='#A0AEC0')
+                link_color = node1.border_color
+                edge = EdgeItem(f"edge_{len(ws.scene.items())}", node1, node2, "", color=link_color)
                 edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
                 ws.scene.addItem(edge)
-                self.save_state()
                 ws.scene.clearSelection()
                 edge.setSelected(True)
+                self.save_state()
 
     def toggle_bold(self):
         ws = self.current_workspace()
@@ -1033,11 +1072,12 @@ class MindMapApp(QMainWindow):
         self.auto_save_workspace()
         self.update_title()
 
-    def load_workspace(self):
-        """ Ouvre une workspace et charge tous les onglets associés """
-        path, _ = QFileDialog.getOpenFileName(self, "Ouvrir une workspace", "", "workspace Mindy (*.mindy)")
+    def load_workspace(self, path=None):
+        """ Charge une workspace (soit via explorateur si path=None, soit directement au démarrage) """
         if not path:
-            return
+            path, _ = QFileDialog.getOpenFileName(self, "Ouvrir un Espace de travail", "", "Espace Mindy (*.mindy)")
+            if not path:
+                return
 
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -1045,7 +1085,7 @@ class MindMapApp(QMainWindow):
             
             file_paths = data.get("files", [])
 
-            # Fermer tous les onglets existants
+            # Bloquer les signaux pour vider proprement les onglets actuels
             self.tab_widget.blockSignals(True)
             try:
                 self.tab_widget.clear()
@@ -1055,13 +1095,13 @@ class MindMapApp(QMainWindow):
             self.current_workspace_path = path
             self.workspace_files = []
 
-            # Charger les fichiers valides
+            # Charger uniquement les fichiers JSON valides sur le disque
             for f_path in file_paths:
                 if os.path.exists(f_path):
                     self.load_project_from_path(f_path)
                     self.workspace_files.append(f_path)
 
-            # Si la workspace était vide, on met une carte vierge
+            # Si le fichier .mindy était vide, on crée un onglet vierge par défaut
             if not self.workspace_files:
                 self.new_project()
 
@@ -1069,7 +1109,7 @@ class MindMapApp(QMainWindow):
             self.update_title()
 
         except Exception as e:
-            QMessageBox.critical(self, "Erreur Chargement", f"Impossible de charger la workspace :\n{str(e)}")
+            QMessageBox.critical(self, "Erreur", f"Impossible de charger l'espace de travail :\n{str(e)}")
 
     def add_current_tab_to_workspace(self):
         """ Ajoute la carte active à la playlist et sauvegarde immédiatement """
