@@ -1393,8 +1393,19 @@ class MindMapApp(QMainWindow):
 
 
 if __name__ == '__main__':
+    import ctypes
+    try:
+        # Assigne un identifiant unique à ton application pour que Windows la gère à part
+        myappid = 'monentreprise.my_mindmap_app.v1.0' 
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
+    icon_path = resource_path('icon.png') 
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
     window = MindMapApp()
     window.show()
     # Forcer la mise à jour géométrique initiale de la barre de boutons dès l'affichage
