@@ -22,6 +22,15 @@ from view_scene import MindMapWorkspace
 
 from items import BRANCH_PALETTES
 
+def resource_path(relative_path):
+    """ Récupère le chemin absolu d'une ressource, fonctionne pour le dev et pour PyInstaller """
+    try:
+        # PyInstaller crée un dossier temporaire _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 
 class MindMapApp(QMainWindow):
     def __init__(self):
@@ -1216,8 +1225,7 @@ class MindMapApp(QMainWindow):
         self.template_combo.setCurrentIndex(0)
         
         if QMessageBox.question(self, "Template", "Charger ce template remplacera la mind map de l'onglet actuel. Continuer ?") == QMessageBox.StandardButton.Yes:
-            base_dir = sys._MEIPASS if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            template_path = os.path.join(base_dir, "templates", filename)
+            template_path = resource_path(os.path.join("templates", filename))
             
             if os.path.exists(template_path):
                 with open(template_path, 'r', encoding='utf-8') as f:
