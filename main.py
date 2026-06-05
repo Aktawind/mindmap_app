@@ -876,6 +876,7 @@ class MindMapApp(QMainWindow):
             if new_text and self.edit_item.label != new_text:
                 self.edit_item.label = new_text
                 self.edit_item.recalculate_size()
+                self.edit_item.update_edges()
                 changed = True
         else:
             if self.edit_item.label != new_text:

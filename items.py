@@ -77,6 +77,11 @@ class NodeItem(QGraphicsItem):
         self.rect = QRectF(-width/2, -height/2, width, height)
         self.prepareGeometryChange()
 
+    def update_edges(self):
+        """Force toutes les arêtes connectées à recalculer leur tracé."""
+        for edge in self.edges:
+            edge.update_position()
+
     def boundingRect(self):
         padding = self.border_width + 6
         return self.rect.adjusted(-padding, -padding, padding, padding)
