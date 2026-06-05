@@ -20,6 +20,29 @@ class MindMapScene(QGraphicsScene):
             self.signals.itemDoubleClicked.emit(event.scenePos())
         super().mouseDoubleClickEvent(event)
 
+    def removeItem(self, item):
+        # On importe EdgeItem pour vérifier si l'élément supprimé est une branche
+        from items import EdgeItem
+        
+        if isinstance(item, EdgeItem):
+            # 1. On nettoie proprement les connexions de la branche dans les nœuds
+            if item.source_node and item in item.source_node.edges:
+                item.source_node.edges.remove(item)
+            if item.dest_node and item in item.dest_node.edges:
+                item.dest_node.edges.remove(item)
+            
+            # 2. On marque le workspace comme modifié pour activer la sauvegarde
+            if hasattr(self, 'parent_workspace') and self.parent_workspace:
+                self.parent_workspace.is_dirty = True
+            elif hasattr(self, 'parent') and callable(self.parent) and self.parent():
+                # Selon comment est lié ton parent, on remonte jusqu'au MindMapWorkspace
+                ws = self.parent()
+                if hasattr(ws, 'is_dirty'):
+                    ws.is_dirty = True
+
+        # On appelle la méthode d'origine de Qt pour réellement enlever l'élément de la scène
+        super().removeItem(item)
+
 
 class MindMapControlView(QGraphicsView):
     def __init__(self, scene, parent=None):
@@ -95,6 +118,7 @@ class MindMapWorkspace(QWidget):
         self.is_dirty = False
 
         self.scene = MindMapScene(self)
+        self.scene.parent_workspace = self
         self.scene.setSceneRect(-5000, -5000, 10000, 10000)
         
         self.scene.selectionChanged.connect(self.main_app.on_selection_changed)
