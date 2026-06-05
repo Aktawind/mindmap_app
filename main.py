@@ -22,7 +22,7 @@ from view_scene import MindMapWorkspace
 
 from items import BRANCH_PALETTES
 
-APP_VERSION  = "1.0.6"
+APP_VERSION  = "1.0.7"
 
 def resource_path(relative_path):
     try:
