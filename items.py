@@ -37,6 +37,7 @@ class NodeItem(QGraphicsItem):
         self.signals = GraphicsSignals()
         self.edges = []
         self.recalculate_size()
+        self._drag_start_pos = None
 
     def add_edge(self, edge):
         if edge not in self.edges:
@@ -170,10 +171,24 @@ class NodeItem(QGraphicsItem):
                 self.setPos(x, y)
                 self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
+            # On met à jour la position des lignes reliées pendant le déplacement
             for edge in self.edges:
                 edge.update_position()
-            self.signals.positionChanged.emit()
+                        
         return super().itemChange(change, value)
+
+    def mousePressEvent(self, event):
+        # Au moment du clic, on enregistre la position initiale du nœud
+        self._drag_start_pos = self.pos()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        # Quand on relâche le clic, on compare avec la position initiale
+        # Si le nœud a bougé, on envoie le signal UNE SEULE FOIS pour l'historique
+        if self._drag_start_pos is not None and self.pos() != self._drag_start_pos:
+            self.signals.positionChanged.emit()
+        self._drag_start_pos = None
 
     def mouseDoubleClickEvent(self, event):
         self.signals.itemDoubleClicked.emit(self)
