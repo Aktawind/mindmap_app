@@ -21,39 +21,26 @@ class MindMapScene(QGraphicsScene):
         super().mouseDoubleClickEvent(event)
 
     def removeItem(self, item):
-        # On importe les classes localement pour éviter les imports circulaires
-        from items import EdgeItem, NodeItem
+        # On importe EdgeItem pour vérifier si l'élément supprimé est une branche
+        from items import EdgeItem
         
-        # CAS 1 : Si l'élément qu'on est en train de supprimer est un NŒUD
-        if isinstance(item, NodeItem):
-            # On doit détruire TOUTES les branches connectées à ce nœud d'abord.
-            # On utilise list(item.edges) pour faire une copie propre de la liste pendant qu'on la vide.
-            for edge in list(item.edges):
-                if edge.scene() == self:
-                    self.removeItem(edge) # On appelle récursivement removeItem pour chaque branche
-            
-            # On prévient le Workspace que le mind map a changé
-            if hasattr(self, 'parent_workspace') and self.parent_workspace:
-                self.parent_workspace.is_dirty = True
-                # On force la mise à jour visuelle du titre de l'application (pour afficher l'astérisque *)
-                if hasattr(self.parent_workspace, 'main_app') and self.parent_workspace.main_app:
-                    self.parent_workspace.main_app.update_title()
-
-        # CAS 2 : Si l'élément qu'on est en train de supprimer est une BRANCHE (Edge)
-        elif isinstance(item, EdgeItem):
-            # 1. On nettoie proprement les pointeurs dans les nœuds source et destination
+        if isinstance(item, EdgeItem):
+            # 1. On nettoie proprement les connexions de la branche dans les nœuds
             if item.source_node and item in item.source_node.edges:
                 item.source_node.edges.remove(item)
             if item.dest_node and item in item.dest_node.edges:
                 item.dest_node.edges.remove(item)
             
-            # 2. On prévient le Workspace et on met à jour le titre (*)
+            # 2. On marque le workspace comme modifié pour activer la sauvegarde
             if hasattr(self, 'parent_workspace') and self.parent_workspace:
                 self.parent_workspace.is_dirty = True
-                if hasattr(self.parent_workspace, 'main_app') and self.parent_workspace.main_app:
-                    self.parent_workspace.main_app.update_title()
+            elif hasattr(self, 'parent') and callable(self.parent) and self.parent():
+                # Selon comment est lié ton parent, on remonte jusqu'au MindMapWorkspace
+                ws = self.parent()
+                if hasattr(ws, 'is_dirty'):
+                    ws.is_dirty = True
 
-        # ENFIN : On appelle la méthode d'origine de PyQt pour retirer physiquement l'élément de la scène
+        # On appelle la méthode d'origine de Qt pour réellement enlever l'élément de la scène
         super().removeItem(item)
 
 
