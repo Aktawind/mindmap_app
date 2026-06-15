@@ -68,6 +68,14 @@ class MindMapApp(QMainWindow):
         sep.setFixedSize(2, 22)
         sep.setStyleSheet("background-color: #cbd5e1; margin: 0 4px;")
         return sep
+    
+    def auto_center_clicked(self):
+        """Méthode appelée lors du clic sur le bouton Auto Center."""
+        # On récupère le workspace actif AU MOMENT du clic
+        ws = self.current_workspace()
+        if ws:
+            # S'il y a un workspace ouvert, on lui demande de se centrer
+            ws.auto_center_root()
 
     def setup_ui(self):
         self.tab_widget = QTabWidget()
@@ -137,6 +145,11 @@ class MindMapApp(QMainWindow):
         hr_layout = QHBoxLayout(self.header_right_widget)
         hr_layout.setContentsMargins(0, 0, 10, 0)
 
+        btn_save = QPushButton("💾")
+        btn_save.setToolTip("Sauvegarder")
+        btn_save.clicked.connect(self.save_project) 
+        workspace_toolbar.addWidget(btn_save)
+
         self.btn_snap = QPushButton(" 🧲 Aimant Grille ")
         self.btn_snap.setCheckable(True)
         self.btn_snap.setStyleSheet("""
@@ -155,8 +168,6 @@ class MindMapApp(QMainWindow):
         self.btn_toggle_routing.clicked.connect(self.toggle_line_routing)
         workspace_toolbar.addWidget(self.btn_toggle_routing)
         
-  
-
         self.template_combo = QComboBox()
         self.template_combo.addItem("Choisir un template...")
         self.template_combo.addItem("🎯 Cadrage d'Idée", "cadrage_idee.json")
@@ -176,6 +187,23 @@ class MindMapApp(QMainWindow):
         """)
         self.template_combo.currentIndexChanged.connect(self.apply_template)
         workspace_toolbar.addWidget(self.template_combo)
+       
+        # 1. Création du bouton Auto Center
+        btn_center = QPushButton("Auto Center")
+        btn_center.setToolTip("Centrer la vue sur le nœud principal")
+        # Optionnel : appliquez un style similaire à vos autres boutons si nécessaire
+        btn_center.setStyleSheet("""
+            QPushButton {
+                background-color: #3B82F6; 
+                color: white; 
+                border-radius: 4px; 
+                padding: 5px 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #2563EB; }
+        """)
+        btn_center.clicked.connect(self.auto_center_clicked)
+        workspace_toolbar.addWidget(btn_center)
 
         menu_bar.setCornerWidget(self.header_right_widget, Qt.Corner.TopRightCorner)
 

@@ -146,7 +146,6 @@ class MindMapControlView(QGraphicsView):
         self.scale(zoom_factor, zoom_factor)
         event.accept()
 
-
 class MindMapWorkspace(QWidget):
     def __init__(self, main_app, file_path=None):
         super().__init__()
@@ -169,4 +168,8 @@ class MindMapWorkspace(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.view)
+        self.view.centerOn(0, 0)
+
+
+    def auto_center_root(self):      
         self.view.centerOn(0, 0)
