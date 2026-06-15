@@ -65,6 +65,25 @@ class MindMapControlView(QGraphicsView):
                 self.setCursor(Qt.CursorShape.ClosedHandCursor)
                 event.accept()
                 return
+
+        # --- CORRECTION ICI ---
+        self._moved_nodes_start_positions = {}
+        if event.button() == Qt.MouseButton.LeftButton and hasattr(self, 'scene') and self.scene():
+            # 1. On récupère d'abord l'élément qui se trouve directement sous le curseur
+            clicked_item = self.itemAt(event.position().toPoint())
+            
+            # Si l'élément sous le curseur fait partie d'un ensemble (ex: un sous-élément graphique),
+            # on remonte jusqu'à l'élément principal (le NodeItem)
+            while clicked_item and clicked_item.parentItem():
+                clicked_item = clicked_item.parentItem()
+            
+            if clicked_item:
+                self._moved_nodes_start_positions[clicked_item] = clicked_item.pos()
+
+            # 2. On ajoute aussi les autres éléments qui étaient déjà sélectionnés (pour la multi-sélection)
+            for item in self.scene().selectedItems():
+                self._moved_nodes_start_positions[item] = item.pos()
+
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -87,7 +106,28 @@ class MindMapControlView(QGraphicsView):
             self.setCursor(Qt.CursorShape.ArrowCursor)
             event.accept()
             return
+
+        # Appeler d'abord le comportement par défaut de Qt pour 
+        # que le déplacement des items soit appliqué et finalisé
         super().mouseReleaseEvent(event)
+
+        # --- AJOUT : Vérifier si au moins un nœud a changé de position ---
+        has_moved = False
+        if hasattr(self, '_moved_nodes_start_positions'):
+            for item, start_pos in self._moved_nodes_start_positions.items():
+                # On compare la position de départ à la position actuelle
+                # Si l'item existe toujours dans la scène et a bougé
+                if item.scene() and item.pos() != start_pos:
+                    has_moved = True
+                    break
+            # Nettoyage de la variable temporaire
+            del self._moved_nodes_start_positions
+
+        # On ne sauvegarde QUE si un mouvement réel a été détecté
+        if has_moved and hasattr(self, 'scene') and self.scene():
+            workspace = getattr(self.scene(), 'parent_workspace', None)
+            if workspace and hasattr(workspace, 'main_app'):
+                workspace.main_app.save_state()
 
     def wheelEvent(self, event):
         zoom_in_factor = 1.15

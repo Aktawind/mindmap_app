@@ -614,7 +614,6 @@ class MindMapApp(QMainWindow):
             )
             node.border_width = data.get("border_width", 1)
             node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-            node.signals.positionChanged.connect(self.save_state)
             ws.scene.addItem(node)
             created_nodes[node_id] = node
 
@@ -642,7 +641,6 @@ class MindMapApp(QMainWindow):
             )
             node.border_width = orphan.get("border_width", 1)
             node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-            node.signals.positionChanged.connect(self.save_state)
             ws.scene.addItem(node)
             created_nodes[node_id] = node
 
@@ -718,7 +716,6 @@ class MindMapApp(QMainWindow):
         new_node.url_link = data["url_link"]
         
         new_node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-        new_node.signals.positionChanged.connect(self.save_state)
         
         ws.scene.addItem(new_node)
         self.save_state()
@@ -815,7 +812,6 @@ class MindMapApp(QMainWindow):
             node = NodeItem(f"node_{len(nodes)+1}", "Nouvelle idée", x, y, bg='#FFF3E0', border='#FFB74D', font_color='#333333')
             
         node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-        node.signals.positionChanged.connect(self.save_state)
         ws.scene.addItem(node)
         self.save_state()
 
@@ -976,7 +972,6 @@ class MindMapApp(QMainWindow):
 
         new_node = NodeItem(new_id, "Nouvelle sous-idée", t_x, t_y, shape='box', bg=bg, border=border, font_color=text_col)
         new_node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-        new_node.signals.positionChanged.connect(self.save_state)
         
         edge = EdgeItem(f"edge_{len(ws.scene.items())}", parent_node, new_node, "", color=edge_col)
         edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
