@@ -1279,7 +1279,23 @@ class MindMapApp(QMainWindow):
         if not ws: return False
         
         if not ws.current_file_path or force_save_as:
-            path, _ = QFileDialog.getSaveFileName(self, "Enregistrer", "ma_mindmap.json", "JSON (*.json)")
+            nodes = [item for item in ws.scene.items() if isinstance(item, NodeItem)]
+            root_node = next((n for n in nodes if n.node_id == 'root'), None)
+            if root_node and root_node.label:
+                default_name = root_node.label.replace('\n', ' ').strip()
+                for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
+                    default_name = default_name.replace(char, '')
+                if not default_name:
+                    default_name = "ma_mindmap"
+            else:
+                default_name = "ma_mindmap"
+
+            path, _ = QFileDialog.getSaveFileName(
+                self, 
+                "Enregistrer la carte", 
+                f"{default_name}.json", 
+                "Mind Map Files (*.json)"
+            )
             if not path: return False
             ws.current_file_path = path
             
