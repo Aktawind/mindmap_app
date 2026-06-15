@@ -1043,12 +1043,39 @@ class MindMapApp(QMainWindow):
             node.update()
             self.save_state()
 
-    def change_color(self, bg, border):
+    def apply_color_downward(self, node, bg_color, border_color):
+        """Applique la couleur au nœud et descend récursivement vers tous ses enfants."""
+        if not node:
+            return
+
+        # 1. On applique la couleur au nœud actuel
+        node.bg_color = QColor(bg_color)
+        node.border_color = QColor(border_color)
+        node.update()
+
+        # 2. On parcourt toutes les branches connectées à ce nœud
+        for edge in node.edges:
+            # Sécurité : on vérifie que le nœud actuel est bien la SOURCE du lien
+            # (ce qui garantit qu'on descend vers l'enfant, sans remonter vers le parent)
+            if edge.source_node == node:
+                # Optionnel : Si vous souhaitez aussi recolorer le trait de la branche
+                edge.color = QColor(border_color)
+                edge.update()
+                
+                # Appel récursif sur le nœud destination (l'enfant)
+                self.apply_color_downward(edge.dest_node, bg_color, border_color)
+
+    def change_color(self, color, border):
         ws = self.current_workspace()
-        if not ws: return
+        if not ws: 
+            return
+            
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            self.apply_color_hierarchy(sel[0], bg, border, '#333333', border)
+            # On applique le changement en cascade descendante depuis le nœud sélectionné
+            self.apply_color_downward(sel[0], color, border)
+            
+            # Sauvegarde de l'état pour que le Ctrl+Z prenne en compte toute la cascade
             self.save_state()
 
     def apply_color_hierarchy(self, node, bg, border, text_col, edge_col):
