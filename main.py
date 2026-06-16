@@ -849,7 +849,7 @@ class MindMapApp(QMainWindow):
 
         if nodes:
             for node in nodes:
-                node.shape = self.shape_combo.itemData(index)
+                node.shape_type = self.shape_combo.itemData(index)
                 node.update()
                 node.recalculate_size()
             self.save_state()
@@ -890,7 +890,10 @@ class MindMapApp(QMainWindow):
         if not nodes:
             node = NodeItem('root', "Nouvelle idée centrale", x, y, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
         else:
-            node = NodeItem(f"node_{len(nodes)+1}", "Nouvelle idée", x, y, bg='#FFF3E0', border='#FFB74D', font_color='#333333')
+            # Génération d'un ID unique basé sur le temps en millisecondes
+            import time
+            unique_id = f"node_{int(time.time() * 1000)}"
+            node = NodeItem(unique_id, "Nouvelle idée", x, y, bg='#FFF3E0', border='#FFB74D', font_color='#333333')
             
         node.signals.itemDoubleClicked.connect(self.start_inline_editing)
         ws.scene.addItem(node)
