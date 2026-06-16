@@ -758,7 +758,8 @@ class MindMapApp(QMainWindow):
             return
             
         sel = ws.scene.selectedItems()
-        if len(sel) == 1:
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        if len(sel) >= 1:
             self.style_bar.show()
             self.connect_controls.hide()
             if isinstance(sel[0], NodeItem):
@@ -797,22 +798,27 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            sel[0].shape_type = self.shape_combo.itemData(index)
-            sel[0].recalculate_size()
-            sel[0].update()
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+
+        if nodes:
+            for node in nodes:
+                node.shape = self.shape_combo.itemData(index)
+                node.update()
+                node.recalculate_size()
             self.save_state()
 
     def on_status_combo_changed(self, index):
         ws = self.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            node = sel[0]
-            node.label = node.label.replace("🚨 ", "").replace("⏳ ", "").replace("✅ ", "")
-            node.status = self.status_combo.itemData(index)
-            node.recalculate_size()
-            node.update()
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+
+        if nodes:
+            for node in nodes:
+                node.label = node.label.replace("🚨 ", "").replace("⏳ ", "").replace("✅ ", "")
+                node.status = self.status_combo.itemData(index)
+                node.recalculate_size()
+                node.update()
             self.save_state()
 
     def on_arrow_combo_changed(self, index):
@@ -1035,12 +1041,20 @@ class MindMapApp(QMainWindow):
     def toggle_bold(self):
         ws = self.current_workspace()
         if not ws: return
+        
         sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            node = sel[0]
-            node.is_bold = not node.is_bold
-            node.recalculate_size()
-            node.update()
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        
+        if nodes:
+            # Règle d'or : si au moins un nœud n'est pas en gras, on applique le gras à tous.
+            # Sinon, on désactive le gras pour tous.
+            any_not_bold = any(not node.is_bold for node in nodes)
+            target_bold = any_not_bold
+            
+            for node in nodes:
+                node.is_bold = target_bold
+                node.update()
+                
             self.save_state()
 
     def apply_color_downward(self, node, bg_color, border_color):
@@ -1067,15 +1081,17 @@ class MindMapApp(QMainWindow):
 
     def change_color(self, color, border):
         ws = self.current_workspace()
-        if not ws: 
-            return
-            
+        if not ws: return
+        
         sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            # On applique le changement en cascade descendante depuis le nœud sélectionné
-            self.apply_color_downward(sel[0], color, border)
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        
+        if nodes:
+            # On applique la couleur en cascade à CHAQUE nœud sélectionné
+            for node in nodes:
+                self.apply_color_downward(node, color, border)
             
-            # Sauvegarde de l'état pour que le Ctrl+Z prenne en compte toute la cascade
+            # Un seul snapshot de l'état pour tout le groupe
             self.save_state()
 
     def apply_color_hierarchy(self, node, bg, border, text_col, edge_col):
