@@ -30,6 +30,7 @@ from services.serializer import MindMapSerializer
 from services.history_service import HistoryService
 
 from controllers.graph_controller import GraphController
+from controllers.style_controller import StyleController
 
 APP_VERSION  = "1.0.7"
 
@@ -686,32 +687,13 @@ class MindMapApp(QMainWindow):
         else:
             self.style_bar.hide()
 
-    def on_shape_combo_changed(self, index):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        nodes = [item for item in sel if isinstance(item, NodeItem)]
+    def on_shape_combo_changed(self, text):
+        """Délègue le changement de forme géométrique au StyleController."""
+        StyleController.on_shape_combo_changed(self, text)
 
-        if nodes:
-            for node in nodes:
-                node.shape_type = self.shape_combo.itemData(index)
-                node.update()
-                node.recalculate_size()
-            self.save_state()
-
-    def on_status_combo_changed(self, index):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        nodes = [item for item in sel if isinstance(item, NodeItem)]
-
-        if nodes:
-            for node in nodes:
-                node.label = node.label.replace("🚨 ", "").replace("⏳ ", "").replace("✅ ", "")
-                node.status = self.status_combo.itemData(index)
-                node.recalculate_size()
-                node.update()
-            self.save_state()
+    def on_status_combo_changed(self, text):
+        """Délègue le changement de statut au StyleController."""
+        StyleController.on_status_combo_changed(self, text)
 
     def on_arrow_combo_changed(self, index):
         ws = self.current_workspace()
@@ -839,25 +821,6 @@ class MindMapApp(QMainWindow):
         GraphController.connect_selected_nodes(self, self.start_inline_editing)
         self.update_title()     # <-- REFORCE L'ÉTOILE SUR L'ONGLET
 
-    def toggle_bold(self):
-        ws = self.current_workspace()
-        if not ws: return
-        
-        sel = ws.scene.selectedItems()
-        nodes = [item for item in sel if isinstance(item, NodeItem)]
-        
-        if nodes:
-            # Règle d'or : si au moins un nœud n'est pas en gras, on applique le gras à tous.
-            # Sinon, on désactive le gras pour tous.
-            any_not_bold = any(not node.is_bold for node in nodes)
-            target_bold = any_not_bold
-            
-            for node in nodes:
-                node.is_bold = target_bold
-                node.update()
-                
-            self.save_state()
-
     def apply_color_downward(self, node, bg_color, border_color):
         """Applique la couleur au nœud et descend récursivement vers tous ses enfants."""
         if not node:
@@ -880,31 +843,13 @@ class MindMapApp(QMainWindow):
                 # Appel récursif sur le nœud destination (l'enfant)
                 self.apply_color_downward(edge.dest_node, bg_color, border_color)
 
-    def change_color(self, color, border):
-        ws = self.current_workspace()
-        if not ws: return
-        
-        sel = ws.scene.selectedItems()
-        nodes = [item for item in sel if isinstance(item, NodeItem)]
-        
-        if nodes:
-            # On applique la couleur en cascade à CHAQUE nœud sélectionné
-            for node in nodes:
-                self.apply_color_downward(node, color, border)
-            
-            # Un seul snapshot de l'état pour tout le groupe
-            self.save_state()
+    def change_color(self, bg_color, border_color):
+        """Délègue la modification de couleur au StyleController."""
+        StyleController.change_color(self, bg_color, border_color)
 
-    def apply_color_hierarchy(self, node, bg, border, text_col, edge_col):
-        node.bg_color = QColor(bg)
-        node.border_color = QColor(border)
-        node.font_color = QColor(text_col)
-        node.update()
-        for edge in node.edges:
-            if edge.source_node == node:
-                edge.color = QColor(edge_col)
-                edge.update()
-                self.apply_color_hierarchy(edge.dest_node, bg, border, text_col, edge_col)
+    def toggle_bold(self):
+        """Délègue le passage en gras au StyleController."""
+        StyleController.toggle_bold(self)
 
     def attach_file(self):
         ws = self.current_workspace()

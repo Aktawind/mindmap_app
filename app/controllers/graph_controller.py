@@ -22,11 +22,12 @@ class GraphController:
         bg, border = "#60A5FA", "#3B82F6"
         if parent_node.node_id != "root":
             bg, border = parent_node.bg_color.name(), parent_node.border_color.name()
+            font_color = parent_node.font_color.name()
 
         # Instanciation du nouveau nœud
         child = NodeItem(
             node_id, "Nouveau nœud", pos.x(), pos.y(),
-            shape="box", bg=bg, border=border, font_color="#ffffff"
+            shape="box", bg=bg, border=border, font_color=font_color
         )
         child.signals.itemDoubleClicked.connect(double_click_handler)
         ws.scene.addItem(child)
