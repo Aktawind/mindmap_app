@@ -16,11 +16,18 @@ from PyQt6.QtGui import (
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer, QPointF, QMarginsF
 from PyQt6.QtPrintSupport import QPrinter
 
-from app.graphics.items import NodeItem, EdgeItem
-from app.signals import GraphicsSignals
-from app.graphics.scene import MindMapWorkspace
+from graphics.items import NodeItem, EdgeItem
+from signals import GraphicsSignals
+from graphics.scene import MindMapWorkspace
 
-from app.graphics.items import BRANCH_PALETTES
+from graphics.items import BRANCH_PALETTES
+
+from ui.menus import create_menus
+from ui.shortcuts import setup_app_shortcuts
+from ui.about_dialog import show_app_about_dialog
+
+from services.serializer import MindMapSerializer
+from services.history_service import HistoryService
 
 APP_VERSION  = "1.0.7"
 
@@ -41,6 +48,11 @@ class MindMapApp(QMainWindow):
 
         self.current_workspace_path = None
         self.workspace_files = []
+
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+        self.tabs.currentChanged.connect(self.on_tab_changed)
         
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
@@ -50,7 +62,7 @@ class MindMapApp(QMainWindow):
         self.setup_ui()
         self.setup_shortcuts()
         self.load_last_project_on_startup()
-        
+      
         last_workspace = self.settings.value("last_collection_path", "")
         
         if last_workspace and os.path.exists(last_workspace):
@@ -61,7 +73,7 @@ class MindMapApp(QMainWindow):
             self.new_project()
 
     def current_workspace(self) -> MindMapWorkspace:
-        return self.tab_widget.currentWidget()
+        return self.tabs.currentWidget()
 
     def create_separator(self):
         sep = QWidget()
@@ -78,17 +90,13 @@ class MindMapApp(QMainWindow):
             ws.auto_center_root()
 
     def setup_ui(self):
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setTabsClosable(True)
-        self.tab_widget.tabCloseRequested.connect(self.close_tab)
-        self.tab_widget.currentChanged.connect(self.on_tab_changed)
-        self.setCentralWidget(self.tab_widget)
+        self.setCentralWidget(self.tabs)
 
         self.add_tab_button = QPushButton("➕ Ajouter un onglet")
         self.add_tab_button.clicked.connect(self.new_project)
-        self.tab_widget.setCornerWidget(self.add_tab_button, Qt.Corner.TopRightCorner)
+        self.tabs.setCornerWidget(self.add_tab_button, Qt.Corner.TopRightCorner)
 
-        menu_bar = self.menuBar()
+        create_menus(self)
 
         workspace_toolbar = self.addToolBar("workspace")
         workspace_toolbar.setMovable(False)
@@ -113,33 +121,6 @@ class MindMapApp(QMainWindow):
         workspace_toolbar.addWidget(btn_remove_from_coll)
         btn_add_to_coll.clicked.connect(self.add_current_tab_to_workspace)
         btn_remove_from_coll.clicked.connect(self.remove_current_tab_from_workspace)
-
-        file_menu = menu_bar.addMenu("Fichier")
-        file_menu.addAction("📄 Nouveau mindmap", lambda: self.new_project())
-        file_menu.addSeparator()
-        file_menu.addAction("📂 Ouvrir un mindmap", self.load_project)
-        file_menu.addAction("💾 Enregistrer", self.save_project).setShortcut("Ctrl+S")
-        file_menu.addAction("💾 Enregistrer sous...", lambda: self.save_project(force_save_as=True))
-
-        file_menu.addSeparator()
-        workspace_menu = file_menu.addMenu("Espaces de travail")
-        workspace_menu.addAction("📄 Nouvel espace de travail", self.new_workspace)
-        workspace_menu.addAction("📂 Ouvrir un espace de travail", self.load_workspace)
-        
-        edit_menu = menu_bar.addMenu("Édition")
-        edit_menu.addAction("↩️ Annuler", self.undo).setShortcut(QKeySequence("Ctrl+Z"))
-        edit_menu.addAction("↪️ Rétablir", self.redo).setShortcut(QKeySequence("Ctrl+Y"))
-        edit_menu.addSeparator()
-        edit_menu.addAction("📋 Copier l'élément", self.copy_selected).setShortcut(QKeySequence("Ctrl+C"))
-        edit_menu.addAction("📥 Coller l'élément", self.paste_node).setShortcut(QKeySequence("Ctrl+V"))
-        
-        export_menu = menu_bar.addMenu("Exporter")
-        export_menu.addAction("Exporter en Image PNG", self.export_png)
-        export_menu.addAction("Exporter en PDF Vectoriel", self.export_pdf)
-        export_menu.addAction("Exporter en Markdown", self.export_md)
-
-        about_menu = menu_bar.addMenu("À propos")
-        about_menu = about_menu.addAction("À propos de Mindy", self.show_about_dialog)
 
         self.header_right_widget = QWidget()
         hr_layout = QHBoxLayout(self.header_right_widget)
@@ -204,8 +185,6 @@ class MindMapApp(QMainWindow):
         """)
         btn_center.clicked.connect(self.auto_center_clicked)
         workspace_toolbar.addWidget(btn_center)
-
-        menu_bar.setCornerWidget(self.header_right_widget, Qt.Corner.TopRightCorner)
 
         self.style_bar = QFrame(self)
         self.style_bar.setObjectName("StyleBar") # <-- On lui donne un nom unique
@@ -326,7 +305,7 @@ class MindMapApp(QMainWindow):
 
     def toggle_line_routing(self, checked):
         """Bascule le mode de routage des lignes en fonction de l'état du bouton."""
-        ws = self.tab_widget.currentWidget()
+        ws = self.tabs.currentWidget()
         if ws and hasattr(ws, 'scene'):
             # Si coché -> 'curved' (courbe), sinon -> 'orthogonal' (lignes droites/perpendiculaires)
             ws.scene.line_routing_mode = 'curved' if checked else 'orthogonal'
@@ -335,7 +314,7 @@ class MindMapApp(QMainWindow):
             self.update_routing_button_ui()
             
             # Force chaque ligne à recalculer son tracé
-            from app.graphics.items import EdgeItem
+            from graphics.items import EdgeItem
             for item in ws.scene.items():
                 if isinstance(item, EdgeItem):
                     item.update_position()
@@ -344,14 +323,7 @@ class MindMapApp(QMainWindow):
             ws.scene.update()
 
     def setup_shortcuts(self):
-        self.shortcut_tab = QShortcut(QKeySequence(Qt.Key.Key_Tab), self)
-        self.shortcut_tab.activated.connect(self.on_tab_pressed)
-        
-        self.shortcut_del = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
-        self.shortcut_del.activated.connect(self.delete_selected)
-        
-        self.shortcut_bs = QShortcut(QKeySequence(Qt.Key.Key_Backspace), self)
-        self.shortcut_bs.activated.connect(self.delete_selected)
+        setup_app_shortcuts(self)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -394,9 +366,9 @@ class MindMapApp(QMainWindow):
             ws.view.centerOn(rect.center())
 
     def close_tab(self, index) -> bool:
-        ws = self.tab_widget.widget(index)
+        ws = self.tabs.widget(index)
         if ws and ws.is_dirty:
-            self.tab_widget.setCurrentWidget(ws)
+            self.tabs.setCurrentWidget(ws)
             name = os.path.basename(ws.current_file_path) if ws.current_file_path else "[Nouveau Projet]"
             reply = QMessageBox.question(
                 self, 
@@ -411,23 +383,23 @@ class MindMapApp(QMainWindow):
             elif reply == QMessageBox.StandardButton.Cancel:
                 return False
 
-        if self.tab_widget.count() > 1:
-            self.tab_widget.removeTab(index)
+        if self.tabs.count() > 1:
+            self.tabs.removeTab(index)
         else:
             self.new_project(force_empty=True)
-            self.tab_widget.removeTab(0)
+            self.tabs.removeTab(0)
         return True
 
     def closeEvent(self, event):
         """Gère la fermeture de l'application et force la sauvegarde des onglets non enregistrés."""
         # On boucle sur tous les onglets pour vérifier s'il y a des modifications en cours
-        for i in range(self.tab_widget.count()):
-            ws = self.tab_widget.widget(i)
+        for i in range(self.tabs.count()):
+            ws = self.tabs.widget(i)
             
             # Si l'onglet a été modifié (is_dirty)
             if hasattr(ws, 'is_dirty') and ws.is_dirty:
                 # On active l'onglet visuellement pour que l'utilisateur voie ce qu'il sauvegarde
-                self.tab_widget.setCurrentIndex(i)
+                self.tabs.setCurrentIndex(i)
                 
                 name = ws.current_file_path if ws.current_file_path else f"Sans titre {i+1}"
                 reply = QMessageBox.question(
@@ -478,7 +450,7 @@ class MindMapApp(QMainWindow):
         base_title = os.path.basename(ws.current_file_path) if ws.current_file_path else "[Nouveau Projet]"
         suffix = " *" if ws.is_dirty else ""
         display_title = base_title + suffix
-        self.tab_widget.setTabText(self.tab_widget.currentIndex(), display_title)
+        self.tabs.setTabText(self.tabs.currentIndex(), display_title)
         
         # Ajout du nom de l'espace de travail dans le titre de la fenêtre si présente
         if self.current_workspace_path:
@@ -547,205 +519,73 @@ class MindMapApp(QMainWindow):
                 print(f"Erreur lors de la suppression du fichier : {e}")
 
     def save_state(self):
+        """Enregistre l'état actuel de l'espace de travail pour l'historique."""
         ws = self.current_workspace()
-        if not ws or ws.is_applying_state: return
-        ws.undo_stack.append(json.dumps(self.get_state()))
-        ws.redo_stack.clear()
-        if len(ws.undo_stack) > 41: ws.undo_stack.pop(0)
-        if len(ws.undo_stack) > 1:
-            ws.is_dirty = True
-            self.update_title()
+        if not ws:
+            return
+        current_state = self.get_state()
+        HistoryService.save_state(ws, current_state)
+
+    def undo(self):
+        """Annule la dernière action."""
+        ws = self.current_workspace()
+        if not ws:
+            return
+        previous_state = HistoryService.undo(ws)
+        if previous_state:
+            self.apply_state(previous_state)
+
+    def redo(self):
+        """Rétablit la dernière action annulée."""
+        ws = self.current_workspace()
+        if not ws:
+            return
+        next_state = HistoryService.redo(ws)
+        if next_state:
+            self.apply_state(next_state)
 
     def get_state(self):
         ws = self.current_workspace()
-        if not ws: return {}
-        
-        all_items = ws.scene.items()
-        nodes = [i for i in all_items if isinstance(i, NodeItem)]
-        edges = [i for i in all_items if isinstance(i, EdgeItem)]
-        
-        root = next((n for n in nodes if n.node_id == 'root'), None) or (nodes[0] if nodes else None)
-        if not root: return {}
 
-        natural_edges = set()
-        serialized_node_ids = set()
+        if not ws:
+            return "{}"
 
-        def serialize_node(node):
-            serialized_node_ids.add(node.node_id)
-            data = {
-                "id": node.node_id,
-                "label": node.label,
-                "x": node.pos().x(),
-                "y": node.pos().y(),
-                "shape": node.shape_type,
-                "bg": node.bg_color.name(),
-                "border": node.border_color.name(),
-                "font_color": node.font_color.name(),
-                "border_width": node.border_width,
-                "is_bold": node.is_bold,
-                "status": node.status,
-                "file_path": node.file_path,
-                "url_link": node.url_link,
-                "children": []
-            }
-            for edge in node.edges:
-                if edge.source_node == node:
-                    natural_edges.add(edge)
-                    child_data = serialize_node(edge.dest_node)
-                    if edge.label: child_data["edge_label"] = edge.label
-                    child_data["edge_arrow_dir"] = edge.arrow_dir
-                    data["children"].append(child_data)
-            return data
-
-        tree_data = serialize_node(root)
-        tree_data["global_line_routing"] = ws.scene.line_routing_mode
-        tree_data["snap_to_grid"] = getattr(ws.scene, 'snap_to_grid', False)
-
-        orphan_nodes_data = []
-        for node in nodes:
-            if node.node_id not in serialized_node_ids:
-                orphan_nodes_data.append({
-                    "id": node.node_id,
-                    "label": node.label,
-                    "x": node.pos().x(),
-                    "y": node.pos().y(),
-                    "shape": node.shape_type,
-                    "bg": node.bg_color.name(),
-                    "border": node.border_color.name(),
-                    "font_color": node.font_color.name(),
-                    "border_width": node.border_width,
-                    "is_bold": node.is_bold,
-                    "status": node.status,
-                    "file_path": node.file_path,
-                    "url_link": node.url_link
-                })
-        tree_data["orphan_nodes"] = orphan_nodes_data
-
-        cross_links_data = []
-        for edge in edges:
-            if edge not in natural_edges:
-                cross_links_data.append({
-                    "from": edge.source_node.node_id,
-                    "to": edge.dest_node.node_id,
-                    "label": edge.label,
-                    "color": edge.color.name(),
-                    "arrow_dir": edge.arrow_dir
-                })
-
-        tree_data["cross_links"] = cross_links_data
-        return tree_data
-
-    def apply_state(self, state_str):
-        ws = self.current_workspace()
-        if not ws or not state_str.strip(): return
-        
-        ws.is_applying_state = True
-        ws.scene.clear()
-        
-        try:
-            root_data = json.loads(state_str)
-        except Exception:
-            ws.is_applying_state = False
+        return MindMapSerializer.get_state(ws)
+    
+    def sync_workspace_ui(self, ui_state):
+        if not ui_state:
             return
 
-        ws.scene.line_routing_mode = root_data.get("global_line_routing", "curved")
-        ws.scene.snap_to_grid = root_data.get("snap_to_grid", False)
-        
         self.btn_snap.blockSignals(True)
-        self.btn_snap.setChecked(ws.scene.snap_to_grid)
+        self.btn_snap.setChecked(
+            ui_state["snap_to_grid"]
+        )
         self.btn_snap.blockSignals(False)
 
-        is_curved = (ws.scene.line_routing_mode == 'curved')
+        is_curved = (
+            ui_state["line_routing_mode"]
+            == "curved"
+        )
+
         self.btn_toggle_routing.blockSignals(True)
         self.btn_toggle_routing.setChecked(is_curved)
         self.btn_toggle_routing.blockSignals(False)
-        
-        node_counter = [0]
-        edge_counter = [0]
-        created_nodes = {}
 
-        def deserialize_node(data, parent_node=None):
-            if not data: return None
-            node_counter[0] += 1
-            node_id = data.get("id") or ('root' if parent_node is None else f"node_{node_counter[0]}")
-            
-            x, y = data.get("x", 0.0), data.get("y", 0.0)
-            bg = data.get("bg", '#60A5FA')
-            border = data.get("border", '#3B82F6')
-            font_color = data.get("font_color", '#ffffff')
-
-            status = data.get("status", "none")
-            raw_label = data.get("label", "")
-            if status == "none" and raw_label.startswith("🚨 "):
-                status = "urgent"
-
-            clean_label = raw_label.replace("\n📄 Document joint", "").replace("\n🔗 Lien URL", "")
-
-            node = NodeItem(
-                node_id, clean_label, x, y,
-                shape=data.get("shape", "box"), bg=bg, border=border, font_color=font_color,
-                file_path=data.get("file_path"), url_link=data.get("url_link"), 
-                is_bold=data.get("is_bold", False), status=status
-            )
-            node.border_width = data.get("border_width", 1)
-            node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-            ws.scene.addItem(node)
-            created_nodes[node_id] = node
-
-            if parent_node:
-                edge_counter[0] += 1
-                edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
-                edge = EdgeItem(f"edge_{edge_counter[0]}", parent_node, node, data.get("edge_label", ""), color=edge_color, arrow_dir=data.get("edge_arrow_dir", "none"))
-                edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
-                ws.scene.addItem(edge)
-
-            for child_data in data.get("children", []):
-                deserialize_node(child_data, node)
-            return node
-
-        deserialize_node(root_data)
-
-        for orphan in root_data.get("orphan_nodes", []):
-            node_id = orphan.get("id")
-            node = NodeItem(
-                node_id, orphan.get("label", ""), orphan.get("x", 0.0), orphan.get("y", 0.0),
-                shape=orphan.get("shape", "box"), bg=orphan.get("bg", '#60A5FA'),
-                border=orphan.get("border", '#3B82F6'), font_color=orphan.get("font_color", '#ffffff'),
-                file_path=orphan.get("file_path"), url_link=orphan.get("url_link"),
-                is_bold=orphan.get("is_bold", False), status=orphan.get("status", "none")
-            )
-            node.border_width = orphan.get("border_width", 1)
-            node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-            ws.scene.addItem(node)
-            created_nodes[node_id] = node
-
-        for cl in root_data.get("cross_links", []):
-            source = created_nodes.get(cl["from"])
-            dest = created_nodes.get(cl["to"])
-            if source and dest:
-                edge_counter[0] += 1
-                edge = EdgeItem(f"edge_{edge_counter[0]}", source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"), arrow_dir=cl.get("arrow_dir", "none"))
-                edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
-                ws.scene.addItem(edge)
-
-        ws.is_applying_state = False
         self.on_selection_changed()
 
-    def undo(self):
+    def apply_state(self, state_str):
         ws = self.current_workspace()
-        if not ws or len(ws.undo_stack) <= 1: return
-        ws.redo_stack.append(ws.undo_stack.pop())
-        self.apply_state(ws.undo_stack[-1])
-        ws.is_dirty = True
-        self.update_title()
 
-    def redo(self):
-        ws = self.current_workspace()
-        if not ws or not ws.redo_stack: return
-        ws.undo_stack.append(ws.redo_stack.pop())
-        self.apply_state(ws.undo_stack[-1])
-        ws.is_dirty = True
-        self.update_title()
+        if not ws:
+            return
+
+        ui_state = MindMapSerializer.load_into_workspace(
+            ws,
+            state_str,
+            self.start_inline_editing
+        )
+
+        self.sync_workspace_ui(ui_state)
 
     def copy_selected(self):
         ws = self.current_workspace()
@@ -1248,11 +1088,11 @@ class MindMapApp(QMainWindow):
         self.workspace_files = []
 
         # Nettoyage propre des onglets actuels
-        self.tab_widget.blockSignals(True)
+        self.tabs.blockSignals(True)
         try:
-            self.tab_widget.clear()
+            self.tabs.clear()
         finally:
-            self.tab_widget.blockSignals(False)
+            self.tabs.blockSignals(False)
 
         self.new_project() # Ouvre un premier onglet vierge
         self.auto_save_workspace()
@@ -1272,11 +1112,11 @@ class MindMapApp(QMainWindow):
             file_paths = data.get("files", [])
 
             # Bloquer les signaux pour vider proprement les onglets actuels
-            self.tab_widget.blockSignals(True)
+            self.tabs.blockSignals(True)
             try:
-                self.tab_widget.clear()
+                self.tabs.clear()
             finally:
-                self.tab_widget.blockSignals(False)
+                self.tabs.blockSignals(False)
 
             self.current_workspace_path = path
             self.workspace_files = []
@@ -1357,8 +1197,8 @@ class MindMapApp(QMainWindow):
         root.signals.positionChanged.connect(self.save_state)
         ws.scene.addItem(root)
         
-        self.tab_widget.addTab(ws, "[Nouveau Projet]")
-        self.tab_widget.setCurrentWidget(ws)
+        self.tabs.addTab(ws, "[Nouveau Projet]")
+        self.tabs.setCurrentWidget(ws)
         self.save_state()
         ws.is_dirty = False 
         self.update_title()
@@ -1374,8 +1214,8 @@ class MindMapApp(QMainWindow):
             state_str = f.read()
             
         ws = MindMapWorkspace(self, path)
-        self.tab_widget.addTab(ws, os.path.basename(path))
-        self.tab_widget.setCurrentWidget(ws)
+        self.tabs.addTab(ws, os.path.basename(path))
+        self.tabs.setCurrentWidget(ws)
         
         self.apply_state(state_str)
         ws.undo_stack.append(state_str)
@@ -1419,27 +1259,8 @@ class MindMapApp(QMainWindow):
         return True
     
     def show_about_dialog(self):
-        """Affiche la boîte de dialogue 'À propos' de l'application."""
-        about_text = f"""
-        <h3>Mindy — Éditeur de Mind Mapping</h3>
-        <p><b>Version :</b> v{APP_VERSION }</p>
-        <p><b>Développeur :</b> Audrey DEAL</p>
-        <hr>
-        <p>Mindy est une application intuitive conçue pour structurer vos idées, 
-        créer des cartes mentales fluides et exporter vos projets dans des formats variés.</p>
+        show_app_about_dialog(self, APP_VERSION)
         
-        <p><b>Fonctionnalités clés :</b></p>
-        <ul>
-            <li>Routage de lignes dynamique</li>
-            <li>Gestion multi-onglets et espace de travail</li>
-            <li>Système de Snap to Grid</li>
-            <li>Ajout de pièces jointes et de liens URL sur les nœuds</li>
-        </ul>
-        <br>
-        <p><small>© 2026 Mindy App. Tous droits réservés.</small></p>
-        """
-        
-        QMessageBox.about(self, "À propos de Mindy", about_text)
 
     def apply_template(self, index):
         if index == 0: return

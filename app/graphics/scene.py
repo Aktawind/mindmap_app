@@ -4,7 +4,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPainter
 from signals import GraphicsSignals
-from items import NodeItem, EdgeItem
+from graphics.items import NodeItem, EdgeItem
 
 class MindMapScene(QGraphicsScene):
     def __init__(self, parent=None):
@@ -22,7 +22,7 @@ class MindMapScene(QGraphicsScene):
 
     def removeItem(self, item):
         # On importe EdgeItem pour vérifier si l'élément supprimé est une branche
-        from items import EdgeItem
+        from graphics.items import EdgeItem
         
         if isinstance(item, EdgeItem):
             # 1. On nettoie proprement les connexions de la branche dans les nœuds
