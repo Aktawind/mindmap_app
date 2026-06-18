@@ -108,16 +108,31 @@ class MindMapSerializer:
     
     @staticmethod
     def load_into_workspace(workspace, state_str, double_click_handler):
-
-        if not state_str.strip():
+        if not state_str or not state_str.strip():
             return None
 
         workspace.is_applying_state = True
         workspace.scene.clear()
 
+        # DÉCODAGE SÉCURISÉ ET ROBUSTE DU JSON
+        root_data = None
         try:
-            root_data = json.loads(state_str)
-        except Exception:
+            if isinstance(state_str, str):
+                root_data = json.loads(state_str)
+            else:
+                root_data = state_str
+                
+            # Sécurité si le JSON a été doublement sérialisé en chaîne de caractères
+            if isinstance(root_data, str):
+                root_data = json.loads(root_data)
+        except Exception as e:
+            print(f"Erreur critique lors du parsing JSON dans le Serializer : {e}")
+            workspace.is_applying_state = False
+            return None
+
+        # Si le fichier est corrompu ou vide après parsing
+        if not root_data or not isinstance(root_data, dict):
+            print("Erreur : Les données décodées ne correspondent pas à un dictionnaire valide.")
             workspace.is_applying_state = False
             return None
 
