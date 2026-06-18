@@ -31,6 +31,7 @@ from services.history_service import HistoryService
 
 from controllers.graph_controller import GraphController
 from controllers.style_controller import StyleController
+from controllers.attachment_controller import AttachmentController
 
 APP_VERSION  = "1.0.7"
 
@@ -821,28 +822,6 @@ class MindMapApp(QMainWindow):
         GraphController.connect_selected_nodes(self, self.start_inline_editing)
         self.update_title()     # <-- REFORCE L'ÉTOILE SUR L'ONGLET
 
-    def apply_color_downward(self, node, bg_color, border_color):
-        """Applique la couleur au nœud et descend récursivement vers tous ses enfants."""
-        if not node:
-            return
-
-        # 1. On applique la couleur au nœud actuel
-        node.bg_color = QColor(bg_color)
-        node.border_color = QColor(border_color)
-        node.update()
-
-        # 2. On parcourt toutes les branches connectées à ce nœud
-        for edge in node.edges:
-            # Sécurité : on vérifie que le nœud actuel est bien la SOURCE du lien
-            # (ce qui garantit qu'on descend vers l'enfant, sans remonter vers le parent)
-            if edge.source_node == node:
-                # Optionnel : Si vous souhaitez aussi recolorer le trait de la branche
-                edge.color = QColor(border_color)
-                edge.update()
-                
-                # Appel récursif sur le nœud destination (l'enfant)
-                self.apply_color_downward(edge.dest_node, bg_color, border_color)
-
     def change_color(self, bg_color, border_color):
         """Délègue la modification de couleur au StyleController."""
         StyleController.change_color(self, bg_color, border_color)
@@ -852,60 +831,20 @@ class MindMapApp(QMainWindow):
         StyleController.toggle_bold(self)
 
     def attach_file(self):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            node = sel[0]
-            if not ws.current_file_path:
-                QMessageBox.information(self, "Sauvegarde requise", "Veuillez d'abord enregistrer votre Mind Map afin de pouvoir y attacher des fichiers.")
-                self.save_file()
-                if not ws.current_file_path: return # Annulé par l'utilisateur
-                
-            path, _ = QFileDialog.getOpenFileName(self, "Choisir un document à joindre")
-            if path:
-                if node.file_path:
-                    self.remove_file_from_attachments(ws, node.file_path)
-                
-                # Copie et récupération du chemin relatif
-                relative_dest = self.copy_file_to_attachments(ws, node.node_id, path)
-                node.file_path = relative_dest
-                node.recalculate_size()
-                self.on_selection_changed()
-                node.update()
-                self.save_state()
+        """Délègue l'ajout de fichier local à l'AttachmentController."""
+        AttachmentController.attach_file(self)
 
     def attach_url(self):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            node = sel[0]
-            url, ok = QInputDialog.getText(self, "Associer une URL", "Entrez l'adresse internet :", text=node.url_link or "https://")
-            if ok and url.strip():
-                node.url_link = url.strip()
-                node.recalculate_size()
-                self.on_selection_changed()
-                node.update()
-                self.save_state()
+        """Délègue l'ajout de lien web à l'AttachmentController."""
+        AttachmentController.attach_url(self)
 
     def detach_links(self):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            node = sel[0]
+        """Délègue l'ajout de fichier local à l'AttachmentController."""
+        AttachmentController.detach_links(self)
 
-            if node.file_path:
-                # Suppression physique du fichier dans .mindmap_attachments
-                self.remove_file_from_attachments(ws, node.file_path)
-                node.file_path = None
-                node.url_link = None
-                node.recalculate_size()
-                self.on_selection_changed()
-                node.update()
-                self.save_state()
-
+    def open_file(self):
+        """Délègue l'ouverture de fichier local à l'AttachmentController."""
+        AttachmentController.open_file(self)
 
     def update_workspace_ui(self):
         """ Met à jour le texte de la barre d'outils pour afficher la workspace active """
@@ -1025,24 +964,6 @@ class MindMapApp(QMainWindow):
             self.auto_save_workspace() # Sauvegarde automatique instantanée
         else:
             QMessageBox.warning(self, "Action impossible", "Ce fichier ne fait pas partie de la workspace.")
-
-    def open_file(self):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            node = sel[0]
-            # Si le chemin est relatif, on le recompose à partir du dossier du JSON
-            if not os.path.isabs(node.file_path) and ws.current_file_path:
-                base_dir = os.path.dirname(ws.current_file_path)
-                full_path = os.path.abspath(os.path.join(base_dir, node.file_path))
-            else:
-                full_path = node.file_path
-
-            if os.path.exists(full_path):
-                QDesktopServices.openUrl(QUrl.fromLocalFile(full_path))
-            else:
-                QMessageBox.warning(self, "Erreur", "Le fichier joint est introuvable.")
 
     def new_project(self, force_empty=False):
         ws = MindMapWorkspace(self)

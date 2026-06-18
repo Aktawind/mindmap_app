@@ -15,27 +15,33 @@ class StyleController:
         if nodes:
             # On applique la couleur en cascade à CHAQUE nœud sélectionné
             for node in nodes:
-                app.apply_color_downward(node, color, border)
+                StyleController.apply_color_downward(node, color, border)
             
             # Un seul snapshot de l'état pour tout le groupe
             app.save_state()
 
-    def apply_color_hierarchy(app, node, bg, border, text_col, edge_col):
-        """Applique récursivement les couleurs sur le nœud et sa descendance."""
-        node.bg_color = QColor(bg)
-        node.border_color = QColor(border)
-        node.font_color = QColor(text_col)
-        
-        # On force le nœud à appliquer graphiquement ces changements
-        node.recalculate_size()
+    @staticmethod
+    def apply_color_downward(node, bg_color, border_color):
+        """Applique la couleur au nœud et descend récursivement vers tous ses enfants."""
+        if not node:
+            return
+
+        # 1. On applique la couleur au nœud actuel
+        node.bg_color = QColor(bg_color)
+        node.border_color = QColor(border_color)
         node.update()
-        
+
+        # 2. On parcourt toutes les branches connectées à ce nœud
         for edge in node.edges:
+            # Sécurité : on vérifie que le nœud actuel est bien la SOURCE du lien
+            # (ce qui garantit qu'on descend vers l'enfant, sans remonter vers le parent)
             if edge.source_node == node:
-                edge.color = QColor(edge_col)
+                # Optionnel : Si vous souhaitez aussi recolorer le trait de la branche
+                edge.color = QColor(border_color)
                 edge.update()
-                # Appel récursif sur le nœud enfant
-                StyleController.apply_color_hierarchy(app, edge.dest_node, bg, border, text_col, edge_col)
+                
+                # Appel récursif sur le nœud destination (l'enfant)
+                StyleController.apply_color_downward(edge.dest_node, bg_color, border_color)
 
     @staticmethod
     def toggle_bold(app):
