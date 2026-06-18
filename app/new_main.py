@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer, QPointF, QMarginsF
 from PyQt6.QtPrintSupport import QPrinter
 
-from controllers.export_controller import ExportController
+
 from graphics.items import NodeItem, EdgeItem
 from signals import GraphicsSignals
 from graphics.scene import MindMapWorkspace
@@ -29,11 +29,13 @@ from ui.about_dialog import show_app_about_dialog
 
 from services.serializer import MindMapSerializer
 from services.history_service import HistoryService
+from services.project_service import ProjectService
 
 from controllers.graph_controller import GraphController
 from controllers.style_controller import StyleController
 from controllers.attachment_controller import AttachmentController
 from controllers.export_controller import ExportController
+from controllers.workspace_controller import WorkspaceController
 
 APP_VERSION  = "1.0.7"
 
@@ -477,52 +479,11 @@ class MindMapApp(QMainWindow):
         ws.scene.update()
         self.save_state()
 
-    def get_attachments_dir(self, ws):
-        """Retourne le chemin du dossier d'onglets pour le workspace actuel."""
-        if not ws or not ws.current_file_path:
-            return None
-        # Le dossier .mindmap_attachments est créé à côté du fichier .json
-        base_dir = os.path.dirname(ws.current_file_path)
-        attachments_dir = os.path.join(base_dir, ".mindmap_attachments")
-        if not os.path.exists(attachments_dir):
-            os.makedirs(attachments_dir)
-        return attachments_dir
+    
 
-    def copy_file_to_attachments(self, ws, node_id, source_path):
-        """Copie un fichier externe dans le dossier des pièces jointes."""
-        attachments_dir = self.get_attachments_dir(ws)
-        if not attachments_dir or not source_path or not os.path.exists(source_path):
-            return source_path # Si pas encore sauvegardé, on garde le lien temporaire
+    
 
-        # On extrait l'extension (.pdf, .docx, etc.)
-        _, ext = os.path.splitext(source_path)
-        # On crée un nom unique basé sur l'id du nœud pour éviter les conflits
-        dest_filename = f"file_{node_id}{ext}"
-        dest_path = os.path.join(attachments_dir, dest_filename)
 
-        try:
-            import shutil
-            shutil.copy2(source_path, dest_path)
-            # IMPORTANT : On stocke un chemin RELATIF dans le JSON.
-            # Ainsi, si vous déplacez le projet complet (.json + dossier), les liens fonctionnent toujours !
-            return os.path.join(".mindmap_attachments", dest_filename)
-        except Exception as e:
-            print(f"Erreur lors de la copie du fichier : {e}")
-            return source_path
-
-    def remove_file_from_attachments(self, ws, relative_path):
-        """Supprime le fichier physique du disque si le chemin est valide."""
-        if not ws or not ws.current_file_path or not relative_path:
-            return
-        base_dir = os.path.dirname(ws.current_file_path)
-        full_path = os.path.abspath(os.path.join(base_dir, relative_path))
-        
-        # Sécurité : on vérifie que le fichier est bien dans notre dossier cible avant de delete
-        if ".mindmap_attachments" in full_path and os.path.exists(full_path):
-            try:
-                os.remove(full_path)
-            except Exception as e:
-                print(f"Erreur lors de la suppression du fichier : {e}")
 
     def save_state(self):
         """Enregistre l'état actuel de l'espace de travail pour l'historique."""
@@ -807,233 +768,70 @@ class MindMapApp(QMainWindow):
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             self.add_child_node(sel[0])
 
+    #-------------------- Gestion des nœuds et liens -------------------- #
     def add_child_node(self, parent_node):
-        """Délègue la création de nœud enfant au GraphController."""
-        child = GraphController.add_child_node(self, parent_node, self.start_inline_editing)
-        if child:
-            self.update_title() # <-- REFORCE L'ÉTOILE SUR L'ONGLET
-        return child
+        GraphController.add_child_node(self, parent_node)
+        self.update_title()
 
     def delete_selected(self):
-        """Délègue la suppression des sélections au GraphController."""
         GraphController.delete_selected(self)
-        self.update_title()     # <-- REFORCE L'ÉTOILE SUR L'ONGLET
+        self.update_title()
 
     def connect_selected_nodes(self):
-        """Délègue l'interconnexion au GraphController."""
-        GraphController.connect_selected_nodes(self, self.start_inline_editing)
-        self.update_title()     # <-- REFORCE L'ÉTOILE SUR L'ONGLET
+        GraphController.connect_selected_nodes(self)
+        self.update_title()
 
+    #-------------------- Gestion du style -------------------- #
     def change_color(self, bg_color, border_color):
-        """Délègue la modification de couleur au StyleController."""
         StyleController.change_color(self, bg_color, border_color)
 
     def toggle_bold(self):
-        """Délègue le passage en gras au StyleController."""
         StyleController.toggle_bold(self)
 
+    #-------------------- Gestion des fichiers et liens -------------------- #
     def attach_file(self):
-        """Délègue l'ajout de fichier local à l'AttachmentController."""
         AttachmentController.attach_file(self)
 
     def attach_url(self):
-        """Délègue l'ajout de lien web à l'AttachmentController."""
         AttachmentController.attach_url(self)
 
     def detach_links(self):
-        """Délègue l'ajout de fichier local à l'AttachmentController."""
         AttachmentController.detach_links(self)
 
     def open_file(self):
-        """Délègue l'ouverture de fichier local à l'AttachmentController."""
         AttachmentController.open_file(self)
 
+    # -------------------- Gestion de l'espace de travail -------------------- #
     def update_workspace_ui(self):
-        """ Met à jour le texte de la barre d'outils pour afficher la workspace active """
-        if self.current_workspace_path:
-            name = os.path.basename(self.current_workspace_path)
-            count = len(self.workspace_files)
-            self.lbl_workspace_status.setText(f"📁 Workspace :  {name} ({count} carte{'s' if count > 1 else ''})")
-        else:
-            self.lbl_workspace_status.setText("📁 Workspace : Aucun")
+        WorkspaceController.update_workspace_ui(self)
 
     def auto_save_workspace(self):
-        """ Écrit instantanément les modifications dans le fichier .mindy """
-        if not self.current_workspace_path:
-            return
-        
-        data = {
-            "version": "1.0",
-            "files": self.workspace_files
-        }
-        try:
-            with open(self.current_workspace_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            self.update_workspace_ui()
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur Sauvegarde", f"Impossible de mettre à jour la workspace :\n{str(e)}")
+        WorkspaceController.auto_save_workspace(self)
 
     def new_workspace(self):
-        """ Crée un nouveau fichier de workspace vide et nettoie l'espace """
-        path, _ = QFileDialog.getSaveFileName(self, "Créer une nouvelle workspace", "MaSessionDuMatin.mindy", "workspace Mindy (*.mindy)")
-        if not path:
-            return
-
-        self.current_workspace_path = path
-        self.workspace_files = []
-
-        # Nettoyage propre des onglets actuels
-        self.tabs.blockSignals(True)
-        try:
-            self.tabs.clear()
-        finally:
-            self.tabs.blockSignals(False)
-
-        self.new_project() # Ouvre un premier onglet vierge
-        self.auto_save_workspace()
-        self.update_title()
+        WorkspaceController.new_workspace(self)
 
     def load_workspace(self, path=None):
-        """ Charge une workspace (soit via explorateur si path=None, soit directement au démarrage) """
-        if not path:
-            path, _ = QFileDialog.getOpenFileName(self, "Ouvrir un Espace de travail", "", "Espace Mindy (*.mindy)")
-            if not path:
-                return
-
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            file_paths = data.get("files", [])
-
-            # Bloquer les signaux pour vider proprement les onglets actuels
-            self.tabs.blockSignals(True)
-            try:
-                self.tabs.clear()
-            finally:
-                self.tabs.blockSignals(False)
-
-            self.current_workspace_path = path
-            self.workspace_files = []
-
-            # Charger uniquement les fichiers JSON valides sur le disque
-            for f_path in file_paths:
-                if os.path.exists(f_path):
-                    self.load_project_from_path(f_path)
-                    self.workspace_files.append(f_path)
-
-            # Si le fichier .mindy était vide, on crée un onglet vierge par défaut
-            if not self.workspace_files:
-                self.new_project()
-
-            self.update_workspace_ui()
-            self.update_title()
-
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Impossible de charger l'espace de travail :\n{str(e)}")
+        WorkspaceController.load_workspace(self, path)
 
     def add_current_tab_to_workspace(self):
-        """ Ajoute la carte active à la playlist et sauvegarde immédiatement """
-        if not self.current_workspace_path:
-            QMessageBox.warning(self, "Attention", "Veuillez d'abord ouvrir ou créer une workspace avec les boutons de gauche.")
-            return
-
-        ws = self.current_workspace()
-        if not ws: return
-
-        if not ws.current_file_path:
-            QMessageBox.warning(self, "Action requise", "Sauvegardez d'abord ce fichier JSON sur votre disque (Ctrl+S) avant de l'ajouter.")
-            return
-
-        if ws.current_file_path in self.workspace_files:
-            QMessageBox.information(self, "Information", "Cette carte est déjà incluse dans la workspace.")
-            return
-
-        self.workspace_files.append(ws.current_file_path)
-        self.auto_save_workspace() # Sauvegarde automatique instantanée
+        WorkspaceController.add_current_tab_to_workspace(self)
 
     def remove_current_tab_from_workspace(self):
-        """ Enlève la carte active de la workspace (sans fermer l'onglet) """
-        if not self.current_workspace_path:
-            return
+        WorkspaceController.remove_current_tab_from_workspace(self)
 
-        ws = self.current_workspace()
-        if not ws or not ws.current_file_path: 
-            return
-
-        if ws.current_file_path in self.workspace_files:
-            self.workspace_files.remove(ws.current_file_path)
-            self.auto_save_workspace() # Sauvegarde automatique instantanée
-        else:
-            QMessageBox.warning(self, "Action impossible", "Ce fichier ne fait pas partie de la workspace.")
-
+    # -------------------- Gestion des projets -------------------- #
     def new_project(self, force_empty=False):
-        ws = MindMapWorkspace(self)
-        root = NodeItem('root', 'Nouveau noeud', 0, 0, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
-        root.signals.itemDoubleClicked.connect(self.start_inline_editing)
-        root.signals.positionChanged.connect(self.save_state)
-        ws.scene.addItem(root)
-        
-        self.tabs.addTab(ws, "[Nouveau Projet]")
-        self.tabs.setCurrentWidget(ws)
-        self.save_state()
-        ws.is_dirty = False 
-        self.update_title()
+        ProjectService.new_project(self, force_empty)
 
     def load_project(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "Ouvrir un ou plusieurs projets", "", "JSON (*.json)")
-        if paths:
-            for path in paths:
-                self.load_project_from_path(path)
+        ProjectService.load_project(self)
 
     def load_project_from_path(self, path):
-        with open(path, 'r', encoding='utf-8') as f:
-            state_str = f.read()
-            
-        ws = MindMapWorkspace(self, path)
-        self.tabs.addTab(ws, os.path.basename(path))
-        self.tabs.setCurrentWidget(ws)
-        
-        self.apply_state(state_str)
-        ws.undo_stack.append(state_str)
-        ws.is_dirty = False
-        
-        self.settings.setValue("last_project_path", path)
-        self.update_title()
-        self.center_on_graph()
+        ProjectService.load_project_from_path(self, path)
 
     def save_project(self, force_save_as=False):
-        ws = self.current_workspace()
-        if not ws: return False
-        
-        if not ws.current_file_path or force_save_as:
-            nodes = [item for item in ws.scene.items() if isinstance(item, NodeItem)]
-            root_node = next((n for n in nodes if n.node_id == 'root'), None)
-            if root_node and root_node.label:
-                default_name = root_node.label.replace('\n', ' ').strip()
-                for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
-                    default_name = default_name.replace(char, '')
-                if not default_name:
-                    default_name = "ma_mindmap"
-            else:
-                default_name = "ma_mindmap"
-
-            path, _ = QFileDialog.getSaveFileName(
-                self, 
-                "Enregistrer la carte", 
-                f"{default_name}.json", 
-                "Mind Map Files (*.json)"
-            )
-            if not path: return False
-            ws.current_file_path = path
-            
-        with open(ws.current_file_path, 'w', encoding='utf-8') as f:
-            json.dump(self.get_state(), f, indent=2, ensure_ascii=False)
-            
-        ws.is_dirty = False
-        self.settings.setValue("last_project_path", ws.current_file_path)
-        self.update_title()
-        return True
+        ProjectService.save_project(self, force_save_as)
     
     def show_about_dialog(self):
         show_app_about_dialog(self, APP_VERSION)

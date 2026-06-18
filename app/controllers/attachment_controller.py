@@ -7,6 +7,56 @@ from graphics.items import NodeItem
 
 class AttachmentController:
     @staticmethod
+    def get_attachments_dir(ws):
+        """Retourne le chemin du dossier d'onglets pour le workspace actuel."""
+        if not ws or not ws.current_file_path:
+            return None
+        # Le dossier .mindmap_attachments est créé à côté du fichier .json
+        base_dir = os.path.dirname(ws.current_file_path)
+        attachments_dir = os.path.join(base_dir, ".mindmap_attachments")
+        if not os.path.exists(attachments_dir):
+            os.makedirs(attachments_dir)
+        return attachments_dir
+
+    @staticmethod
+    def remove_file_from_attachments(ws, relative_path):
+        """Supprime le fichier physique du disque si le chemin est valide."""
+        if not ws or not ws.current_file_path or not relative_path:
+            return
+        base_dir = os.path.dirname(ws.current_file_path)
+        full_path = os.path.abspath(os.path.join(base_dir, relative_path))
+        
+        # Sécurité : on vérifie que le fichier est bien dans notre dossier cible avant de delete
+        if ".mindmap_attachments" in full_path and os.path.exists(full_path):
+            try:
+                os.remove(full_path)
+            except Exception as e:
+                print(f"Erreur lors de la suppression du fichier : {e}")
+
+    @staticmethod
+    def copy_file_to_attachments(ws, node_id, source_path):
+        """Copie un fichier externe dans le dossier des pièces jointes."""
+        attachments_dir = AttachmentController.get_attachments_dir(ws)
+        if not attachments_dir or not source_path or not os.path.exists(source_path):
+            return source_path # Si pas encore sauvegardé, on garde le lien temporaire
+
+        # On extrait l'extension (.pdf, .docx, etc.)
+        _, ext = os.path.splitext(source_path)
+        # On crée un nom unique basé sur l'id du nœud pour éviter les conflits
+        dest_filename = f"file_{node_id}{ext}"
+        dest_path = os.path.join(attachments_dir, dest_filename)
+
+        try:
+            import shutil
+            shutil.copy2(source_path, dest_path)
+            # IMPORTANT : On stocke un chemin RELATIF dans le JSON.
+            # Ainsi, si vous déplacez le projet complet (.json + dossier), les liens fonctionnent toujours !
+            return os.path.join(".mindmap_attachments", dest_filename)
+        except Exception as e:
+            print(f"Erreur lors de la copie du fichier : {e}")
+            return source_path
+
+    @staticmethod
     def attach_file(app):
         ws = app.current_workspace()
         if not ws: return
@@ -21,10 +71,10 @@ class AttachmentController:
             path, _ = QFileDialog.getOpenFileName(app, "Choisir un document à joindre")
             if path:
                 if node.file_path:
-                    app.remove_file_from_attachments(ws, node.file_path)
+                    AttachmentController.remove_file_from_attachments(ws, node.file_path)
                 
                 # Copie et récupération du chemin relatif
-                relative_dest = app.copy_file_to_attachments(ws, node.node_id, path)
+                relative_dest = AttachmentController.copy_file_to_attachments(ws, node.node_id, path)
                 node.file_path = relative_dest
                 node.recalculate_size()
                 app.on_selection_changed()
@@ -54,15 +104,24 @@ class AttachmentController:
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             node = sel[0]
 
+            # Si le nœud n'a ni fichier ni URL, rien à faire
+            if not node.file_path and not node.url_link:
+                return
+
+            # 1. Gestion du fichier s'il existe
             if node.file_path:
                 # Suppression physique du fichier dans .mindmap_attachments
-                app.remove_file_from_attachments(ws, node.file_path)
+                AttachmentController.remove_file_from_attachments(ws, node.file_path)
                 node.file_path = None
-                node.url_link = None
-                node.recalculate_size()
-                app.on_selection_changed()
-                node.update()
-                app.save_state()
+
+            # 2. Gestion de l'URL (s'exécute TOUJOURS, même s'il n'y a pas de fichier)
+            node.url_link = None
+            
+            # 3. Rafraîchissement visuel et sauvegarde de l'état
+            node.recalculate_size()
+            app.on_selection_changed()
+            node.update()
+            app.save_state()
 
     @staticmethod
     def open_file(app):
