@@ -89,7 +89,7 @@ def create_toolbar(app_window):
     app_window.template_combo.setStyleSheet("""
         QComboBox { border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 5px; background: white; }
     """)
-    app_window.template_combo.currentIndexChanged.connect(app_window.apply_template)
+    app_window.template_combo.currentIndexChanged.connect(lambda index: ToolsController.apply_template(app_window, index))
     workspace_toolbar.addWidget(app_window.template_combo)
     
     # 1. Création du bouton Auto Center
@@ -106,7 +106,7 @@ def create_toolbar(app_window):
         }
         QPushButton:hover { background-color: #2563EB; }
     """)
-    btn_center.clicked.connect(ToolsController.auto_center_clicked)
+    btn_center.clicked.connect(app_window.auto_center_clicked)
     workspace_toolbar.addWidget(btn_center)
 
     app_window.add_tab_button = QPushButton("➕ Ajouter un onglet")

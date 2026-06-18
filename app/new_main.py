@@ -615,33 +615,6 @@ class MindMapApp(QMainWindow):
     def show_about_dialog(self):
         show_app_about_dialog(self, APP_VERSION)
         
-
-    def apply_template(self, index):
-        if index == 0: return
-        ws = self.current_workspace()
-        if not ws: return
-        
-        filename = self.template_combo.itemData(index)
-        self.template_combo.setCurrentIndex(0)
-        
-        if QMessageBox.question(self, "Template", "Charger ce template remplacera la mind map de l'onglet actuel. Continuer ?") == QMessageBox.StandardButton.Yes:
-            template_path = ToolsController.resource_path(os.path.join("templates", filename))
-            
-            if os.path.exists(template_path):
-                with open(template_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    
-                state_str = data["content"] if "content" in data else json.dumps(data)
-                self.apply_state(state_str)
-                ws.undo_stack.clear()
-                ws.redo_stack.clear()
-                ws.undo_stack.append(state_str)
-                ws.is_dirty = True
-                self.update_title()
-                self.center_on_graph()
-            else:
-                QMessageBox.warning(self, "Erreur", f"Fichier template introuvable :\n{template_path}")
-
     def export_png(self):
         """Délègue l'exportation PNG à l'ExportController."""
         ExportController.export_png(self)
@@ -653,6 +626,17 @@ class MindMapApp(QMainWindow):
     def export_md(self):
         """Délègue l'exportation Markdown à l'ExportController."""
         ExportController.export_md(self)
+
+    def auto_center_clicked(self):
+        """Méthode appelée lors du clic sur le bouton Auto Center."""
+        ws = self.current_workspace()
+        if ws:
+            # S'il y a un workspace ouvert, on lui demande de se centrer
+            if hasattr(ws, 'auto_center_root'):
+                ws.auto_center_root()
+            elif hasattr(self, 'center_on_graph'):
+                self.center_on_graph()
+
 
 
 if __name__ == '__main__':
