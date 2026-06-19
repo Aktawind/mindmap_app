@@ -1,8 +1,8 @@
-# ui/about_dialog.py
 from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import Qt
 
 def show_app_about_dialog(app_window, version_str):
-    """Affiche la boîte de dialogue 'À propos' de l'application."""
+    """Affiche la boîte de dialogue 'À propos' de l'application avec un rendu HTML garanti."""
     about_text = f"""
     <h3>Mindy — Éditeur de Mind Mapping</h3>
     <p><b>Version :</b> v{version_str}</p>
@@ -22,9 +22,18 @@ def show_app_about_dialog(app_window, version_str):
     <p><small>© 2026 Mindy App. Tous droits réservés.</small></p>
     """
     
-    msg = QMessageBox(app_window)
+    # Sécurité si app_window est None
+    msg = QMessageBox(app_window) if app_window else QMessageBox()
     msg.setWindowTitle("À propos de Mindy")
+    
+    # 🚨 FIX CRITIQUE : On force Qt à interpréter la chaîne comme du HTML/RichText
+    msg.setTextFormat(Qt.TextFormat.RichText)
     msg.setText(about_text)
+    
     msg.setIcon(QMessageBox.Icon.Information)
-    msg.setWindowIcon(app_window.windowIcon())
+    
+    # Sécurité sur l'extraction de l'icône de la fenêtre principale
+    if app_window and hasattr(app_window, 'windowIcon') and not app_window.windowIcon().isNull():
+        msg.setWindowIcon(app_window.windowIcon())
+        
     msg.exec()

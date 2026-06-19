@@ -1,6 +1,5 @@
-# items.py
 import math
-from PyQt6.QtCore import Qt, QRectF, QPointF
+from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF
 from PyQt6.QtGui import QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, QPolygonF, QPainterPathStroker
 from PyQt6.QtWidgets import QGraphicsItem, QGraphicsPathItem
 from signals import GraphicsSignals
@@ -57,7 +56,6 @@ class NodeItem(QGraphicsItem):
         elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
         elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
 
-        # Ajout discret des icônes à la fin du texte pour le calcul de la taille
         if self.file_path: display_label += " 📄"
         if self.url_link: display_label += " 🔗"
 
@@ -69,16 +67,35 @@ class NodeItem(QGraphicsItem):
         height = max(total_height + 20, 40)
         
         if self.shape_type == 'diamond':
-            width = int(width * 1.1)
+            width = int(width * 1.4)  # Augmenté pour éviter que le texte ne sorte des pointes du losange
             height = int(height * 1.7)
         elif self.shape_type == 'ellipse':
+            width = int(width * 1.2)
             height = max(total_height + 35, 55)
 
         self.rect = QRectF(-width/2, -height/2, width, height)
         self.prepareGeometryChange()
 
+    def node_shape_path(self):
+        """Retourne le QPainterPath précis et exact de la forme géométrique du nœud."""
+        path = QPainterPath()
+        if self.shape_type == 'ellipse':
+            path.addEllipse(self.rect)
+        elif self.shape_type == 'diamond':
+            path.moveTo(self.rect.left() + self.rect.width()/2, self.rect.top())
+            path.lineTo(self.rect.right(), self.rect.top() + self.rect.height()/2)
+            path.lineTo(self.rect.left() + self.rect.width()/2, self.rect.bottom())
+            path.lineTo(self.rect.left(), self.rect.top() + self.rect.height()/2)
+            path.closeSubpath()
+        else:
+            path.addRoundedRect(self.rect, 6, 6)
+        return path
+
+    def shape(self):
+        """Surchargé pour la détection précise des clics de souris et des intersections."""
+        return self.node_shape_path()
+
     def update_edges(self):
-        """Force toutes les arêtes connectées à recalculer leur tracé."""
         for edge in self.edges:
             edge.update_position()
 
@@ -104,22 +121,16 @@ class NodeItem(QGraphicsItem):
             final_border = QColor("#059669")
             final_text_color = QColor("#065F46")
 
+        # Rendu de l'ombre portée basée sur la forme réelle
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(0, 0, 0, 15))
-        shadow_rect = self.rect.translated(2, 2)
-        if self.shape_type == 'ellipse':
-            painter.drawEllipse(shadow_rect)
-        elif self.shape_type == 'diamond':
-            path = QPainterPath()
-            path.moveTo(shadow_rect.left() + shadow_rect.width()/2, shadow_rect.top())
-            path.lineTo(shadow_rect.right(), shadow_rect.top() + shadow_rect.height()/2)
-            path.lineTo(shadow_rect.left() + shadow_rect.width()/2, shadow_rect.bottom())
-            path.lineTo(shadow_rect.left(), shadow_rect.top() + shadow_rect.height()/2)
-            path.closeSubpath()
-            painter.drawPath(path)
-        else:
-            painter.drawRoundedRect(shadow_rect, 6, 6)
+        
+        shape_path = self.node_shape_path()
+        shadow_path = QPainterPath(shape_path)
+        shadow_path.translate(2, 2)
+        painter.drawPath(shadow_path)
 
+        # Style de bordure et sélection
         pen = QPen(final_border, b_width)
         if self.isSelected():
             pen.setWidth(b_width + 2)
@@ -127,19 +138,10 @@ class NodeItem(QGraphicsItem):
         painter.setPen(pen)
         painter.setBrush(QBrush(final_bg))
 
-        if self.shape_type == 'ellipse':
-            painter.drawEllipse(self.rect)
-        elif self.shape_type == 'diamond':
-            path = QPainterPath()
-            path.moveTo(self.rect.left() + self.rect.width()/2, self.rect.top())
-            path.lineTo(self.rect.right(), self.rect.top() + self.rect.height()/2)
-            path.lineTo(self.rect.left() + self.rect.width()/2, self.rect.bottom())
-            path.lineTo(self.rect.left(), self.rect.top() + self.rect.height()/2)
-            path.closeSubpath()
-            painter.drawPath(path)
-        else:
-            painter.drawRoundedRect(self.rect, 6, 6)
+        # Dessin de la forme principale
+        painter.drawPath(shape_path)
 
+        # Rendu du texte
         painter.setPen(QPen(final_text_color))
         font = QFont('Segoe UI', 11)
         if self.is_bold:
@@ -151,7 +153,6 @@ class NodeItem(QGraphicsItem):
         elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
         elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
 
-        # Ajout discret des icônes uniquement à l'affichage
         if self.file_path: display_label += " 📄"
         if self.url_link: display_label += " 🔗"
 
@@ -205,44 +206,42 @@ class EdgeItem(QGraphicsPathItem):
         scene = self.scene()
         mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
 
-        start_center = self.source_node.pos()
-        end_center = self.dest_node.pos()
+        # Détermination globale des faces pour l'orientation des courbes
+        dx_centers = self.dest_node.pos().x() - self.source_node.pos().x()
+        dy_centers = self.dest_node.pos().y() - self.source_node.pos().y()
+        
+        if abs(dx_centers) > abs(dy_centers):
+            start_side = "right" if dx_centers > 0 else "left"
+            end_side = "left" if dx_centers > 0 else "right"
+        else:
+            start_side = "bottom" if dy_centers > 0 else "top"
+            end_side = "top" if dy_centers > 0 else "bottom"
 
-        # Fonction modifiée pour renvoyer le point ET la face d'intersection
-        def get_border_intersection(node, target_pos):
-            dx = target_pos.x() - node.pos().x()
-            dy = target_pos.y() - node.pos().y()
-
-            if dx == 0 and dy == 0:
-                return node.pos(), "center"
-
-            half_w = node.rect.width() / 2
-            half_h = node.rect.height() / 2
-
-            ratio_x = half_w / abs(dx) if dx != 0 else float('inf')
-            ratio_y = half_h / abs(dy) if dy != 0 else float('inf')
+        # 🚨 RECONSTRUCTION GÉOMÉTRIQUE : Calcul par intersection vectorielle réelle
+        def get_exact_intersection(source, target):
+            line = QLineF(source.pos(), target.pos())
+            # Chargement de la forme vectorielle exacte du nœud mappé dans la scène
+            path = source.mapToScene(source.node_shape_path())
             
-            # Détermination de la face touchée (gauche/droite vs haut/bas)
-            if ratio_x < ratio_y:
-                scale = ratio_x
-                side = "right" if dx > 0 else "left"
-            else:
-                scale = ratio_y
-                side = "bottom" if dy > 0 else "top"
+            # Dichotomie sur 50 segments pour intercepter la frontière vectorielle exacte
+            intersect_point = source.pos()
+            for i in range(100):
+                t = i / 100.0
+                p = line.pointAt(t)
+                if not path.contains(p):
+                    intersect_point = p
+                    break
+            return intersect_point
 
-            return QPointF(node.pos().x() + dx * scale, node.pos().y() + dy * scale), side
-
-        # 1. Calcul des points d'attache et récupération des faces concernées
-        start, start_side = get_border_intersection(self.source_node, end_center)
-        end, end_side = get_border_intersection(self.dest_node, start_center)
+        start = get_exact_intersection(self.source_node, self.dest_node)
+        end = get_exact_intersection(self.dest_node, self.source_node)
 
         path = QPainterPath()
         path.moveTo(start)
         
-        # 2. Routage selon le mode
         if mode == 'orthogonal':
-            dx = abs(end_center.x() - start_center.x())
-            dy = abs(end_center.y() - start_center.y())
+            dx = abs(self.dest_node.pos().x() - self.source_node.pos().x())
+            dy = abs(self.dest_node.pos().y() - self.source_node.pos().y())
             
             if dy > dx:
                 mid_y = start.y() + (end.y() - start.y()) / 2
@@ -252,26 +251,22 @@ class EdgeItem(QGraphicsPathItem):
                 mid_x = start.x() + (end.x() - start.x()) / 2
                 path.lineTo(mid_x, start.y())
                 path.lineTo(mid_x, end.y())
-                
             path.lineTo(end)
         else:
-            # --- MODE COURBE DYNAMIQUE ET PERPENDICULAIRE ---
             dx = end.x() - start.x()
             dy = end.y() - start.y()
             
-            # Point de contrôle 1 (départ du nœud parent)
             ctrl_x1, ctrl_y1 = start.x(), start.y()
             if start_side in ('left', 'right'):
-                ctrl_x1 += dx / 2  # Pousse horizontalement
+                ctrl_x1 += dx / 2
             else:
-                ctrl_y1 += dy / 2  # Pousse verticalement (perpendiculaire !)
+                ctrl_y1 += dy / 2
 
-            # Point de contrôle 2 (arrivée sur le nœud enfant)
             ctrl_x2, ctrl_y2 = end.x(), end.y()
             if end_side in ('left', 'right'):
-                ctrl_x2 -= dx / 2  # Arrive horizontalement
+                ctrl_x2 -= dx / 2
             else:
-                ctrl_y2 -= dy / 2  # Arrive verticalement (perpendiculaire !)
+                ctrl_y2 -= dy / 2
             
             path.cubicTo(ctrl_x1, ctrl_y1, ctrl_x2, ctrl_y2, end.x(), end.y())
         
@@ -284,10 +279,8 @@ class EdgeItem(QGraphicsPathItem):
 
     def _draw_arrow(self, painter, tip, angle, color):
         size = 12
-        p1 = tip - QPointF(math.cos(angle - math.pi/6)*size,
-                           math.sin(angle - math.pi/6)*size)
-        p2 = tip - QPointF(math.cos(angle + math.pi/6)*size,
-                           math.sin(angle + math.pi/6)*size)
+        p1 = tip - QPointF(math.cos(angle - math.pi/6)*size, math.sin(angle - math.pi/6)*size)
+        p2 = tip - QPointF(math.cos(angle + math.pi/6)*size, math.sin(angle + math.pi/6)*size)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(color))
         painter.drawPolygon(QPolygonF([tip, p1, p2]))

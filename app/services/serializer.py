@@ -7,86 +7,128 @@ class MindMapSerializer:
         self.app = app
 
     def get_state(self):
+        """Sérialise l'état complet du workspace actif dans un dictionnaire Python."""
         ws = self.app.current_workspace()
-        if not ws: return {}
+        if not ws or not hasattr(ws, 'scene') or ws.scene is None: 
+            return {}
         
         all_items = ws.scene.items()
         nodes = [i for i in all_items if isinstance(i, NodeItem)]
         edges = [i for i in all_items if isinstance(i, EdgeItem)]
         
         root = next((n for n in nodes if n.node_id == 'root'), None) or (nodes[0] if nodes else None)
-        if not root: return {}
+        if not root: 
+            return {}
 
         natural_edges = set()
         serialized_node_ids = set()
 
         def serialize_node(node):
+            if not node: return None
+            
+            # 🚨 SÉCURITÉ ANTI-BOUCLE INFINIE À LA SAUVEGARDE
+            # Si le nœud a déjà été traité dans l'arbre, on s'arrête pour éviter la récursion infinie
+            if node.node_id in serialized_node_ids:
+                return None
+                
             serialized_node_ids.add(node.node_id)
+            
             data = {
                 "id": node.node_id,
-                "label": node.label,
+                "label": getattr(node, 'label', ''),
                 "x": node.pos().x(),
                 "y": node.pos().y(),
-                "shape": node.shape_type,
-                "bg": node.bg_color.name(),
-                "border": node.border_color.name(),
-                "font_color": node.font_color.name(),
-                "border_width": node.border_width,
-                "is_bold": node.is_bold,
-                "status": node.status,
-                "file_path": node.file_path,
-                "url_link": node.url_link,
+                "shape": getattr(node, 'shape_type', 'box'),
+                "bg": node.bg_color.name() if hasattr(node, 'bg_color') else '#60A5FA',
+                "border": node.border_color.name() if hasattr(node, 'border_color') else '#3B82F6',
+                "font_color": node.font_color.name() if hasattr(node, 'font_color') else '#ffffff',
+                "border_width": getattr(node, 'border_width', 1),
+                "is_bold": getattr(node, 'is_bold', False),
+                "status": getattr(node, 'status', 'none'),
+                "file_path": getattr(node, 'file_path', None),
+                "url_link": getattr(node, 'url_link', None),
                 "children": []
             }
-            for edge in node.edges:
-                if edge.source_node == node:
+            
+            for edge in getattr(node, 'edges', []):
+                if getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node:
+                    
+                    # 🚨 SÉCURITÉ SUPPLÉMENTAIRE : On vérifie si l'enfant n'est pas un ancêtre déjà visité
+                    if edge.dest_node.node_id in serialized_node_ids:
+                        # Si oui, ce lien n'est pas un enfant naturel de l'arbre, c'est un cross-link !
+                        # On ne le sérialise pas comme enfant pour éviter la boucle.
+                        continue
+                        
                     natural_edges.add(edge)
                     child_data = serialize_node(edge.dest_node)
-                    if edge.label: child_data["edge_label"] = edge.label
-                    child_data["edge_arrow_dir"] = edge.arrow_dir
-                    data["children"].append(child_data)
+                    if child_data:
+                        child_data["edge_label"] = getattr(edge, 'label', '')
+                        child_data["edge_arrow_dir"] = getattr(edge, 'arrow_dir', 'none')
+                        data["children"].append(child_data)
             return data
 
-        tree_data = serialize_node(root)
-        tree_data["global_line_routing"] = ws.scene.line_routing_mode
-        tree_data["snap_to_grid"] = getattr(ws.scene, 'snap_to_grid', False)
+        # Structuration propre du JSON global
+        state = {
+            "global_line_routing": getattr(ws.scene, 'line_routing_mode', 'curved'),
+            "snap_to_grid": getattr(ws.scene, 'snap_to_grid', False),
+            "root": serialize_node(root),
+            "orphan_nodes": [],
+            "cross_links": []
+        }
 
-        orphan_nodes_data = []
+        # Collecte des nœuds orphelins (non rattachés à l'arbre principal)
         for node in nodes:
             if node.node_id not in serialized_node_ids:
-                orphan_nodes_data.append({
+                state["orphan_nodes"].append({
                     "id": node.node_id,
-                    "label": node.label,
+                    "label": getattr(node, 'label', ''),
                     "x": node.pos().x(),
                     "y": node.pos().y(),
-                    "shape": node.shape_type,
-                    "bg": node.bg_color.name(),
-                    "border": node.border_color.name(),
-                    "font_color": node.font_color.name(),
-                    "border_width": node.border_width,
-                    "is_bold": node.is_bold,
-                    "status": node.status,
-                    "file_path": node.file_path,
-                    "url_link": node.url_link
+                    "shape": getattr(node, 'shape_type', 'box'),
+                    "bg": node.bg_color.name() if hasattr(node, 'bg_color') else '#60A5FA',
+                    "border": node.border_color.name() if hasattr(node, 'border_color') else '#3B82F6',
+                    "font_color": node.font_color.name() if hasattr(node, 'font_color') else '#ffffff',
+                    "border_width": getattr(node, 'border_width', 1),
+                    "is_bold": getattr(node, 'is_bold', False),
+                    "status": getattr(node, 'status', 'none'),
+                    "file_path": getattr(node, 'file_path', None),
+                    "url_link": getattr(node, 'url_link', None)
                 })
-        tree_data["orphan_nodes"] = orphan_nodes_data
 
-        cross_links_data = []
+        # Collecte des liens transversaux (liens personnalisés créés par l'utilisateur)
         for edge in edges:
-            if edge not in natural_edges:
-                cross_links_data.append({
+            if edge not in natural_edges and getattr(edge, 'source_node', None) and getattr(edge, 'dest_node', None):
+                state["cross_links"].append({
                     "from": edge.source_node.node_id,
                     "to": edge.dest_node.node_id,
-                    "label": edge.label,
-                    "color": edge.color.name(),
-                    "arrow_dir": edge.arrow_dir
+                    "label": getattr(edge, 'label', ''),
+                    "color": edge.color.name() if hasattr(edge, 'color') else '#A0AEC0',
+                    "arrow_dir": getattr(edge, 'arrow_dir', 'none')
                 })
 
-        tree_data["cross_links"] = cross_links_data
-        return tree_data
+        return state
     
     def apply_state(self, state_data):
-        # CORRECTION : On accède au workspace via self.app
+        """Applique l'état sauvegardé à la scène courante."""
+        # 🚨 FIX CRITIQUE : Si on reçoit une chaîne JSON (str), on la décode en dictionnaire
+        if isinstance(state_data, str):
+            try:
+                state_data = json.loads(state_data)
+            except Exception as e:
+                print(f"Erreur lors du décodage du state_str : {e}")
+                return
+
+        # Si ton code extrait un sous-objet pour root_data, assure-visualisation qu'il est décodé aussi
+        root_data = state_data.get("root", state_data) if isinstance(state_data, dict) else {}
+        
+        # Si root_data est resté un string pour une raison X ou Y, on le décode à son tour
+        if isinstance(root_data, str):
+            try:
+                root_data = json.loads(root_data)
+            except:
+                root_data = {}
+
+        """Restaure l'état complet du workspace depuis des données sérialisées."""
         ws = self.app.current_workspace()
         if not ws or state_data is None: return
         
@@ -102,14 +144,16 @@ class MindMapSerializer:
         ws.is_applying_state = True
         ws.scene.clear()
 
+        # Restauration des configurations globales de la scène
         ws.scene.line_routing_mode = root_data.get("global_line_routing", "curved")
         ws.scene.snap_to_grid = root_data.get("snap_to_grid", False)
         
-        # CORRECTION : Utilisation de self.app pour l'UI
-        self.app.workspace_controller.sync_workspace_ui({
-            "snap_to_grid": ws.scene.snap_to_grid,
-            "line_routing_mode": ws.scene.line_routing_mode
-        })
+        # Synchronisation de l'interface graphique globale
+        if hasattr(self.app, 'workspace_controller'):
+            self.app.workspace_controller.sync_workspace_ui({
+                "snap_to_grid": ws.scene.snap_to_grid,
+                "line_routing_mode": ws.scene.line_routing_mode
+            })
         
         node_counter = [0]
         edge_counter = [0]
@@ -117,9 +161,14 @@ class MindMapSerializer:
 
         def deserialize_node(data, parent_node=None):
             if not data: return None
-            node_counter[0] += 1
+            
             node_id = data.get("id") or ('root' if parent_node is None else f"node_{node_counter[0]}")
             
+            # 🚨 SÉCURITÉ ANTI-DOUBLON : Si le nœud existe déjà, on ne le recrée pas !
+            if node_id in created_nodes:
+                return created_nodes[node_id]
+                
+            node_counter[0] += 1
             x, y = data.get("x", 0.0), data.get("y", 0.0)
             bg = data.get("bg", '#60A5FA')
             border = data.get("border", '#3B82F6')
@@ -139,25 +188,44 @@ class MindMapSerializer:
                 is_bold=data.get("is_bold", False), status=status
             )
             node.border_width = data.get("border_width", 1)
-            node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+            
+            if hasattr(self.app, 'editing_controller'):
+                node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+                
             ws.scene.addItem(node)
-            created_nodes[node_id] = node
+            created_nodes[node_id] = node  # Enregistrement immédiat
 
             if parent_node:
                 edge_counter[0] += 1
                 edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
                 edge = EdgeItem(f"edge_{edge_counter[0]}", parent_node, node, data.get("edge_label", ""), color=edge_color, arrow_dir=data.get("edge_arrow_dir", "none"))
-                edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+                
+                if hasattr(self.app, 'editing_controller'):
+                    edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+                
                 ws.scene.addItem(edge)
+                
+                if not hasattr(parent_node, 'edges'): parent_node.edges = []
+                if not hasattr(node, 'edges'): node.edges = []
+                parent_node.edges.append(edge)
+                node.edges.append(edge)
 
             for child_data in data.get("children", []):
                 deserialize_node(child_data, node)
             return node
 
-        deserialize_node(root_data)
+        # 1. Chargement de l'arbre principal
+        tree_root_data = root_data.get("root") if "root" in root_data else root_data
+        deserialize_node(tree_root_data)
 
+        # 2. Restauration des nœuds orphelins (Protégés par la sécurité anti-doublon)
         for orphan in root_data.get("orphan_nodes", []):
             node_id = orphan.get("id")
+            
+            # 🚨 SÉCURITÉ ICI AUSSI : Si déjà créé via l'arbre, on saute !
+            if node_id in created_nodes:
+                continue
+                
             node = NodeItem(
                 node_id, orphan.get("label", ""), orphan.get("x", 0.0), orphan.get("y", 0.0),
                 shape=orphan.get("shape", "box"), bg=orphan.get("bg", '#60A5FA'),
@@ -166,18 +234,42 @@ class MindMapSerializer:
                 is_bold=orphan.get("is_bold", False), status=orphan.get("status", "none")
             )
             node.border_width = orphan.get("border_width", 1)
-            node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+            
+            if hasattr(self.app, 'editing_controller'):
+                node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+                
             ws.scene.addItem(node)
             created_nodes[node_id] = node
 
+        # Restauration des liens transversaux personnalisés (Cross Links)
         for cl in root_data.get("cross_links", []):
             source = created_nodes.get(cl["from"])
             dest = created_nodes.get(cl["to"])
             if source and dest:
                 edge_counter[0] += 1
                 edge = EdgeItem(f"edge_{edge_counter[0]}", source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"), arrow_dir=cl.get("arrow_dir", "none"))
-                edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+                
+                if hasattr(self.app, 'editing_controller'):
+                    edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+                
                 ws.scene.addItem(edge)
+                
+                # CORRECTION CRITIQUE : Liaison en mémoire pour les liens transversaux
+                if not hasattr(source, 'edges'): source.edges = []
+                if not hasattr(dest, 'edges'): dest.edges = []
+                source.edges.append(edge)
+                dest.edges.append(edge)
+
+        # Rafraîchissement géométrique forcé de toutes les arêtes après routage
+        for item in ws.scene.items():
+            if isinstance(item, EdgeItem):
+                if hasattr(item, 'update_position'): item.update_position()
+                elif hasattr(item, 'update_path'): item.update_path()
+                item.update()
 
         ws.is_applying_state = False
         on_selection_changed(self.app)
+
+        # 🚨 LE FIX ICI : Force le bouton de la toolbar à lire l'état qui vient d'être chargé !
+        if hasattr(self.app, 'routing_controller'):
+            self.app.routing_controller.update_routing_button_ui()
