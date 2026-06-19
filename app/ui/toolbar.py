@@ -60,7 +60,7 @@ def create_toolbar(app_window):
         QPushButton { padding: 6px 15px; border: 1px solid #ccc; border-radius: 4px; background: #f1f5f9; }
         QPushButton:checked { background: #3B82F6; color: white; border-color: #2563EB; font-weight: bold; }
     """)
-    app_window.btn_snap.clicked.connect(app_window.toggle_snap_to_grid)
+    app_window.btn_snap.clicked.connect(app_window.grid_controller.toggle_snap_to_grid)
     workspace_toolbar.addWidget(app_window.btn_snap)
 
     # Crée le bouton et active le mode "Toggle" (mémorisable)
@@ -69,7 +69,7 @@ def create_toolbar(app_window):
     app_window.btn_toggle_routing.setStyleSheet("""
         QPushButton { padding: 6px 15px; border: 1px solid #ccc; border-radius: 4px; background: #ffffff; font-weight: bold; }
     """)
-    app_window.btn_toggle_routing.clicked.connect(app_window.toggle_line_routing)
+    app_window.btn_toggle_routing.clicked.connect(app_window.routing_controller.toggle_line_routing)
     workspace_toolbar.addWidget(app_window.btn_toggle_routing)
     
     app_window.template_combo = QComboBox()

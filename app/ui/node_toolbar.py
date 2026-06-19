@@ -43,7 +43,7 @@ def create_node_toolbar(app_window):
     app_window.shape_combo.addItem("Rectangle", "box")
     app_window.shape_combo.addItem("Losange", "diamond")
     app_window.shape_combo.addItem("Ellipse", "ellipse")
-    app_window.shape_combo.currentIndexChanged.connect(app_window.on_shape_combo_changed)
+    app_window.shape_combo.currentIndexChanged.connect(app_window.style_controller.on_shape_combo_changed)
     nc_layout.addWidget(app_window.shape_combo)
     
     nc_layout.addWidget(ToolsController.create_separator(app_window))
@@ -53,7 +53,7 @@ def create_node_toolbar(app_window):
     app_window.status_combo.addItem("🚨 Urgent", "urgent")
     app_window.status_combo.addItem("⏳ En cours", "progress")
     app_window.status_combo.addItem("✅ Terminé", "done")
-    app_window.status_combo.currentIndexChanged.connect(app_window.on_status_combo_changed)
+    app_window.status_combo.currentIndexChanged.connect(app_window.style_controller.on_status_combo_changed)
     nc_layout.addWidget(app_window.status_combo)
 
     nc_layout.addWidget(ToolsController.create_separator(app_window))
@@ -102,7 +102,7 @@ def create_node_toolbar(app_window):
     app_window.arrow_combo.addItem("➡️ Flèche Avant", "forward")
     app_window.arrow_combo.addItem("⬅️ Flèche Arrière", "backward")
     app_window.arrow_combo.addItem("↔️ Double flèche", "both")
-    app_window.arrow_combo.currentIndexChanged.connect(app_window.on_arrow_combo_changed)
+    app_window.arrow_combo.currentIndexChanged.connect(app_window.routing_controller.on_arrow_combo_changed)
     ec_layout.addWidget(app_window.arrow_combo)
     
     style_layout.addWidget(app_window.edge_controls)

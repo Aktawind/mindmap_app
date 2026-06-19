@@ -2,6 +2,7 @@ import json
 import os
 
 from PyQt6.QtWidgets import QMessageBox, QFileDialog
+from ui.selection_manager import on_selection_changed
 
 class WorkspaceController:
     def __init__(self, app):
@@ -28,7 +29,7 @@ class WorkspaceController:
 
         self.app.project_service.new_project() # Ouvre un premier onglet vierge
         self.auto_save_workspace()
-        self.app.update_title()
+        self.app.tabs_controller.update_title()
 
     def auto_save_workspace(self):
         """ Écrit instantanément les modifications dans le fichier .mindy """
@@ -92,7 +93,7 @@ class WorkspaceController:
                 self.app.project_service.new_project()
 
             self.update_workspace_ui()
-            self.app.update_title()
+            self.app.tabs_controller.update_title()
 
         except Exception as e:
             QMessageBox.critical(self.app, "Erreur", f"Impossible de charger l'espace de travail :\n{str(e)}")
@@ -131,3 +132,27 @@ class WorkspaceController:
             self.auto_save_workspace() 
         else:
             QMessageBox.warning(self.app, "Action impossible", "Ce fichier ne fait pas partie de la workspace.")
+
+    def sync_workspace_ui(self, ui_state):
+        if not ui_state:
+            return
+
+        self.app.btn_snap.blockSignals(True)
+        self.app.btn_snap.setChecked(ui_state["snap_to_grid"])
+        self.app.btn_snap.blockSignals(False)
+
+        is_curved = (ui_state["line_routing_mode"] == "curved")
+
+        self.app.btn_toggle_routing.blockSignals(True)
+        self.app.btn_toggle_routing.setChecked(is_curved)
+        self.app.btn_toggle_routing.blockSignals(False)
+
+        if hasattr(self.app, 'on_selection_changed'):
+            self.app.on_selection_changed()
+
+    def center_on_graph(self):
+        ws = self.app.current_workspace()
+        if not ws: return
+        rect = ws.scene.itemsBoundingRect()
+        if not rect.isEmpty():
+            ws.view.centerOn(rect.center())

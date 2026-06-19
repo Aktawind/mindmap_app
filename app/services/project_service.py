@@ -3,6 +3,7 @@ import os
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from graphics.items import NodeItem
 from graphics.scene import MindMapWorkspace
+from PyQt6.QtCore import QSettings, QTimer
 
 class ProjectService:
     def __init__(self, app):
@@ -15,7 +16,6 @@ class ProjectService:
         # 2. On configure le nœud racine
         root = NodeItem('root', 'Nouveau noeud', 0, 0, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
         
-        # CORRECTION : Ces méthodes de callback se trouvent sur self.app
         root.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
         
         ws.scene.addItem(root)
@@ -24,10 +24,9 @@ class ProjectService:
         self.app.tabs.addTab(ws, "[Nouveau Projet]")
         self.app.tabs.setCurrentWidget(ws)
         
-        # CORRECTION : On force la sauvegarde de l'état initial
         self.app.save_state()
         ws.is_dirty = False 
-        self.app.update_title()
+        self.app.tabs_controller.update_title()
 
     def load_project(self):
         paths, _ = QFileDialog.getOpenFileNames(self.app, "Ouvrir un ou plusieurs projets", "", "JSON (*.json)")
@@ -60,8 +59,8 @@ class ProjectService:
         
         # 4. Finalisation de l'affichage
         self.app.settings.setValue("last_project_path", path)
-        self.app.update_title()
-        self.app.center_on_graph()
+        self.app.tabs_controller.update_title()
+        self.app.workspace_controller.center_on_graph()
 
     def save_project(self, force_save_as=False):
         ws = self.app.current_workspace()
@@ -96,8 +95,17 @@ class ProjectService:
                 
             ws.is_dirty = False
             self.app.settings.setValue("last_project_path", ws.current_file_path)
-            self.app.update_title()
+            self.app.tabs_controller.update_title()
             return True
         except Exception as e:
             QMessageBox.critical(self.app, "Erreur Sauvegarde", f"Impossible de sauvegarder le fichier :\n{str(e)}")
             return False
+        
+    def load_last_project_on_startup(self):
+        last_path = self.app.settings.value("last_project_path", "")
+        if last_path and os.path.exists(last_path):
+            self.load_project_from_path(last_path)
+        else:
+            self.new_project(force_empty=True)
+            
+        QTimer.singleShot(100, self.app.workspace_controller.center_on_graph)

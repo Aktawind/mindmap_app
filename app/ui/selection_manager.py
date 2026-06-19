@@ -2,11 +2,22 @@
 from graphics.items import NodeItem, EdgeItem
 
 def on_selection_changed(app):
-        ws = app.current_workspace()
-        if not ws: 
-            app.style_bar.hide()
-            return
+        try:
+            if not app or not hasattr(app, 'tabs'):
+                return
+            ws = app.current_workspace()
+        except RuntimeError:
+            return # On intercepte le crash C++ direct et on stoppe proprement
             
+        if not ws: 
+            # Sécurité supplémentaire au cas où les contrôleurs de barre de style seraient déjà détruits
+            try:
+                if hasattr(app, 'style_bar') and app.style_bar:
+                    app.style_bar.hide()
+            except RuntimeError:
+                pass
+            return
+           
         sel = ws.scene.selectedItems()
         nodes = [item for item in sel if isinstance(item, NodeItem)]
         if len(sel) >= 1:

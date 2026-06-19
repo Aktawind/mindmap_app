@@ -106,7 +106,7 @@ class MindMapSerializer:
         ws.scene.snap_to_grid = root_data.get("snap_to_grid", False)
         
         # CORRECTION : Utilisation de self.app pour l'UI
-        self.app.sync_workspace_ui({
+        self.app.workspace_controller.sync_workspace_ui({
             "snap_to_grid": ws.scene.snap_to_grid,
             "line_routing_mode": ws.scene.line_routing_mode
         })

@@ -56,8 +56,8 @@ class ToolsController:
                         
                     ws.undo_stack.append(state_str)
                     ws.is_dirty = True
-                    self.app.update_title()
-                    self.app.center_on_graph()
+                    self.app.tabs_controller.update_title()
+                    self.app.workspace_controller.center_on_graph()
                 except Exception as e:
                     QMessageBox.critical(self.app, "Erreur", f"Erreur lors de la lecture du template :\n{str(e)}")
             else:
@@ -158,4 +158,49 @@ class ToolsController:
         if hasattr(self.app, 'save_state'):
             self.app.save_state()
 
-    
+    def handle_close_event(self, event):
+        """Gère la fermeture de l'application et force la sauvegarde des onglets non enregistrés."""
+        
+        # On bloque temporairement les signaux pour éviter les crashs de rafraîchissement (RuntimeError)
+        self.app.tabs.blockSignals(True)
+        
+        try:
+            # On boucle sur tous les onglets de l'application via self.app
+            for i in range(self.app.tabs.count()):
+                ws = self.app.tabs.widget(i)
+                
+                # Si l'onglet a été modifié (is_dirty)
+                if hasattr(ws, 'is_dirty') and ws.is_dirty:
+                    # On active l'onglet visuellement
+                    self.app.tabs.setCurrentIndex(i)
+                    
+                    name = ws.current_file_path if ws.current_file_path else f"Sans titre {i+1}"
+                    reply = QMessageBox.question(
+                        self.app, # Le parent de la boîte de dialogue devient l'application
+                        'Enregistrer les modifications',
+                        f"Le document '{os.path.basename(name)}' a été modifié.\nVoulez-vous enregistrer les modifications ?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+                        QMessageBox.StandardButton.Yes
+                    )
+
+                    if reply == QMessageBox.StandardButton.Yes:
+                        # Appel du service de sauvegarde sur l'application
+                        saved = self.app.project_service.save_project() 
+                        
+                        # Si la sauvegarde a été annulée par l'utilisateur, on intercepte et stoppe tout
+                        if not saved:
+                            self.app.tabs.blockSignals(False)
+                            event.ignore()
+                            return
+                            
+                    elif reply == QMessageBox.StandardButton.Cancel:
+                        # L'utilisateur a cliqué sur Annuler : on stoppe complètement la fermeture
+                        self.app.tabs.blockSignals(False)
+                        event.ignore()
+                        return
+        finally:
+            # Sécurité : On débloque toujours les signaux si l'application ne s'est finalement pas fermée
+            self.app.tabs.blockSignals(False)
+
+        # Si tout est validé/sauvegardé, on autorise la fermeture de la fenêtre
+        event.accept()
