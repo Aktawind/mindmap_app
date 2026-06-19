@@ -6,8 +6,11 @@ from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 from graphics.items import NodeItem
 
 class AttachmentController:
-    @staticmethod
-    def get_attachments_dir(ws):
+    def __init__(self, app):
+        self.app = app
+
+    def get_attachments_dir(self):
+        ws = self.app.current_workspace()
         """Retourne le chemin du dossier d'onglets pour le workspace actuel."""
         if not ws or not ws.current_file_path:
             return None
@@ -18,8 +21,8 @@ class AttachmentController:
             os.makedirs(attachments_dir)
         return attachments_dir
 
-    @staticmethod
-    def remove_file_from_attachments(ws, relative_path):
+    def remove_file_from_attachments(self, relative_path):
+        ws = self.app.current_workspace()
         """Supprime le fichier physique du disque si le chemin est valide."""
         if not ws or not ws.current_file_path or not relative_path:
             return
@@ -33,10 +36,10 @@ class AttachmentController:
             except Exception as e:
                 print(f"Erreur lors de la suppression du fichier : {e}")
 
-    @staticmethod
-    def copy_file_to_attachments(ws, node_id, source_path):
+    def copy_file_to_attachments(self, node_id, source_path):
+        ws = self.app.current_workspace()
         """Copie un fichier externe dans le dossier des pièces jointes."""
-        attachments_dir = AttachmentController.get_attachments_dir(ws)
+        attachments_dir = self.get_attachments_dir()
         if not attachments_dir or not source_path or not os.path.exists(source_path):
             return source_path # Si pas encore sauvegardé, on garde le lien temporaire
 
@@ -49,56 +52,51 @@ class AttachmentController:
         try:
             import shutil
             shutil.copy2(source_path, dest_path)
-            # IMPORTANT : On stocke un chemin RELATIF dans le JSON.
-            # Ainsi, si vous déplacez le projet complet (.json + dossier), les liens fonctionnent toujours !
             return os.path.join(".mindmap_attachments", dest_filename)
         except Exception as e:
             print(f"Erreur lors de la copie du fichier : {e}")
             return source_path
 
-    @staticmethod
-    def attach_file(app):
-        ws = app.current_workspace()
+    def attach_file(self):
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             node = sel[0]
             if not ws.current_file_path:
-                QMessageBox.information(app, "Sauvegarde requise", "Veuillez d'abord enregistrer votre Mind Map afin de pouvoir y attacher des fichiers.")
-                app.save_file()
+                QMessageBox.information(self.app, "Sauvegarde requise", "Veuillez d'abord enregistrer votre Mind Map afin de pouvoir y attacher des fichiers.")
+                self.app.save_file()
                 if not ws.current_file_path: return # Annulé par l'utilisateur
                 
-            path, _ = QFileDialog.getOpenFileName(app, "Choisir un document à joindre")
+            path, _ = QFileDialog.getOpenFileName(self.app, "Choisir un document à joindre")
             if path:
                 if node.file_path:
-                    AttachmentController.remove_file_from_attachments(ws, node.file_path)
+                    self.remove_file_from_attachments(node.file_path)
                 
                 # Copie et récupération du chemin relatif
-                relative_dest = AttachmentController.copy_file_to_attachments(ws, node.node_id, path)
+                relative_dest = self.copy_file_to_attachments(node.node_id, path)
                 node.file_path = relative_dest
                 node.recalculate_size()
-                app.on_selection_changed()
+                self.app.on_selection_changed()
                 node.update()
-                app.save_state()
+                self.app.save_state()
 
-    @staticmethod
-    def attach_url(app):
-        ws = app.current_workspace()
+    def attach_url(self):
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             node = sel[0]
-            url, ok = QInputDialog.getText(app, "Associer une URL", "Entrez l'adresse internet :", text=node.url_link or "https://")
+            url, ok = QInputDialog.getText(self.app, "Associer une URL", "Entrez l'adresse internet :", text=node.url_link or "https://")
             if ok and url.strip():
                 node.url_link = url.strip()
                 node.recalculate_size()
-                app.on_selection_changed()
+                self.app.on_selection_changed()
                 node.update()
-                app.save_state()
+                self.app.save_state()
 
-    @staticmethod
-    def detach_links(app):
-        ws = app.current_workspace()
+    def detach_links(self):
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
@@ -111,7 +109,7 @@ class AttachmentController:
             # 1. Gestion du fichier s'il existe
             if node.file_path:
                 # Suppression physique du fichier dans .mindmap_attachments
-                AttachmentController.remove_file_from_attachments(ws, node.file_path)
+                self.remove_file_from_attachments(node.file_path)
                 node.file_path = None
 
             # 2. Gestion de l'URL (s'exécute TOUJOURS, même s'il n'y a pas de fichier)
@@ -119,13 +117,12 @@ class AttachmentController:
             
             # 3. Rafraîchissement visuel et sauvegarde de l'état
             node.recalculate_size()
-            app.on_selection_changed()
+            self.app.on_selection_changed()
             node.update()
-            app.save_state()
+            self.app.save_state()
 
-    @staticmethod
-    def open_file(app):
-        ws = app.current_workspace()
+    def open_file(self):
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
@@ -134,7 +131,7 @@ class AttachmentController:
             # SÉCURITÉ : Si le nœud a une URL mais pas de fichier local,
             # on bascule automatiquement sur l'ouverture de l'URL !
             if not node.file_path and node.url_link:
-                AttachmentController.open_url(app)
+                self.app.open_url(self.app)
                 return
 
             if not node.file_path:
@@ -150,12 +147,11 @@ class AttachmentController:
             if os.path.exists(full_path):
                 QDesktopServices.openUrl(QUrl.fromLocalFile(full_path))
             else:
-                QMessageBox.warning(app, "Erreur", "Le fichier joint est introuvable.")
+                QMessageBox.warning(self.app, "Erreur", "Le fichier joint est introuvable.")
 
-    @staticmethod
-    def open_url(app):
+    def open_url(self):
         """Ouvre le lien internet associé au nœud dans le navigateur par défaut."""
-        ws = app.current_workspace()
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):

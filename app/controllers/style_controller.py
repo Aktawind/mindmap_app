@@ -4,9 +4,11 @@ from PyQt6.QtWidgets import QColorDialog
 from graphics.items import NodeItem
 
 class StyleController:
-    @staticmethod
-    def change_color(app, color, border):
-        ws = app.current_workspace()
+    def __init__(self, app):
+        self.app = app
+
+    def change_color(self, color, border):
+        ws = self.app.current_workspace()
         if not ws: return
         
         sel = ws.scene.selectedItems()
@@ -15,13 +17,12 @@ class StyleController:
         if nodes:
             # On applique la couleur en cascade à CHAQUE nœud sélectionné
             for node in nodes:
-                StyleController.apply_color_downward(node, color, border)
+                self.apply_color_downward(node, color, border)
             
             # Un seul snapshot de l'état pour tout le groupe
-            app.save_state()
+            self.app.save_state()
 
-    @staticmethod
-    def apply_color_downward(node, bg_color, border_color):
+    def apply_color_downward(self, node, bg_color, border_color):
         """Applique la couleur au nœud et descend récursivement vers tous ses enfants."""
         if not node:
             return
@@ -41,10 +42,9 @@ class StyleController:
                 edge.update()
                 
                 # Appel récursif sur le nœud destination (l'enfant)
-                StyleController.apply_color_downward(edge.dest_node, bg_color, border_color)
+                self.apply_color_downward(edge.dest_node, bg_color, border_color)
 
-    @staticmethod
-    def toggle_bold(app):
+    def toggle_bold(self, app):
         ws = app.current_workspace()
         if not ws: return
         
@@ -61,25 +61,23 @@ class StyleController:
                 node.is_bold = target_bold
                 node.update()
                 
-            app.save_state()
+            self.app.save_state()
 
-    @staticmethod
-    def on_shape_combo_changed(app, index):
-        ws = app.current_workspace()
+    def on_shape_combo_changed(self, index):
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         nodes = [item for item in sel if isinstance(item, NodeItem)]
 
         if nodes:
             for node in nodes:
-                node.shape_type = app.shape_combo.itemData(index)
+                node.shape_type = self.app.shape_combo.itemData(index)
                 node.update()
                 node.recalculate_size()
-            app.save_state()
+            self.app.save_state()
 
-    @staticmethod
-    def on_status_combo_changed(app, index):
-        ws = app.current_workspace()
+    def on_status_combo_changed(self, index):
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         nodes = [item for item in sel if isinstance(item, NodeItem)]
@@ -87,7 +85,7 @@ class StyleController:
         if nodes:
             for node in nodes:
                 node.label = node.label.replace("🚨 ", "").replace("⏳ ", "").replace("✅ ", "")
-                node.status = app.status_combo.itemData(index)
+                node.status = self.app.status_combo.itemData(index)
                 node.recalculate_size()
                 node.update()
-            app.save_state()
+            self.app.save_state()

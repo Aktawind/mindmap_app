@@ -8,8 +8,9 @@ from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QWidget
 from graphics.items import NodeItem
 
 class ToolsController:
+    def __init__(self, app):
+        self.app = app
 
-    @staticmethod
     def resource_path(relative_path):
         """Calcule le chemin absolu vers les ressources (gère l'exécutable PyInstaller)."""
         try:
@@ -19,7 +20,6 @@ class ToolsController:
             base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base_path, relative_path)
     
-    @staticmethod
     def create_separator(parent_toolbar):
         """Crée un séparateur visuel personnalisé pour la barre d'outils."""
         sep = QWidget(parent_toolbar)
@@ -27,17 +27,16 @@ class ToolsController:
         sep.setStyleSheet("background-color: #cbd5e1; margin: 0 4px;")
         return sep
        
-    @staticmethod
-    def apply_template(app, index):
+    def apply_template(self, index):
         """Applique un fichier template JSON à la mind map courante."""
         if index == 0: return
-        ws = app.current_workspace()
+        ws = self.app.current_workspace()
         if not ws: return
         
-        filename = app.template_combo.itemData(index)
-        app.template_combo.setCurrentIndex(0)
+        filename = self.app.template_combo.itemData(index)
+        self.app.template_combo.setCurrentIndex(0)
         
-        if QMessageBox.question(app, "Template", "Charger ce template remplacera la mind map de l'onglet actuel. Continuer ?") == QMessageBox.StandardButton.Yes:
+        if QMessageBox.question(self.app, "Template", "Charger ce template remplacera la mind map de l'onglet actuel. Continuer ?") == QMessageBox.StandardButton.Yes:
             # Recherche du fichier dans le dossier 'templates' global
             template_path = ToolsController.resource_path(os.path.join("templates", filename))
             
@@ -47,7 +46,7 @@ class ToolsController:
                         data = json.load(f)
                         
                     state_str = data["content"] if "content" in data else json.dumps(data)
-                    app.apply_state(state_str)
+                    self.app.apply_state(state_str)
                     
                     ws.undo_stack.clear()
                     if hasattr(ws, 'redo_stack'):
@@ -55,9 +54,9 @@ class ToolsController:
                         
                     ws.undo_stack.append(state_str)
                     ws.is_dirty = True
-                    app.update_title()
-                    app.center_on_graph()
+                    self.app.update_title()
+                    self.app.center_on_graph()
                 except Exception as e:
-                    QMessageBox.critical(app, "Erreur", f"Erreur lors de la lecture du template :\n{str(e)}")
+                    QMessageBox.critical(self.app, "Erreur", f"Erreur lors de la lecture du template :\n{str(e)}")
             else:
-                QMessageBox.warning(app, "Erreur", f"Fichier template introuvable :\n{template_path}")
+                QMessageBox.warning(self.app, "Erreur", f"Fichier template introuvable :\n{template_path}")

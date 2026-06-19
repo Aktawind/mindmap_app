@@ -4,12 +4,14 @@ from PyQt6.QtCore import QPointF
 from graphics.items import BRANCH_PALETTES, NodeItem, EdgeItem
 
 class GraphController:
-    @staticmethod
+    def __init__(self, app):
+        self.app = app
+
     def add_child_node(self, parent_node):
-        ws = self.current_workspace()
+        ws = self.app.current_workspace()
         new_id = f"node_{len(ws.scene.items())}"
         
-        t_x, t_y = GraphController.calculate_smart_position(self, parent_node)
+        t_x, t_y = self.calculate_smart_position(parent_node)
         if getattr(ws.scene, 'snap_to_grid', False):
             t_x = round(t_x / 20) * 20
             t_y = round(t_y / 20) * 20
@@ -25,22 +27,21 @@ class GraphController:
             if p_edge: edge_col = p_edge.color.name()
 
         new_node = NodeItem(new_id, "Nouvelle sous-idée", t_x, t_y, shape='box', bg=bg, border=border, font_color=text_col)
-        new_node.signals.itemDoubleClicked.connect(self.start_inline_editing)
+        new_node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
         
         edge = EdgeItem(f"edge_{len(ws.scene.items())}", parent_node, new_node, "", color=edge_col)
-        edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
+        edge.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
         
         ws.scene.addItem(new_node)
         ws.scene.addItem(edge)
-        self.save_state()
+        self.app.save_state()
         
         ws.scene.clearSelection()
         new_node.setSelected(True)
-        self.start_inline_editing(new_node)
+        self.app.start_inline_editing(new_node)
 
-    @staticmethod
     def calculate_smart_position(self, parent_node):
-        ws = self.current_workspace()
+        ws = self.app.current_workspace()
         if not ws or not parent_node:
             return 150, 0
             
@@ -76,10 +77,9 @@ class GraphController:
                     break
         return target_x, target_y
 
-    @staticmethod
     def delete_selected(self):
         if hasattr(self, 'editor') and self.editor is not None: return
-        ws = self.current_workspace()
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if not sel: return
@@ -98,11 +98,10 @@ class GraphController:
                 if item in item.dest_node.edges: item.dest_node.edges.remove(item)
                 if item.scene() == ws.scene: ws.scene.removeItem(item)
                     
-        self.save_state()
+        self.app.save_state()
 
-    @staticmethod
     def connect_selected_nodes(self):
-        ws = self.current_workspace()
+        ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
@@ -115,8 +114,8 @@ class GraphController:
             if not already_linked:
                 link_color = node1.border_color
                 edge = EdgeItem(f"edge_{len(ws.scene.items())}", node1, node2, "", color=link_color)
-                edge.signals.itemDoubleClicked.connect(self.start_inline_editing)
+                edge.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
                 ws.scene.addItem(edge)
                 ws.scene.clearSelection()
                 edge.setSelected(True)
-                self.save_state()
+                self.app.save_state()

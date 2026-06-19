@@ -57,6 +57,17 @@ class MindMapApp(QMainWindow):
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.close_tab)
         self.tabs.currentChanged.connect(self.on_tab_changed)
+
+        self.graph_controller = GraphController(self)
+        self.style_controller = StyleController(self)
+        self.attachment_controller = AttachmentController(self)
+        self.export_controller = ExportController(self)
+        self.workspace_controller = WorkspaceController(self)
+        self.tools_controller = ToolsController(self)
+
+        self.project_service = ProjectService(self)
+        self.history_service = HistoryService(self)
+        self.serializer = MindMapSerializer(self)
         
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
@@ -72,7 +83,7 @@ class MindMapApp(QMainWindow):
         if last_workspace and os.path.exists(last_workspace):
             QTimer.singleShot(100, lambda: self.load_workspace(last_workspace))
         else:
-            self.new_project()
+            self.project_service.new_project()
 
     def current_workspace(self) -> MindMapWorkspace:
         return self.tabs.currentWidget()
@@ -270,7 +281,7 @@ class MindMapApp(QMainWindow):
         if not ws:
             return
         current_state = self.get_state()
-        HistoryService.save_state(ws, current_state)
+        self.history_service.save_state(ws, current_state)
         
         # On s'assure que l'étoile se met à jour dès qu'un état est enregistré
         self.update_title()
@@ -280,7 +291,7 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws:
             return
-        previous_state = HistoryService.undo(ws)
+        previous_state = self.history_service.undo(ws)
         if previous_state:
             self.apply_state(previous_state)
 
@@ -289,17 +300,15 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws:
             return
-        next_state = HistoryService.redo(ws)
+        next_state = self.history_service.redo(ws)
         if next_state:
             self.apply_state(next_state)
 
     def get_state(self):
-        ws = self.current_workspace()
-
-        if not ws:
-            return "{}"
-
-        return MindMapSerializer.get_state(ws)
+        return self.serializer.get_state()
+    
+    def apply_state(self, state_str):
+        self.serializer.apply_state(state_str)
     
     def sync_workspace_ui(self, ui_state):
         if not ui_state:
@@ -322,19 +331,7 @@ class MindMapApp(QMainWindow):
 
         self.on_selection_changed()
 
-    def apply_state(self, state_str):
-        ws = self.current_workspace()
-
-        if not ws:
-            return
-
-        ui_state = MindMapSerializer.load_into_workspace(
-            ws,
-            state_str,
-            self.start_inline_editing
-        )
-
-        self.sync_workspace_ui(ui_state)
+    
 
     def copy_selected(self):
         ws = self.current_workspace()
@@ -549,83 +546,81 @@ class MindMapApp(QMainWindow):
 
     #-------------------- Gestion des nœuds et liens -------------------- #
     def add_child_node(self, parent_node):
-        GraphController.add_child_node(self, parent_node)
+        self.graph_controller.add_child_node(parent_node)
         self.update_title()
 
     def delete_selected(self):
-        GraphController.delete_selected(self)
+        self.graph_controller.delete_selected()
         self.update_title()
 
     def connect_selected_nodes(self):
-        GraphController.connect_selected_nodes(self)
+        self.graph_controller.connect_selected_nodes()
         self.update_title()
 
     #-------------------- Gestion du style -------------------- #
     def change_color(self, bg_color, border_color):
-        StyleController.change_color(self, bg_color, border_color)
+        self.style_controller.change_color(self, bg_color, border_color)
 
     def toggle_bold(self):
-        StyleController.toggle_bold(self)
+        self.style_controller.toggle_bold(self)
 
     #-------------------- Gestion des fichiers et liens -------------------- #
     def attach_file(self):
-        AttachmentController.attach_file(self)
+        self.attachment_controller.attach_file()
 
     def attach_url(self):
-        AttachmentController.attach_url(self)
+        self.attachment_controller.attach_url()
 
     def detach_links(self):
-        AttachmentController.detach_links(self)
+        self.attachment_controller.detach_links()
 
     def open_file(self):
-        AttachmentController.open_file(self)
+        self.attachment_controller.open_file()
 
     # -------------------- Gestion de l'espace de travail -------------------- #
     def update_workspace_ui(self):
-        WorkspaceController.update_workspace_ui(self)
+        self.workspace_controller.update_workspace_ui()
 
     def auto_save_workspace(self):
-        WorkspaceController.auto_save_workspace(self)
+        self.workspace_controller.auto_save_workspace()
 
     def new_workspace(self):
-        WorkspaceController.new_workspace(self)
+        self.workspace_controller.new_workspace()
 
     def load_workspace(self, path=None):
-        WorkspaceController.load_workspace(self, path)
+        self.workspace_controller.load_workspace(path)
 
     def add_current_tab_to_workspace(self):
-        WorkspaceController.add_current_tab_to_workspace(self)
+        self.workspace_controller.add_current_tab_to_workspace()
 
     def remove_current_tab_from_workspace(self):
-        WorkspaceController.remove_current_tab_from_workspace(self)
+        self.workspace_controller.remove_current_tab_from_workspace()
 
     # -------------------- Gestion des projets -------------------- #
     def new_project(self, force_empty=False):
-        ProjectService.new_project(self, force_empty)
+        self.project_service.new_project(force_empty)
 
     def load_project(self):
-        ProjectService.load_project(self)
+        self.project_service.load_project()
 
     def load_project_from_path(self, path):
-        ProjectService.load_project_from_path(self, path)
+        self.project_service.load_project_from_path( path)
 
     def save_project(self, force_save_as=False):
-        ProjectService.save_project(self, force_save_as)
-    
+        self.project_service.save_project(force_save_as)
+
     def show_about_dialog(self):
         show_app_about_dialog(self, APP_VERSION)
         
+    # -------------------- Gestion des exports -------------------- #
     def export_png(self):
-        """Délègue l'exportation PNG à l'ExportController."""
-        ExportController.export_png(self)
+        self.export_controller.export_png()
 
     def export_pdf(self):
-        """Délègue l'exportation PDF à l'ExportController."""
-        ExportController.export_pdf(self)
+        self.export_controller.export_pdf()
 
     def export_md(self):
-        """Délègue l'exportation Markdown à l'ExportController."""
-        ExportController.export_md(self)
+        self.export_controller.export_md()
 
     def auto_center_clicked(self):
         """Méthode appelée lors du clic sur le bouton Auto Center."""

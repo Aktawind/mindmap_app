@@ -9,20 +9,22 @@ from PyQt6.QtPrintSupport import QPrinter
 from graphics.items import NodeItem
 
 class ExportController:
-    @staticmethod
-    def export_png(app):
-        ws = app.current_workspace()
+    def __init__(self, app):
+        self.app = app
+
+    def export_png(self):
+        ws = self.app.current_workspace()
         if not ws: return
         default_name = "ma_mindmap.png"
         if ws.current_file_path:
             base = os.path.splitext(os.path.basename(ws.current_file_path))[0]
             default_name = f"{base}.png"
-        path, _ = QFileDialog.getSaveFileName(app, "Exporter PNG", default_name, "PNG (*.png)")
+        path, _ = QFileDialog.getSaveFileName(self.app, "Exporter PNG", default_name, "PNG (*.png)")
         if path:
             ws.scene.clearSelection()
             rect = ws.scene.itemsBoundingRect().adjusted(-50, -50, 50, 50)
             
-            ratio = app.devicePixelRatioF() if hasattr(app, 'devicePixelRatioF') else app.devicePixelRatio()
+            ratio = self.app.devicePixelRatioF() if hasattr(self.app, 'devicePixelRatioF') else self.app.devicePixelRatio()
             
             pixmap = QPixmap(int(rect.width() * ratio), int(rect.height() * ratio))
             pixmap.setDevicePixelRatio(ratio)
@@ -40,9 +42,8 @@ class ExportController:
             painter.end()
             pixmap.save(path, "PNG", 100)
 
-    @staticmethod
-    def export_pdf(app):
-        ws = app.current_workspace()
+    def export_pdf(self):
+        ws = self.app.current_workspace()
         if not ws: return
         
         default_name = "ma_mindmap.pdf"
@@ -50,7 +51,7 @@ class ExportController:
             base = os.path.splitext(os.path.basename(ws.current_file_path))[0]
             default_name = f"{base}.pdf"
             
-        path, _ = QFileDialog.getSaveFileName(app, "Exporter PDF Vectoriel", default_name, "PDF (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(self.app, "Exporter PDF Vectoriel", default_name, "PDF (*.pdf)")
         if path:
             ws.scene.clearSelection()
             
@@ -98,15 +99,15 @@ class ExportController:
             ws.scene.render(painter, target=target_rect, source=rect)
             painter.end()
 
-    def export_md(app):
-        ws = app.current_workspace()
+    def export_md(self):
+        ws = self.app.current_workspace()
         if not ws: return
         default_name = "ma_mindmap.md"
         if ws.current_file_path:
             base = os.path.splitext(os.path.basename(ws.current_file_path))[0]
             default_name = f"{base}.md"
             
-        path, _ = QFileDialog.getSaveFileName(app, "Exporter Markdown", default_name, "Markdown (*.md)")
+        path, _ = QFileDialog.getSaveFileName(self.app, "Exporter Markdown", default_name, "Markdown (*.md)")
         if path:
             nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
             root = next((n for n in nodes if n.node_id == 'root'), nodes[0] if nodes else None)
