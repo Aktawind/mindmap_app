@@ -1,9 +1,5 @@
-import json
-import os
-import sys
-from PyQt6.QtCore import QUrl, Qt, QObject
-from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QTextEdit, QWidget
+from PyQt6.QtCore import Qt, QObject
+from PyQt6.QtWidgets import QTextEdit
 from graphics.items import NodeItem, EdgeItem
 from ui.selection_manager import on_selection_changed
 
@@ -15,10 +11,12 @@ class EditingController(QObject):
         self.editor = None
 
     def start_inline_editing(self, item):
+        """Lance l'édition textuelle en place sur un NodeItem ou un EdgeItem."""
         ws = self.app.current_workspace()
-        if not ws: return
+        if not ws: 
+            return
         
-        # Sécurité : si une édition est déjà en cours, on la valide
+        # Sécurité : si une édition est déjà en cours, on la valide d'abord
         if self.editor:
             self.commit_edit()
 
@@ -26,16 +24,29 @@ class EditingController(QObject):
         self.editor = QTextEdit(ws.view)
         
         if isinstance(item, NodeItem):
-            clean_text = item.label.replace('🚨 ', '').replace('⏳ ', '').replace('✅ ', '')
+            # Nettoyage des badges de statut pour ne pas éditer les émojis bruts
+            clean_text = getattr(item, 'label', "").replace('🚨 ', '').replace('⏳ ', '').replace('✅ ', '')
             view_pos = ws.view.mapFromScene(item.pos())
             w = int(item.rect.width())
             h = max(int(item.rect.height()), 40)
             self.editor.setGeometry(view_pos.x() - w//2, view_pos.y() - h//2, w, h)
-        else:
-            clean_text = item.label
-            center = item.path().pointAtPercent(0.5)
-            view_pos = ws.view.mapFromScene(center)
+            
+        elif isinstance(item, EdgeItem):
+            clean_text = getattr(item, 'label', "")
+            # Sécurité au cas où la méthode path() ou pointAtPercent() échouerait
+            try:
+                center = item.path().pointAtPercent(0.5)
+                view_pos = ws.view.mapFromScene(center)
+            except Exception:
+                view_pos = ws.view.mapFromScene(item.pos()) if hasattr(item, 'pos') else ws.view.mapFromScene(ws.scene.sceneRect().center())
+                
             self.editor.setGeometry(view_pos.x() - 75, view_pos.y() - 15, 150, 40)
+        else:
+            # Sécurité : Type d'élément non pris en charge pour l'édition
+            self.editor.deleteLater()
+            self.editor = None
+            self.edit_item = None
+            return
 
         self.editor.setText(clean_text) 
         self.editor.setStyleSheet("border: 2px solid #60A5FA; background: white; font-family: Segoe UI; font-size: 11pt;")
@@ -47,66 +58,76 @@ class EditingController(QObject):
         self.editor.installEventFilter(self)
 
     def eventFilter(self, obj, event):
+        """Filtre les événements clavier et de focus pour l'éditeur de texte."""
         if obj == getattr(self, 'editor', None):
             if event.type() == event.Type.KeyPress:
+                # Entrée valide l'édition (sauf si Shift est enfoncé pour un saut de ligne)
                 if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
                     self.commit_edit()
                     return True
+                # Échap annule l'édition
                 if event.key() == Qt.Key.Key_Escape:
                     self.cancel_edit()
                     return True
             elif event.type() == event.Type.FocusOut:
+                # La perte de focus valide automatiquement
                 self.commit_edit()
                 return True
         return super().eventFilter(obj, event)
 
     def commit_edit(self):
-        if not self.editor or not self.edit_item: return
+        """Enregistre les modifications textuelles et ferme l'éditeur."""
+        if not self.editor or not self.edit_item: 
+            return
         
-        new_text = self.editor.toPlainText().strip()
+        # Copie locale des références pour éviter les conflits d'événements pendant la destruction
+        editor = self.editor
+        item = self.edit_item
+        
+        # Réinitialisation immédiate des variables d'état (Sécurité anti-boucle)
+        self.editor = None
+        self.edit_item = None
+        
+        new_text = editor.toPlainText().strip()
         changed = False
         
-        if isinstance(self.edit_item, NodeItem):
+        if isinstance(item, NodeItem):
             # Réinjecter le préfixe de statut s'il existait
             prefix = ""
-            if self.edit_item.status == "urgent": prefix = "🚨 "
-            elif self.edit_item.status == "progress": prefix = "⏳ "
-            elif self.edit_item.status == "done": prefix = "✅ "
+            status = getattr(item, 'status', None)
+            if status == "urgent": prefix = "🚨 "
+            elif status == "progress": prefix = "⏳ "
+            elif status == "done": prefix = "✅ "
             
             full_text = prefix + new_text
-            if new_text and self.edit_item.label != full_text:
-                self.edit_item.label = full_text
-                # Note : Utilisez update_geometry() ou recalculate_size() selon le nom exact dans votre NodeItem
-                if hasattr(self.edit_item, 'update_geometry'):
-                    self.edit_item.update_geometry()
-                elif hasattr(self.edit_item, 'recalculate_size'):
-                    self.edit_item.recalculate_size()
+            if new_text and item.label != full_text:
+                item.label = full_text
                 
-                if hasattr(self.edit_item, 'update_edges'):
-                    self.edit_item.update_edges()
+                if hasattr(item, 'update_geometry'):
+                    item.update_geometry()
+                elif hasattr(item, 'recalculate_size'):
+                    item.recalculate_size()
+                
+                if hasattr(item, 'update_edges'):
+                    item.update_edges()
                 changed = True
-        else:
-            if self.edit_item.label != new_text:
-                self.edit_item.label = new_text
-                self.edit_item.update()
+        elif isinstance(item, EdgeItem):
+            if item.label != new_text:
+                item.label = new_text
+                item.update()
                 changed = True
             
-        # Nettoyage propre
-        self.editor.removeEventFilter(self)
-        self.editor.deleteLater()
-        self.editor = None
+        # Nettoyage propre du widget
+        editor.removeEventFilter(self)
+        editor.deleteLater()
         
-        # Optionnel : Désélectionner le nœud après modification si désiré
-        # self.edit_item.setSelected(False)
-        self.edit_item = None
-
         if changed:
             self.app.save_state() 
             
-        on_selection_changed(self.app) # Force le rafraîchissement des barres d'outils
+        on_selection_changed(self.app)
 
     def cancel_edit(self):
-        """ Annule l'édition sans sauvegarder les modifications """
+        """Annule l'édition en cours sans enregistrer les modifications."""
         if self.editor:
             self.editor.removeEventFilter(self)
             self.editor.deleteLater()
@@ -115,9 +136,12 @@ class EditingController(QObject):
         on_selection_changed(self.app)
 
     def on_tab_pressed(self):
-        if self.editor is not None: return
-        ws = self.app.current_workspace() # CORRECTION : self.app
-        if not ws: return
+        """Gère l'appui sur la touche Tab pour insérer un nœud enfant s'il n'y a pas d'édition en cours."""
+        if self.editor is not None: 
+            return
+        ws = self.app.current_workspace()
+        if not ws: 
+            return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
             if hasattr(self, 'graph_controller'):
@@ -126,8 +150,11 @@ class EditingController(QObject):
                 self.app.graph_controller.add_child_node(sel[0])
 
     def edit_selected_edge(self): 
+        """Déclenche l'édition sur le lien (EdgeItem) sélectionné."""
         ws = self.app.current_workspace()
-        if not ws: return
+        if not ws: 
+            return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], EdgeItem):
-            self.editing_controller.start_inline_editing(sel[0])
+            # CORRECTION : Remplacement de self.editing_controller par self
+            self.start_inline_editing(sel[0])
