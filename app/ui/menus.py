@@ -1,6 +1,5 @@
 # ui/menus.py
 from PyQt6.QtGui import QKeySequence
-from controllers.tools_controller import ToolsController
 
 def create_menus(app_window):
     """Construit et ajoute les menus à la barre de menus de la fenêtre."""
@@ -8,16 +7,16 @@ def create_menus(app_window):
 
     # Menu Fichier
     file_menu = menu_bar.addMenu("Fichier")
-    file_menu.addAction("📄 Nouveau mindmap", lambda: app_window.new_project())
+    file_menu.addAction("📄 Nouveau mindmap", lambda: app_window.project_service.new_project())
     file_menu.addSeparator()
-    file_menu.addAction("📂 Ouvrir un mindmap", app_window.load_project)
-    file_menu.addAction("💾 Enregistrer", app_window.save_project).setShortcut("Ctrl+S")
-    file_menu.addAction("💾 Enregistrer sous...", lambda: app_window.save_project(force_save_as=True))
+    file_menu.addAction("📂 Ouvrir un mindmap", app_window.project_service.load_project)
+    file_menu.addAction("💾 Enregistrer", app_window.project_service.save_project).setShortcut("Ctrl+S")
+    file_menu.addAction("💾 Enregistrer sous...", lambda: app_window.project_service.save_project(force_save_as=True))
 
     file_menu.addSeparator()
     workspace_menu = file_menu.addMenu("Espaces de travail")
-    workspace_menu.addAction("📄 Nouvel espace de travail", app_window.new_workspace)
-    workspace_menu.addAction("📂 Ouvrir un espace de travail", app_window.load_workspace)
+    workspace_menu.addAction("📄 Nouvel espace de travail", app_window.workspace_controller.new_workspace)
+    workspace_menu.addAction("📂 Ouvrir un espace de travail", app_window.workspace_controller.load_workspace)
     
     # Menu Édition
     edit_menu = menu_bar.addMenu("Édition")
@@ -29,9 +28,9 @@ def create_menus(app_window):
     
     # Menu Exporter
     export_menu = menu_bar.addMenu("Exporter")
-    export_menu.addAction("Exporter en Image PNG", app_window.export_png)
-    export_menu.addAction("Exporter en PDF Vectoriel", app_window.export_pdf)
-    export_menu.addAction("Exporter en Markdown", app_window.export_md)
+    export_menu.addAction("Exporter en Image PNG", app_window.export_controller.export_png)
+    export_menu.addAction("Exporter en PDF Vectoriel", app_window.export_controller.export_pdf)
+    export_menu.addAction("Exporter en Markdown", app_window.export_controller.export_md)
 
     # Menu À propos
     about_menu = menu_bar.addMenu("À propos")

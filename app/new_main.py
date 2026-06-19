@@ -1,29 +1,11 @@
-# main.py
 import sys
 import os
-import json
-import math
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QGraphicsItem, 
-    QGraphicsPathItem, QFileDialog, 
-    QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-    QFrame, QComboBox, QTextEdit, QTabWidget, QInputDialog
-)
-from PyQt6.QtGui import (
-    QPainter, QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, 
-    QKeySequence, QDesktopServices, QPixmap, QShortcut, QPainterPathStroker, QIcon, QCloseEvent, QPolygonF, QPageLayout, QPageSize
-)
-from PyQt6.QtCore import Qt, QRectF, pyqtSignal, QObject, QUrl, QSettings, QTimer, QPointF, QMarginsF
-from PyQt6.QtPrintSupport import QPrinter
-
-
-
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QTabWidget
+from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import QSettings, QTimer
 
 from graphics.items import NodeItem, EdgeItem
-from signals import GraphicsSignals
 from graphics.scene import MindMapWorkspace
-
-from graphics.items import BRANCH_PALETTES
 
 from ui.menus import create_menus
 from ui.toolbar import create_toolbar
@@ -85,7 +67,7 @@ class MindMapApp(QMainWindow):
         last_workspace = self.settings.value("last_collection_path", "")
         
         if last_workspace and os.path.exists(last_workspace):
-            QTimer.singleShot(100, lambda: self.load_workspace(last_workspace))
+            QTimer.singleShot(100, lambda: self.workspace_controller.load_workspace(last_workspace))
         else:
             self.project_service.new_project()
 
@@ -154,7 +136,7 @@ class MindMapApp(QMainWindow):
     def load_last_project_on_startup(self):
         last_path = self.settings.value("last_project_path", "")
         if last_path and os.path.exists(last_path):
-            self.load_project_from_path(last_path)
+            self.project_service.load_project_from_path(last_path)
         else:
             self.new_project(force_empty=True)
             
@@ -180,7 +162,7 @@ class MindMapApp(QMainWindow):
                 QMessageBox.StandardButton.Yes
             )
             if reply == QMessageBox.StandardButton.Yes:
-                self.save_project()
+                self.project_service.save_project()
                 if ws.is_dirty: return False
             elif reply == QMessageBox.StandardButton.Cancel:
                 return False
@@ -215,7 +197,7 @@ class MindMapApp(QMainWindow):
                 if reply == QMessageBox.StandardButton.Yes:
                     # --- CRUCIAL : On force la sauvegarde immédiate ---
                     # On appelle ta méthode de sauvegarde (ajuste le nom si elle s'appelle autrement, ex: self.save_file)
-                    saved = self.save_project() 
+                    saved = self.project_service.save_project() 
                     
                     # Si la sauvegarde a été annulée par l'utilisateur dans le prompt de fichier, on stoppe la fermeture
                     if not saved:
@@ -244,7 +226,7 @@ class MindMapApp(QMainWindow):
             self.btn_snap.setChecked(getattr(ws.scene, 'snap_to_grid', False))
             self.btn_snap.blockSignals(False)
         on_selection_changed(self)
-        self.update_workspace_ui()
+        self.workspace_controller.update_workspace_ui()
 
     def update_title(self):
         ws = self.current_workspace()
@@ -273,46 +255,19 @@ class MindMapApp(QMainWindow):
         ws.scene.update()
         self.save_state()
 
-    
-
-    
-
-
-
     def save_state(self):
         """Enregistre l'état actuel de l'espace de travail pour l'historique."""
         ws = self.current_workspace()
         if not ws:
             return
-        current_state = self.get_state()
+        current_state = self.serializer.get_state()
         self.history_service.save_state(ws, current_state)
         
         # On s'assure que l'étoile se met à jour dès qu'un état est enregistré
         self.update_title()
 
-    def undo(self):
-        """Annule la dernière action."""
-        ws = self.current_workspace()
-        if not ws:
-            return
-        previous_state = self.history_service.undo(ws)
-        if previous_state:
-            self.apply_state(previous_state)
 
-    def redo(self):
-        """Rétablit la dernière action annulée."""
-        ws = self.current_workspace()
-        if not ws:
-            return
-        next_state = self.history_service.redo(ws)
-        if next_state:
-            self.apply_state(next_state)
 
-    def get_state(self):
-        return self.serializer.get_state()
-    
-    def apply_state(self, state_str):
-        self.serializer.apply_state(state_str)
     
     def sync_workspace_ui(self, ui_state):
         if not ui_state:
@@ -335,12 +290,6 @@ class MindMapApp(QMainWindow):
 
         on_selection_changed(self)
 
-    
-
-    
-
-    
-
     def on_shape_combo_changed(self, text):
         """Délègue le changement de forme géométrique au StyleController."""
         StyleController.on_shape_combo_changed(self, text)
@@ -358,121 +307,22 @@ class MindMapApp(QMainWindow):
             sel[0].update()
             self.save_state()
 
-    def on_bg_double_clicked(self, pos):
-        ws = self.current_workspace()
-        if not ws: return
-        nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
-        
-        x, y = pos.x(), pos.y()
-        if getattr(ws.scene, 'snap_to_grid', False):
-            x = round(x / 20) * 20
-            y = round(y / 20) * 20
-
-        if not nodes:
-            node = NodeItem('root', "Nouvelle idée centrale", x, y, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
-        else:
-            # Génération d'un ID unique basé sur le temps en millisecondes
-            import time
-            unique_id = f"node_{int(time.time() * 1000)}"
-            node = NodeItem(unique_id, "Nouvelle idée", x, y, bg='#FFF3E0', border='#FFB74D', font_color='#333333')
-            
-        node.signals.itemDoubleClicked.connect(self.editing_controller.start_inline_editing)
-        ws.scene.addItem(node)
-        self.save_state()
-
     
-
     
-    #-------------------- Gestion des nœuds et liens -------------------- #
-    def add_child_node(self, parent_node):
-        self.graph_controller.add_child_node(parent_node)
-        self.update_title()
-
-    def delete_selected(self):
-        self.graph_controller.delete_selected()
-        self.update_title()
-
-    def connect_selected_nodes(self):
-        self.graph_controller.connect_selected_nodes()
-        self.update_title()
-
-    #-------------------- Gestion du style -------------------- #
-    def change_color(self, bg_color, border_color):
-        self.style_controller.change_color(self, bg_color, border_color)
-
-    def toggle_bold(self):
-        self.style_controller.toggle_bold(self)
-
-    #-------------------- Gestion des fichiers et liens -------------------- #
-    def attach_file(self):
-        self.attachment_controller.attach_file()
-
-    def attach_url(self):
-        self.attachment_controller.attach_url()
-
-    def detach_links(self):
-        self.attachment_controller.detach_links()
-
-    def open_file(self):
-        self.attachment_controller.open_file()
-
-    # -------------------- Gestion de l'espace de travail -------------------- #
-    def update_workspace_ui(self):
-        self.workspace_controller.update_workspace_ui()
-
-    def auto_save_workspace(self):
-        self.workspace_controller.auto_save_workspace()
-
-    def new_workspace(self):
-        self.workspace_controller.new_workspace()
-
-    def load_workspace(self, path=None):
-        self.workspace_controller.load_workspace(path)
-
-    def add_current_tab_to_workspace(self):
-        self.workspace_controller.add_current_tab_to_workspace()
-
-    def remove_current_tab_from_workspace(self):
-        self.workspace_controller.remove_current_tab_from_workspace()
-
-    # -------------------- Gestion des projets -------------------- #
-    def new_project(self, force_empty=False):
-        self.project_service.new_project(force_empty)
-
-    def load_project(self):
-        self.project_service.load_project()
-
-    def load_project_from_path(self, path):
-        self.project_service.load_project_from_path( path)
-
-    def save_project(self, force_save_as=False):
-        self.project_service.save_project(force_save_as)
-
     def show_about_dialog(self):
         show_app_about_dialog(self, APP_VERSION)
+
+    def undo(self):
+        previous_state = self.history_service.undo(self.current_workspace())
+        if previous_state:
+            self.serializer.apply_state(previous_state)
+
+    def redo(self):
+        next_state = self.history_service.redo(self.current_workspace())
+        if next_state:
+            self.serializer.apply_state(next_state)
         
-    # -------------------- Gestion des exports -------------------- #
-    def export_png(self):
-        self.export_controller.export_png()
-
-    def export_pdf(self):
-        self.export_controller.export_pdf()
-
-    def export_md(self):
-        self.export_controller.export_md()
-
-    def auto_center_clicked(self):
-        """Méthode appelée lors du clic sur le bouton Auto Center."""
-        ws = self.current_workspace()
-        if ws:
-            # S'il y a un workspace ouvert, on lui demande de se centrer
-            if hasattr(ws, 'auto_center_root'):
-                ws.auto_center_root()
-            elif hasattr(self, 'center_on_graph'):
-                self.center_on_graph()
-
-
-
+    
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))

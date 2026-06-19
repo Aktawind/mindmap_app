@@ -34,7 +34,7 @@ def create_node_toolbar(app_window):
     btn_bold.setFont(QFont("Arial", 10, QFont.Weight.Bold))
     btn_bold.setFixedSize(38, 26)
     btn_bold.setStyleSheet("QPushButton { padding: 0px; margin: 0px; }")
-    btn_bold.clicked.connect(app_window.toggle_bold)
+    btn_bold.clicked.connect(app_window.style_controller.toggle_bold)
     nc_layout.addWidget(btn_bold)
     
     nc_layout.addWidget(ToolsController.create_separator(app_window))
@@ -62,27 +62,27 @@ def create_node_toolbar(app_window):
         btn = QPushButton()
         btn.setFixedSize(22, 22)
         btn.setStyleSheet(f"background: {color}; border: 2px solid {border}; border-radius: 11px;")
-        btn.clicked.connect(lambda checked, c=color, b=border: app_window.change_color(c, b))
+        btn.clicked.connect(lambda checked, c=color, b=border: app_window.style_controller.change_color(c, b))
         nc_layout.addWidget(btn)
         
     nc_layout.addWidget(ToolsController.create_separator(app_window))
     
     btn_attach = QPushButton("📎 Fichier")
-    btn_attach.clicked.connect(app_window.attach_file)
+    btn_attach.clicked.connect(app_window.attachment_controller.attach_file)
     nc_layout.addWidget(btn_attach)
     
     btn_url = QPushButton("🔗 URL")
-    btn_url.clicked.connect(app_window.attach_url)
+    btn_url.clicked.connect(app_window.attachment_controller.attach_url)
     nc_layout.addWidget(btn_url)
     
     app_window.btn_open = QPushButton("📂 Ouvrir")
     app_window.btn_open.setStyleSheet("background: #2D3748; color: white;")
-    app_window.btn_open.clicked.connect(app_window.open_file)
+    app_window.btn_open.clicked.connect(app_window.attachment_controller.open_file)
     nc_layout.addWidget(app_window.btn_open)
 
     app_window.btn_detach = QPushButton("❌ Dissocier")
     app_window.btn_detach.setStyleSheet("background: #FED7D7; color: #C53030;")
-    app_window.btn_detach.clicked.connect(app_window.detach_links)
+    app_window.btn_detach.clicked.connect(app_window.attachment_controller.detach_links)
     nc_layout.addWidget(app_window.btn_detach)
     
     style_layout.addWidget(app_window.node_controls)
@@ -112,7 +112,7 @@ def create_node_toolbar(app_window):
     cc_layout.setContentsMargins(0,0,0,0)
     btn_connect = QPushButton("Relier les nœuds")
     btn_connect.setStyleSheet("background: #EBF8FF; border: 1px solid #90CDF4; color: #2B6CB0; font-weight: bold;")
-    btn_connect.clicked.connect(app_window.connect_selected_nodes)
+    btn_connect.clicked.connect(app_window.graph_controller.connect_selected_nodes)
     cc_layout.addWidget(btn_connect)
     style_layout.addWidget(app_window.connect_controls)
     

@@ -8,7 +8,7 @@ def setup_app_shortcuts(app_window):
     app_window.shortcut_tab.activated.connect(app_window.editing_controller.on_tab_pressed)
     
     app_window.shortcut_del = QShortcut(QKeySequence(Qt.Key.Key_Delete), app_window)
-    app_window.shortcut_del.activated.connect(app_window.delete_selected)
+    app_window.shortcut_del.activated.connect(app_window.graph_controller.delete_selected)
     
     app_window.shortcut_bs = QShortcut(QKeySequence(Qt.Key.Key_Backspace), app_window)
-    app_window.shortcut_bs.activated.connect(app_window.delete_selected)
+    app_window.shortcut_bs.activated.connect(app_window.graph_controller.delete_selected)

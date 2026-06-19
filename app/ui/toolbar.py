@@ -42,8 +42,8 @@ def create_toolbar(app_window):
     workspace_toolbar.addSeparator()
     workspace_toolbar.addWidget(btn_add_to_coll)
     workspace_toolbar.addWidget(btn_remove_from_coll)
-    btn_add_to_coll.clicked.connect(app_window.add_current_tab_to_workspace)
-    btn_remove_from_coll.clicked.connect(app_window.remove_current_tab_from_workspace)
+    btn_add_to_coll.clicked.connect(app_window.workspace_controller.add_current_tab_to_workspace)
+    btn_remove_from_coll.clicked.connect(app_window.workspace_controller.remove_current_tab_from_workspace)
 
     app_window.header_right_widget = QWidget()
     hr_layout = QHBoxLayout(app_window.header_right_widget)
@@ -51,7 +51,7 @@ def create_toolbar(app_window):
 
     btn_save = QPushButton("💾")
     btn_save.setToolTip("Sauvegarder")
-    btn_save.clicked.connect(app_window.save_project) 
+    btn_save.clicked.connect(app_window.project_service.save_project) 
     workspace_toolbar.addWidget(btn_save)
 
     app_window.btn_snap = QPushButton(" 🧲 Aimant Grille ")
@@ -106,9 +106,9 @@ def create_toolbar(app_window):
         }
         QPushButton:hover { background-color: #2563EB; }
     """)
-    btn_center.clicked.connect(app_window.auto_center_clicked)
+    btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
     workspace_toolbar.addWidget(btn_center)
 
     app_window.add_tab_button = QPushButton("➕ Ajouter un onglet")
-    app_window.add_tab_button.clicked.connect(app_window.new_project)
+    app_window.add_tab_button.clicked.connect(app_window.project_service.new_project)
     app_window.tabs.setCornerWidget(app_window.add_tab_button, Qt.Corner.TopRightCorner)

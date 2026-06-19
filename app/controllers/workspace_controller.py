@@ -26,7 +26,7 @@ class WorkspaceController:
         finally:
             self.app.tabs.blockSignals(False)
 
-        self.app.new_project() # Ouvre un premier onglet vierge
+        self.app.project_service.new_project() # Ouvre un premier onglet vierge
         self.auto_save_workspace()
         self.app.update_title()
 
@@ -84,13 +84,12 @@ class WorkspaceController:
             # Charger uniquement les fichiers JSON valides sur le disque
             for f_path in file_paths:
                 if os.path.exists(f_path):
-                    # CORRECTION : load_project_from_path appartient à self.app
-                    self.app.load_project_from_path(f_path)
+                    self.app.project_service.load_project_from_path(f_path)
                     self.workspace_files.append(f_path)
 
             # Si le fichier .mindy était vide, on crée un onglet vierge par défaut
             if not self.workspace_files:
-                self.app.new_project()
+                self.app.project_service.new_project()
 
             self.update_workspace_ui()
             self.app.update_title()
@@ -116,7 +115,6 @@ class WorkspaceController:
             return
 
         self.workspace_files.append(ws.current_file_path)
-        # CORRECTION : Appel direct à self.auto_save_workspace() au lieu de self.app
         self.auto_save_workspace() 
 
     def remove_current_tab_from_workspace(self):
@@ -130,7 +128,6 @@ class WorkspaceController:
 
         if ws.current_file_path in self.workspace_files:
             self.workspace_files.remove(ws.current_file_path)
-            # CORRECTION : Appel direct à self.auto_save_workspace() au lieu de self.app
             self.auto_save_workspace() 
         else:
             QMessageBox.warning(self.app, "Action impossible", "Ce fichier ne fait pas partie de la workspace.")

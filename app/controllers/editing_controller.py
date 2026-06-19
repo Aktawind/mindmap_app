@@ -120,11 +120,10 @@ class EditingController(QObject):
         if not ws: return
         sel = ws.scene.selectedItems()
         if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            # CORRECTION : Appel de la méthode sur soi-même si elle existe dans ce contrôleur
-            if hasattr(self, 'add_child_node'):
-                self.add_child_node(sel[0])
-            elif hasattr(self.app, 'add_child_node'):
-                self.app.add_child_node(sel[0])
+            if hasattr(self, 'graph_controller'):
+                self.graph_controller.add_child_node(sel[0])
+            elif hasattr(self.app, 'graph_controller'):
+                self.app.graph_controller.add_child_node(sel[0])
 
     def edit_selected_edge(self): 
         ws = self.app.current_workspace()

@@ -48,7 +48,7 @@ class ToolsController:
                         data = json.load(f)
                         
                     state_str = data["content"] if "content" in data else json.dumps(data)
-                    self.app.apply_state(state_str)
+                    self.app.serializer.apply_state(state_str)
                     
                     ws.undo_stack.clear()
                     if hasattr(ws, 'redo_stack'):
@@ -113,3 +113,49 @@ class ToolsController:
         
         ws.scene.clearSelection()
         new_node.setSelected(True)
+
+    def auto_center_clicked(self):
+        """Méthode appelée lors du clic sur le bouton Auto Center."""
+        ws = self.app.current_workspace()
+        if ws:
+            # 1. On cherche d'abord le nœud racine ('root') dans la scène
+            all_items = ws.scene.items()
+            root_node = next((item for item in all_items if hasattr(item, 'node_id') and item.node_id == 'root'), None)
+            
+            if root_node:
+                # Si le nœud root existe, on demande à la vue (QGraphicsView) de se centrer pile dessus
+                ws.view.centerOn(root_node)
+            else:
+                # Repli de sécurité : si pas de root, on cadre sur toute la scène
+                ws.view.centerOn(0, 0)
+
+    def on_bg_double_clicked(self, pos):
+        # On récupère le workspace via self.app
+        ws = self.app.current_workspace()
+        if not ws: return
+        
+        nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+        
+        x, y = pos.x(), pos.y()
+        if getattr(ws.scene, 'snap_to_grid', False):
+            x = round(x / 20) * 20
+            y = round(y / 20) * 20
+
+        if not nodes:
+            node = NodeItem('root', "Nouvelle idée centrale", x, y, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
+        else:
+            # Génération d'un ID unique basé sur le temps en millisecondes
+            import time
+            unique_id = f"node_{int(time.time() * 1000)}"
+            node = NodeItem(unique_id, "Nouvelle idée", x, y, bg='#FFF3E0', border='#FFB74D', font_color='#333333')
+            
+        if hasattr(self.app, 'editing_controller'):
+            node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+        
+        ws.scene.addItem(node)
+        
+        # Sauvegarde du nouvel état pour le Ctrl+Z via l'application principale
+        if hasattr(self.app, 'save_state'):
+            self.app.save_state()
+
+    

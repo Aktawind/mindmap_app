@@ -44,8 +44,8 @@ class StyleController:
                 # Appel récursif sur le nœud destination (l'enfant)
                 self.apply_color_downward(edge.dest_node, bg_color, border_color)
 
-    def toggle_bold(self, app):
-        ws = app.current_workspace()
+    def toggle_bold(self):
+        ws = self.app.current_workspace()
         if not ws: return
         
         sel = ws.scene.selectedItems()

@@ -16,7 +16,7 @@ class ProjectService:
         root = NodeItem('root', 'Nouveau noeud', 0, 0, bg='#60A5FA', border='#3B82F6', font_color='#ffffff')
         
         # CORRECTION : Ces méthodes de callback se trouvent sur self.app
-        root.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+        root.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
         
         ws.scene.addItem(root)
         
@@ -51,7 +51,7 @@ class ProjectService:
         self.app.tabs.setCurrentWidget(ws)
         
         # 3. On applique les données de la mindmap et on initialise son historique
-        self.app.apply_state(state_str)
+        self.app.serializer.apply_state(state_str)
         
         if hasattr(ws, 'undo_stack'):
             ws.undo_stack.append(state_str)
@@ -92,8 +92,7 @@ class ProjectService:
             
         try:
             with open(ws.current_file_path, 'w', encoding='utf-8') as f:
-                # CORRECTION : get_state() est une méthode de l'application principale
-                json.dump(self.app.get_state(), f, indent=2, ensure_ascii=False)
+                json.dump(self.app.serializer.get_state(), f, indent=2, ensure_ascii=False)
                 
             ws.is_dirty = False
             self.app.settings.setValue("last_project_path", ws.current_file_path)

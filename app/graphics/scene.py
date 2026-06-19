@@ -162,7 +162,7 @@ class MindMapWorkspace(QWidget):
         self.scene.setSceneRect(-5000, -5000, 10000, 10000)
 
         self.scene.selectionChanged.connect(lambda: on_selection_changed(self.main_app))
-        self.scene.signals.itemDoubleClicked.connect(self.main_app.on_bg_double_clicked)
+        self.scene.signals.itemDoubleClicked.connect(self.main_app.tools_controller.on_bg_double_clicked)
         
         self.view = MindMapControlView(self.scene, self)
         
