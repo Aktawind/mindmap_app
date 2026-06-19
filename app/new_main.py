@@ -29,6 +29,7 @@ from ui.toolbar import create_toolbar
 from ui.shortcuts import setup_app_shortcuts
 from ui.about_dialog import show_app_about_dialog
 from ui.node_toolbar import create_node_toolbar
+from ui.selection_manager import on_selection_changed
 
 from services.serializer import MindMapSerializer
 from services.history_service import HistoryService
@@ -239,7 +240,7 @@ class MindMapApp(QMainWindow):
             self.btn_snap.blockSignals(True)
             self.btn_snap.setChecked(getattr(ws.scene, 'snap_to_grid', False))
             self.btn_snap.blockSignals(False)
-        self.on_selection_changed()
+        on_selection_changed(self)
         self.update_workspace_ui()
 
     def update_title(self):
@@ -329,7 +330,7 @@ class MindMapApp(QMainWindow):
         self.btn_toggle_routing.setChecked(is_curved)
         self.btn_toggle_routing.blockSignals(False)
 
-        self.on_selection_changed()
+        on_selection_changed(self)
 
     
 
@@ -384,48 +385,7 @@ class MindMapApp(QMainWindow):
         ws.scene.clearSelection()
         new_node.setSelected(True)
 
-    def on_selection_changed(self):
-        ws = self.current_workspace()
-        if not ws: 
-            self.style_bar.hide()
-            return
-            
-        sel = ws.scene.selectedItems()
-        nodes = [item for item in sel if isinstance(item, NodeItem)]
-        if len(sel) >= 1:
-            self.style_bar.show()
-            self.connect_controls.hide()
-            if isinstance(sel[0], NodeItem):
-                self.node_controls.show()
-                self.edge_controls.hide()
-                has_links = bool(sel[0].file_path or sel[0].url_link)
-                self.btn_open.setVisible(has_links)
-                self.btn_detach.setVisible(has_links)
-                
-                self.shape_combo.blockSignals(True)
-                self.shape_combo.setCurrentIndex(self.shape_combo.findData(sel[0].shape_type))
-                self.shape_combo.blockSignals(False)
-                
-                self.status_combo.blockSignals(True)
-                self.status_combo.setCurrentIndex(self.status_combo.findData(sel[0].status))
-                self.status_combo.blockSignals(False)
-                
-            elif isinstance(sel[0], EdgeItem):
-                self.node_controls.hide()
-                self.edge_controls.show()
-                
-                self.arrow_combo.blockSignals(True)
-                self.arrow_combo.setCurrentIndex(self.arrow_combo.findData(sel[0].arrow_dir))
-                self.arrow_combo.blockSignals(False)
-            self.reposition_style_bar()
-        elif len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
-            self.style_bar.show()
-            self.node_controls.hide()
-            self.edge_controls.hide()
-            self.connect_controls.show()
-            self.reposition_style_bar()
-        else:
-            self.style_bar.hide()
+    
 
     def on_shape_combo_changed(self, text):
         """Délègue le changement de forme géométrique au StyleController."""

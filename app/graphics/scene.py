@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPainter
 from signals import GraphicsSignals
 from graphics.items import NodeItem, EdgeItem
+from ui.selection_manager import on_selection_changed
 
 class MindMapScene(QGraphicsScene):
     def __init__(self, parent=None):
@@ -159,8 +160,8 @@ class MindMapWorkspace(QWidget):
         self.scene = MindMapScene(self)
         self.scene.parent_workspace = self
         self.scene.setSceneRect(-5000, -5000, 10000, 10000)
-        
-        self.scene.selectionChanged.connect(self.main_app.on_selection_changed)
+
+        self.scene.selectionChanged.connect(lambda: on_selection_changed(self.main_app))
         self.scene.signals.itemDoubleClicked.connect(self.main_app.on_bg_double_clicked)
         
         self.view = MindMapControlView(self.scene, self)

@@ -4,6 +4,7 @@ from PyQt6.QtCore import QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 from graphics.items import NodeItem
+from ui.selection_manager import on_selection_changed
 
 class AttachmentController:
     def __init__(self, app):
@@ -77,7 +78,7 @@ class AttachmentController:
                 relative_dest = self.copy_file_to_attachments(node.node_id, path)
                 node.file_path = relative_dest
                 node.recalculate_size()
-                self.app.on_selection_changed()
+                on_selection_changed(self.app)
                 node.update()
                 self.app.save_state()
 
@@ -91,7 +92,7 @@ class AttachmentController:
             if ok and url.strip():
                 node.url_link = url.strip()
                 node.recalculate_size()
-                self.app.on_selection_changed()
+                on_selection_changed(self.app)
                 node.update()
                 self.app.save_state()
 
@@ -117,7 +118,7 @@ class AttachmentController:
             
             # 3. Rafraîchissement visuel et sauvegarde de l'état
             node.recalculate_size()
-            self.app.on_selection_changed()
+            on_selection_changed(self.app)
             node.update()
             self.app.save_state()
 

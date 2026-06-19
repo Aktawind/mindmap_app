@@ -1,5 +1,6 @@
 import json
 from graphics.items import NodeItem, EdgeItem
+from ui.selection_manager import on_selection_changed
 
 class MindMapSerializer:
     def __init__(self, app):
@@ -181,4 +182,4 @@ class MindMapSerializer:
                 ws.scene.addItem(edge)
 
         ws.is_applying_state = False
-        self.app.on_selection_changed()
+        on_selection_changed(self.app)
