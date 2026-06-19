@@ -139,8 +139,7 @@ class MindMapSerializer:
                 is_bold=data.get("is_bold", False), status=status
             )
             node.border_width = data.get("border_width", 1)
-            # CORRECTION : start_inline_editing appartient à self.app
-            node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+            node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
             ws.scene.addItem(node)
             created_nodes[node_id] = node
 
@@ -148,8 +147,7 @@ class MindMapSerializer:
                 edge_counter[0] += 1
                 edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
                 edge = EdgeItem(f"edge_{edge_counter[0]}", parent_node, node, data.get("edge_label", ""), color=edge_color, arrow_dir=data.get("edge_arrow_dir", "none"))
-                # CORRECTION : idem ici
-                edge.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+                edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 ws.scene.addItem(edge)
 
             for child_data in data.get("children", []):
@@ -168,7 +166,7 @@ class MindMapSerializer:
                 is_bold=orphan.get("is_bold", False), status=orphan.get("status", "none")
             )
             node.border_width = orphan.get("border_width", 1)
-            node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+            node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
             ws.scene.addItem(node)
             created_nodes[node_id] = node
 
@@ -178,7 +176,7 @@ class MindMapSerializer:
             if source and dest:
                 edge_counter[0] += 1
                 edge = EdgeItem(f"edge_{edge_counter[0]}", source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"), arrow_dir=cl.get("arrow_dir", "none"))
-                edge.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+                edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 ws.scene.addItem(edge)
 
         ws.is_applying_state = False

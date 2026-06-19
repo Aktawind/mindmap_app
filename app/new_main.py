@@ -18,6 +18,7 @@ from PyQt6.QtPrintSupport import QPrinter
 
 
 
+
 from graphics.items import NodeItem, EdgeItem
 from signals import GraphicsSignals
 from graphics.scene import MindMapWorkspace
@@ -35,6 +36,7 @@ from services.serializer import MindMapSerializer
 from services.history_service import HistoryService
 from services.project_service import ProjectService
 
+from controllers.editing_controller import EditingController
 from controllers.graph_controller import GraphController
 from controllers.style_controller import StyleController
 from controllers.attachment_controller import AttachmentController
@@ -65,11 +67,12 @@ class MindMapApp(QMainWindow):
         self.export_controller = ExportController(self)
         self.workspace_controller = WorkspaceController(self)
         self.tools_controller = ToolsController(self)
+        self.editing_controller = EditingController(self)
 
         self.project_service = ProjectService(self)
         self.history_service = HistoryService(self)
         self.serializer = MindMapSerializer(self)
-        
+      
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
@@ -334,56 +337,7 @@ class MindMapApp(QMainWindow):
 
     
 
-    def copy_selected(self):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            src = sel[0]
-            self._clipboard_node = {
-                "label": src.label,
-                "shape": src.shape_type,
-                "bg": src.bg_color.name(),
-                "border": src.border_color.name(),
-                "font_color": src.font_color.name(),
-                "is_bold": src.is_bold,
-                "status": src.status,
-                "notes": getattr(src, 'notes', ''),
-                "file_path": src.file_path,
-                "url_link": src.url_link
-            }
-
-    def paste_node(self):
-        ws = self.current_workspace()
-        if not ws or not self._clipboard_node: return
-        
-        data = self._clipboard_node
-        new_id = f"node_paste_{len(ws.scene.items())}"
-        
-        center = ws.view.mapToScene(ws.view.viewport().rect().center())
-        x, y = center.x(), center.y()
-        
-        if getattr(ws.scene, 'snap_to_grid', False):
-            x = round(x / 20) * 20
-            y = round(y / 20) * 20
-
-        new_node = NodeItem(
-            new_id, data["label"], x, y,
-            shape=data["shape"], bg=data["bg"], border=data["border"], font_color=data["font_color"]
-        )
-        new_node.is_bold = data["is_bold"]
-        new_node.status = data["status"]
-        if hasattr(new_node, 'notes'): new_node.notes = data["notes"]
-        new_node.file_path = data["file_path"]
-        new_node.url_link = data["url_link"]
-        
-        new_node.signals.itemDoubleClicked.connect(self.start_inline_editing)
-        
-        ws.scene.addItem(new_node)
-        self.save_state()
-        
-        ws.scene.clearSelection()
-        new_node.setSelected(True)
+    
 
     
 
@@ -422,88 +376,13 @@ class MindMapApp(QMainWindow):
             unique_id = f"node_{int(time.time() * 1000)}"
             node = NodeItem(unique_id, "Nouvelle idée", x, y, bg='#FFF3E0', border='#FFB74D', font_color='#333333')
             
-        node.signals.itemDoubleClicked.connect(self.start_inline_editing)
+        node.signals.itemDoubleClicked.connect(self.editing_controller.start_inline_editing)
         ws.scene.addItem(node)
         self.save_state()
 
-    def edit_selected_edge(self):
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], EdgeItem):
-            self.start_inline_editing(sel[0])
+    
 
-    def start_inline_editing(self, item):
-        ws = self.current_workspace()
-        if not ws: return
-        self.edit_item = item
-        self.editor = QTextEdit(ws.view)
-        
-        if isinstance(item, NodeItem):
-            clean_text = item.label.replace('🚨 ', '').replace('⏳ ', '').replace('✅ ', '')
-            view_pos = ws.view.mapFromScene(item.pos())
-            w = int(item.rect.width())
-            h = max(int(item.rect.height()), 40)
-            self.editor.setGeometry(view_pos.x() - w//2, view_pos.y() - h//2, w, h)
-        else:
-            clean_text = item.label
-            center = item.path().pointAtPercent(0.5)
-            view_pos = ws.view.mapFromScene(center)
-            self.editor.setGeometry(view_pos.x() - 75, view_pos.y() - 15, 150, 40)
-
-        self.editor.setText(clean_text)
-        self.editor.setStyleSheet("border: 2px solid #60A5FA; background: white; font-family: Segoe UI; font-size: 11pt;")
-        self.editor.selectAll()
-        self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter) 
-        self.editor.show()
-        self.editor.setFocus()
-        self.editor.installEventFilter(self)
-
-    def eventFilter(self, obj, event):
-        if obj == getattr(self, 'editor', None):
-            if event.type() == event.Type.KeyPress:
-                if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
-                    self.commit_edit()
-                    return True
-                if event.key() == Qt.Key.Key_Escape:
-                    self.editor.deleteLater()
-                    self.editor = None
-                    return True
-            elif event.type() == event.Type.FocusOut:
-                self.commit_edit()
-                return True
-        return super().eventFilter(obj, event)
-
-    def commit_edit(self):
-        if not hasattr(self, 'editor') or self.editor is None: return
-        new_text = self.editor.toPlainText().strip()
-        changed = False
-        
-        if isinstance(self.edit_item, NodeItem):
-            if new_text and self.edit_item.label != new_text:
-                self.edit_item.label = new_text
-                self.edit_item.recalculate_size()
-                self.edit_item.update_edges()
-                changed = True
-        else:
-            if self.edit_item.label != new_text:
-                self.edit_item.label = new_text
-                self.edit_item.update()
-                changed = True
-            
-        self.editor.deleteLater()
-        self.editor = None
-        if changed:
-            self.save_state()
-
-    def on_tab_pressed(self):
-        if hasattr(self, 'editor') and self.editor is not None: return
-        ws = self.current_workspace()
-        if not ws: return
-        sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            self.add_child_node(sel[0])
-
+    
     #-------------------- Gestion des nœuds et liens -------------------- #
     def add_child_node(self, parent_node):
         self.graph_controller.add_child_node(parent_node)

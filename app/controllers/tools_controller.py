@@ -11,6 +11,7 @@ class ToolsController:
     def __init__(self, app):
         self.app = app
 
+    @staticmethod
     def resource_path(relative_path):
         """Calcule le chemin absolu vers les ressources (gère l'exécutable PyInstaller)."""
         try:
@@ -20,6 +21,7 @@ class ToolsController:
             base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base_path, relative_path)
     
+    @staticmethod
     def create_separator(parent_toolbar):
         """Crée un séparateur visuel personnalisé pour la barre d'outils."""
         sep = QWidget(parent_toolbar)
@@ -60,3 +62,54 @@ class ToolsController:
                     QMessageBox.critical(self.app, "Erreur", f"Erreur lors de la lecture du template :\n{str(e)}")
             else:
                 QMessageBox.warning(self.app, "Erreur", f"Fichier template introuvable :\n{template_path}")
+
+    def copy_selected(self):
+        ws = self.app.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            src = sel[0]
+            self._clipboard_node = {
+                "label": src.label,
+                "shape": src.shape_type,
+                "bg": src.bg_color.name(),
+                "border": src.border_color.name(),
+                "font_color": src.font_color.name(),
+                "is_bold": src.is_bold,
+                "status": src.status,
+                "notes": getattr(src, 'notes', ''),
+                "file_path": src.file_path,
+                "url_link": src.url_link
+            }
+
+    def paste_node(self):
+        ws = self.app.current_workspace()
+        if not ws or not self._clipboard_node: return
+        
+        data = self._clipboard_node
+        new_id = f"node_paste_{len(ws.scene.items())}"
+        
+        center = ws.view.mapToScene(ws.view.viewport().rect().center())
+        x, y = center.x(), center.y()
+        
+        if getattr(ws.scene, 'snap_to_grid', False):
+            x = round(x / 20) * 20
+            y = round(y / 20) * 20
+
+        new_node = NodeItem(
+            new_id, data["label"], x, y,
+            shape=data["shape"], bg=data["bg"], border=data["border"], font_color=data["font_color"]
+        )
+        new_node.is_bold = data["is_bold"]
+        new_node.status = data["status"]
+        if hasattr(new_node, 'notes'): new_node.notes = data["notes"]
+        new_node.file_path = data["file_path"]
+        new_node.url_link = data["url_link"]
+        
+        new_node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+        
+        ws.scene.addItem(new_node)
+        self.app.save_state()
+        
+        ws.scene.clearSelection()
+        new_node.setSelected(True)

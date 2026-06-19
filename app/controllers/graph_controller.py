@@ -27,10 +27,10 @@ class GraphController:
             if p_edge: edge_col = p_edge.color.name()
 
         new_node = NodeItem(new_id, "Nouvelle sous-idée", t_x, t_y, shape='box', bg=bg, border=border, font_color=text_col)
-        new_node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+        new_node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
         
         edge = EdgeItem(f"edge_{len(ws.scene.items())}", parent_node, new_node, "", color=edge_col)
-        edge.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+        edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
         
         ws.scene.addItem(new_node)
         ws.scene.addItem(edge)
@@ -38,7 +38,7 @@ class GraphController:
         
         ws.scene.clearSelection()
         new_node.setSelected(True)
-        self.app.start_inline_editing(new_node)
+        self.app.editing_controller.start_inline_editing(new_node)
 
     def calculate_smart_position(self, parent_node):
         ws = self.app.current_workspace()
@@ -114,7 +114,7 @@ class GraphController:
             if not already_linked:
                 link_color = node1.border_color
                 edge = EdgeItem(f"edge_{len(ws.scene.items())}", node1, node2, "", color=link_color)
-                edge.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+                edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 ws.scene.addItem(edge)
                 ws.scene.clearSelection()
                 edge.setSelected(True)

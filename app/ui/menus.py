@@ -1,5 +1,6 @@
 # ui/menus.py
 from PyQt6.QtGui import QKeySequence
+from controllers.tools_controller import ToolsController
 
 def create_menus(app_window):
     """Construit et ajoute les menus à la barre de menus de la fenêtre."""
@@ -23,8 +24,8 @@ def create_menus(app_window):
     edit_menu.addAction("↩️ Annuler", app_window.undo).setShortcut(QKeySequence("Ctrl+Z"))
     edit_menu.addAction("↪️ Rétablir", app_window.redo).setShortcut(QKeySequence("Ctrl+Y"))
     edit_menu.addSeparator()
-    edit_menu.addAction("📋 Copier l'élément", app_window.copy_selected).setShortcut(QKeySequence("Ctrl+C"))
-    edit_menu.addAction("📥 Coller l'élément", app_window.paste_node).setShortcut(QKeySequence("Ctrl+V"))
+    edit_menu.addAction("📋 Copier l'élément", app_window.tools_controller.copy_selected).setShortcut(QKeySequence("Ctrl+C"))
+    edit_menu.addAction("📥 Coller l'élément", app_window.tools_controller.paste_node).setShortcut(QKeySequence("Ctrl+V"))
     
     # Menu Exporter
     export_menu = menu_bar.addMenu("Exporter")

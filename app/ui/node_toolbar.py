@@ -92,7 +92,7 @@ def create_node_toolbar(app_window):
     ec_layout.setContentsMargins(0,0,0,0)
     
     btn_edit_edge = QPushButton("Texte de branche")
-    btn_edit_edge.clicked.connect(app_window.edit_selected_edge)
+    btn_edit_edge.clicked.connect(app_window.editing_controller.edit_selected_edge)
     ec_layout.addWidget(btn_edit_edge)
     
     ec_layout.addWidget(ToolsController.create_separator(app_window))
