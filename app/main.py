@@ -70,11 +70,8 @@ class MindMapApp(QMainWindow):
         self.project_service.load_last_project_on_startup()
       
         last_workspace = self.settings.value("last_collection_path", "")
-        
         if last_workspace and os.path.exists(last_workspace):
             QTimer.singleShot(100, lambda: self.workspace_controller.load_workspace(last_workspace))
-        else:
-            self.project_service.new_project()
 
     def current_workspace(self) -> MindMapWorkspace:
         try:

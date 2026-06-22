@@ -10,7 +10,6 @@ from graphics.items import NodeItem
 class ToolsController:
     def __init__(self, app):
         self.app = app
-        # 🚨 FIX : Initialisation obligatoire du presse-papier interne pour éviter le AttributeError
         self._clipboard_node = None
 
     @staticmethod
@@ -32,17 +31,28 @@ class ToolsController:
         return sep
        
     def apply_template(self, index):
-        """Applique un fichier template JSON à la mind map courante."""
+        """Demande confirmation et génère le template dans un nouvel onglet dédié."""
         if index == 0: return
-        ws = self.app.current_workspace()
-        if not ws: return
         
         if not hasattr(self.app, 'template_combo') or self.app.template_combo is None: return
         
+        # Récupération des métadonnées du template sélectionné
+        template_name = self.app.template_combo.itemText(index)
         filename = self.app.template_combo.itemData(index)
+        
+        # Remet immédiatement l'index à 0 pour la Toolbar
         self.app.template_combo.setCurrentIndex(0)
         
-        if QMessageBox.question(self.app, "Template", "Charger ce template remplacera la mind map de l'onglet actuel. Continuer ?") == QMessageBox.StandardButton.Yes:
+        # 🟢 NOUVEAU COMPORTEMENT : Demande de création d'un nouvel onglet
+        msg = f"Voulez-vous ouvrir le template '{template_name}' dans un nouvel onglet ?"
+        reply = QMessageBox.question(
+            self.app, 
+            "Ouvrir un Template", 
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
             template_path = ToolsController.resource_path(os.path.join("templates", filename))
             
             if os.path.exists(template_path):
@@ -52,22 +62,46 @@ class ToolsController:
                         
                     state_str = data["content"] if "content" in data else json.dumps(data)
                     
+                    # 1. Génération du nouvel onglet via le ProjectService
+                    if hasattr(self.app, 'project_service') and self.app.project_service:
+                        self.app.project_service.new_project()
+                    
+                    # 2. Récupération du workspace de ce nouvel onglet créé
+                    ws = self.app.current_workspace()
+                    if not ws: return
+                    
+                    # Renomme l'onglet temporairement avec le nom du template
+                    if hasattr(self.app, 'tabs') and self.app.tabs:
+                        current_idx = self.app.tabs.currentIndex()
+                        self.app.tabs.setTabText(current_idx, f"[{template_name}]")
+                    
+                    # 3. Application du template sur le nouvel onglet propre
                     if hasattr(self.app, 'serializer') and self.app.serializer:
+                        # Nettoie d'abord le nœud par défaut généré par new_project
+                        ws.scene.clear() 
                         self.app.serializer.apply_state(state_str)
                     
-                    # Nettoyage et initialisation sécurisée de l'historique d'annulation
+                    # Réinitialisation de l'historique sur le nouvel onglet
                     if hasattr(ws, 'undo_stack'): ws.undo_stack.clear()
                     if hasattr(ws, 'redo_stack'): ws.redo_stack.clear()
                     
-                    ws.undo_stack.append(state_str)
+                    # Conversion de state_str en dict si ton undo_stack attend un dictionnaire 
+                    # (vu dans ton ProjectService précédent)
+                    try:
+                        state_dict = json.loads(state_str) if isinstance(state_str, str) else state_str
+                        ws.undo_stack.append(state_dict)
+                    except Exception:
+                        ws.undo_stack.append(state_str)
+                        
                     ws.is_dirty = True
                     
                     if hasattr(self.app, 'tabs_controller'):
                         self.app.tabs_controller.update_title()
                     if hasattr(self.app, 'workspace_controller'):
                         self.app.workspace_controller.center_on_graph()
+                        
                 except Exception as e:
-                    QMessageBox.critical(self.app, "Erreur", f"Erreur lors de la lecture du template :\n{str(e)}")
+                    QMessageBox.critical(self.app, "Erreur", f"Erreur lors du chargement du template :\n{str(e)}")
             else:
                 QMessageBox.warning(self.app, "Erreur", f"Fichier template introuvable :\n{template_path}")
 
