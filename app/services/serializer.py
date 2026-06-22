@@ -45,7 +45,7 @@ class MindMapSerializer:
                 "border_width": getattr(node, 'border_width', 1),
                 "is_bold": getattr(node, 'is_bold', False),
                 "status": getattr(node, 'status', 'none'),
-                "file_path": getattr(node, 'file_path', None),
+                "attachments": getattr(node, 'attachments', []),
                 "url_link": getattr(node, 'url_link', None),
                 "children": []
             }
@@ -91,7 +91,7 @@ class MindMapSerializer:
                     "border_width": getattr(node, 'border_width', 1),
                     "is_bold": getattr(node, 'is_bold', False),
                     "status": getattr(node, 'status', 'none'),
-                    "file_path": getattr(node, 'file_path', None),
+                    "attachments": getattr(node, 'attachments', []),
                     "url_link": getattr(node, 'url_link', None)
                 })
 
@@ -188,6 +188,21 @@ class MindMapSerializer:
                 is_bold=data.get("is_bold", False), status=status
             )
             node.border_width = data.get("border_width", 1)
+
+            if "attachments" in data:
+                node.attachments = data["attachments"]
+            else:
+                node.attachments = []
+                # Fallback : Si c'est un vieux fichier avec l'ancienne clé unique unique file_path
+                old_path = data.get("file_path")
+                if old_path:
+                    node.attachments.append({
+                        "name": os.path.basename(old_path),
+                        "path": old_path,
+                        "is_local_copy": True
+                    })
+            
+            node.recalculate_size()
             
             if hasattr(self.app, 'editing_controller'):
                 node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
@@ -234,6 +249,20 @@ class MindMapSerializer:
                 is_bold=orphan.get("is_bold", False), status=orphan.get("status", "none")
             )
             node.border_width = orphan.get("border_width", 1)
+
+            if "attachments" in orphan:
+                node.attachments = orphan["attachments"]
+            else:
+                node.attachments = []
+                old_path = orphan.get("file_path")
+                if old_path:
+                    node.attachments.append({
+                        "name": os.path.basename(old_path),
+                        "path": old_path,
+                        "is_local_copy": True
+                    })
+                    
+            node.recalculate_size()
             
             if hasattr(self.app, 'editing_controller'):
                 node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)

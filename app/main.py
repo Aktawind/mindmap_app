@@ -3,6 +3,7 @@ import os
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
 from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtCore import QSettings, QTimer
+from PyQt6 import sip
 
 from graphics.scene import MindMapWorkspace
 
@@ -33,13 +34,19 @@ APP_VERSION  = "1.0.7"
 class MindMapApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Mindy {APP_VERSION }")
+        self.setWindowTitle(f"Mindy {APP_VERSION}")
         self.settings = QSettings("MindyApp", "MindMapEditor")
         self._clipboard_node = None
 
         self.current_workspace_path = None
         self.workspace_files = []
 
+        # Initialisation des composants métiers / logiques d'abord
+        self.project_service = ProjectService(self)
+        self.history_service = HistoryService(self)
+        self.serializer = MindMapSerializer(self)
+
+        # Initialisation des contrôleurs
         self.graph_controller = GraphController(self)
         self.style_controller = StyleController(self)
         self.attachment_controller = AttachmentController(self)
@@ -51,10 +58,7 @@ class MindMapApp(QMainWindow):
         self.routing_controller = RoutingController(self)
         self.tabs_controller = TabsController(self)
 
-        self.project_service = ProjectService(self)
-        self.history_service = HistoryService(self)
-        self.serializer = MindMapSerializer(self)
-
+        # UI Principale
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.tabs_controller.close_tab)
@@ -67,45 +71,47 @@ class MindMapApp(QMainWindow):
         
         self.setup_ui()
         self.setup_shortcuts()
+        
+        # 🟢 RESTAURATION SECURISEE : On séquence proprement les chargements au démarrage
         self.project_service.load_last_project_on_startup()
       
         last_workspace = self.settings.value("last_collection_path", "")
         if last_workspace and os.path.exists(last_workspace):
-            QTimer.singleShot(100, lambda: self.workspace_controller.load_workspace(last_workspace))
+            # On attend un tout petit peu plus pour éviter la collision d'I/O avec le premier projet
+            QTimer.singleShot(200, lambda: self.workspace_controller.load_workspace(last_workspace))
 
     def current_workspace(self) -> MindMapWorkspace:
         try:
-            if not hasattr(self, 'tabs') or self.tabs is None:
+            # Utilisation de sip pour s'assurer que l'objet C++ sous-jacent de Qt n'est pas mort
+            if not hasattr(self, 'tabs') or self.tabs is None or sip.isdeleted(self.tabs):
                 return None
-            # On vérifie avec une méthode native que l'objet C++ sous-jacent n'est pas mort
-            if self.tabs.parent() is None and not self.isVisible(): 
-                return None # L'application est probablement en train de fermer
-                
             return self.tabs.currentWidget()
         except (RuntimeError, AttributeError):
-            # Si Qt lève une exception "wrapped C/C++ object has been deleted", on la passe sous silence
             return None
    
     def setup_ui(self):
         self.setCentralWidget(self.tabs)
-
         create_menus(self)
         create_toolbar(self)
-        create_node_toolbar(self)
+        create_node_toolbar(self) # C'est ici que self.style_bar et self.overlay doivent être créés
 
     def setup_shortcuts(self):
         setup_app_shortcuts(self)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.reposition_style_bar()
-        self.overlay.raise_()
+        # 🟢 PROTECTION : On vérifie l'existence des attributs dynamiques pour éviter le crash au démarrage
+        if hasattr(self, 'style_bar') and self.style_bar is not None:
+            self.reposition_style_bar()
+        if hasattr(self, 'overlay') and self.overlay is not None:
+            self.overlay.raise_()
 
     def reposition_style_bar(self):
-        self.style_bar.adjustSize()
-        x = (self.width() - self.style_bar.width()) // 2
-        y = self.height() - self.style_bar.height() - 30
-        self.style_bar.move(x, y)
+        if hasattr(self, 'style_bar') and self.style_bar is not None:
+            self.style_bar.adjustSize()
+            x = (self.width() - self.style_bar.width()) // 2
+            y = self.height() - self.style_bar.height() - 30
+            self.style_bar.move(x, y)
 
     def closeEvent(self, event):
         if hasattr(self, 'tools_controller'):
@@ -114,28 +120,29 @@ class MindMapApp(QMainWindow):
             event.accept()
 
     def save_state(self):
-        """Enregistre l'état actuel de l'espace de travail pour l'historique."""
         ws = self.current_workspace()
         if not ws:
             return
         current_state = self.serializer.get_state()
         self.history_service.save_state(ws, current_state)
-        
-        # On s'assure que l'étoile se met à jour dès qu'un état est enregistré
         self.tabs_controller.update_title()
 
     def show_about_dialog(self):
         show_app_about_dialog(self, APP_VERSION)
 
     def undo(self):
-        previous_state = self.history_service.undo(self.current_workspace())
-        if previous_state:
-            self.serializer.apply_state(previous_state)
+        ws = self.current_workspace()
+        if ws:
+            previous_state = self.history_service.undo(ws)
+            if previous_state:
+                self.serializer.apply_state(previous_state)
 
     def redo(self):
-        next_state = self.history_service.redo(self.current_workspace())
-        if next_state:
-            self.serializer.apply_state(next_state)
+        ws = self.current_workspace()
+        if ws:
+            next_state = self.history_service.redo(ws)
+            if next_state:
+                self.serializer.apply_state(next_state)
         
     
 if __name__ == '__main__':
@@ -143,6 +150,7 @@ if __name__ == '__main__':
     app.setFont(QFont("Segoe UI", 10))
     window = MindMapApp()
     window.show()
-    # Forcer la mise à jour géométrique initiale de la barre de boutons dès l'affichage
+    
+    # Sécurité géométrique
     QTimer.singleShot(50, window.reposition_style_bar)
     sys.exit(app.exec())

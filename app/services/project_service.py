@@ -80,6 +80,11 @@ class ProjectService:
             
         if hasattr(self.app, 'tabs_controller'):
             self.app.tabs_controller.update_title()
+
+        # 🟢 APPEL DE LA FONCTION DE NETTOYAGE :
+        # Exécuté après que la scène a été entièrement reconstruite (apply_state)
+        if hasattr(self.app, 'attachment_controller'):
+            self.app.attachment_controller.clean_orphan_attachments()
             
         if hasattr(self.app, 'workspace_controller'):
             self.app.workspace_controller.center_on_graph()

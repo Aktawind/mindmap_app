@@ -1,4 +1,5 @@
 import math
+import os
 from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF
 from PyQt6.QtGui import QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, QPolygonF, QPainterPathStroker
 from PyQt6.QtWidgets import QGraphicsItem, QGraphicsPathItem
@@ -21,12 +22,32 @@ class NodeItem(QGraphicsItem):
         self.bg_color = QColor(bg)
         self.border_color = QColor(border)
         self.font_color = QColor(font_color)
-        self.file_path = file_path
-        self.url_link = url_link
+
+        self.attachments = []
+        
+        # Rétrocompatibilité lors de l'initialisation
+        if file_path:
+            self.attachments.append({
+                "name": os.path.basename(file_path),
+                "path": file_path,
+                "type": "file",
+                "is_local_copy": True
+            })
+        if url_link:
+            display_name = url_link.replace("https://", "").replace("http://", "")
+            self.attachments.append({
+                "name": f"🔗 {display_name}",
+                "path": url_link,
+                "type": "url",
+                "is_local_copy": False
+            })
+
+        self.file_path = None  # Obsolète
+        self.url_link = None   # Obsolète (géré par self.attachments)
         self.is_bold = is_bold
         self.status = status 
         self.border_width = 1
-        
+       
         self.setPos(x, y)
         self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable | 
                       QGraphicsItem.GraphicsItemFlag.ItemIsMovable | 
@@ -36,6 +57,7 @@ class NodeItem(QGraphicsItem):
         self.signals = GraphicsSignals()
         self.edges = []
         self.recalculate_size()
+        self.setAcceptHoverEvents(True)
 
     def add_edge(self, edge):
         if edge not in self.edges:
@@ -45,29 +67,97 @@ class NodeItem(QGraphicsItem):
         if edge in self.edges:
             self.edges.remove(edge)
 
+    def _get_attachment_text(self, att):
+        """Méthode utilitaire pour uniformiser le préfixe textuel et tronquer les noms trop longs."""
+        MAX_CHARS = 25  # 💡 Ajuste cette valeur selon tes préférences
+        
+        name = att.get("name", "")
+        
+        # Si c'est une URL, le nom commence déjà par "🔗 " dans notre logique
+        if att.get("type") == "url":
+            # On retire le symbole pour compter les vrais caractères du texte
+            clean_name = name.replace("🔗 ", "")
+            if len(clean_name) > MAX_CHARS:
+                name = f"🔗 {clean_name[:MAX_CHARS]}..."
+            return name
+        else:
+            # Pour un fichier, on tronque le nom avant d'ajouter le préfixe "📎 "
+            if len(name) > MAX_CHARS:
+                name = f"{name[:MAX_CHARS]}..."
+            return f"📎 {name}"
+
+    def hoverMoveEvent(self, event):
+        """🟢 Change le curseur en petite main si la souris survole n'importe quelle pièce jointe (Fichier ou URL)."""
+        attachments_to_draw = getattr(self, 'attachments', [])
+        
+        if attachments_to_draw:
+            pos = event.pos()
+            
+            font_main = QFont('Segoe UI', 11)
+            if self.is_bold: font_main.setBold(True)
+            fm_main = QFontMetrics(font_main)
+            text_main_height = fm_main.height() * len(self.label.split('\n'))
+            main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
+            
+            font_att = QFont('Segoe UI', 9)
+            fm_att = QFontMetrics(font_att)
+            current_y = main_text_rect.bottom() + 4
+            
+            for att in attachments_to_draw:
+                att_text = self._get_attachment_text(att)
+                text_width = fm_att.horizontalAdvance(att_text)
+                current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+                file_rect = QRectF(current_x, current_y, text_width, fm_att.height())
+                
+                # Si le curseur est sur l'élément -> Petite main
+                if file_rect.contains(pos):
+                    self.setCursor(Qt.CursorShape.PointingHandCursor)
+                    super().hoverMoveEvent(event)
+                    return
+                
+                current_y += fm_att.height() + 2
+                
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().hoverMoveEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().hoverLeaveEvent(event)
+
     def recalculate_size(self):
-        font = QFont('Segoe UI', 11)
-        if self.is_bold:
-            font.setBold(True)
-        fm = QFontMetrics(font)
+        """Calcule dynamiquement la taille du nœud selon le texte principal et la liste globale d'attachements."""
+        font_main = QFont('Segoe UI', 11)
+        if self.is_bold: font_main.setBold(True)
+        fm_main = QFontMetrics(font_main)
         
         display_label = self.label
         if self.status == 'urgent' and not display_label.startswith("🚨 "): display_label = "🚨 " + display_label
         elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
         elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
 
-        if self.file_path: display_label += " 📄"
-        if self.url_link: display_label += " 🔗"
-
         lines = display_label.split('\n')
-        max_width = max(fm.horizontalAdvance(line) for line in lines) if lines else 0
-        total_height = fm.height() * len(lines) if lines else fm.height()
+        max_width = max(fm_main.horizontalAdvance(line) for line in lines) if lines else 0
+        total_height = fm_main.height() * len(lines) if lines else fm_main.height()
+
+        # Calcul pour la liste unifiée d'attachements (Fichiers & Liens)
+        attachments_to_draw = getattr(self, 'attachments', [])
+        if attachments_to_draw:
+            font_att = QFont('Segoe UI', 9)
+            fm_att = QFontMetrics(font_att)
+            total_height += 8 # Marge d'espacement (padding)
+            
+            for att in attachments_to_draw:
+                att_text = self._get_attachment_text(att)
+                w_att = fm_att.horizontalAdvance(att_text)
+                if w_att > max_width:
+                    max_width = w_att
+                total_height += fm_att.height() + 2
         
         width = max(max_width + 30, 100)
         height = max(total_height + 20, 40)
         
         if self.shape_type == 'diamond':
-            width = int(width * 1.4)  # Augmenté pour éviter que le texte ne sorte des pointes du losange
+            width = int(width * 1.4)
             height = int(height * 1.7)
         elif self.shape_type == 'ellipse':
             width = int(width * 1.2)
@@ -77,7 +167,6 @@ class NodeItem(QGraphicsItem):
         self.prepareGeometryChange()
 
     def node_shape_path(self):
-        """Retourne le QPainterPath précis et exact de la forme géométrique du nœud."""
         path = QPainterPath()
         if self.shape_type == 'ellipse':
             path.addEllipse(self.rect)
@@ -92,7 +181,6 @@ class NodeItem(QGraphicsItem):
         return path
 
     def shape(self):
-        """Surchargé pour la détection précise des clics de souris et des intersections."""
         return self.node_shape_path()
 
     def update_edges(self):
@@ -121,7 +209,6 @@ class NodeItem(QGraphicsItem):
             final_border = QColor("#059669")
             final_text_color = QColor("#065F46")
 
-        # Rendu de l'ombre portée basée sur la forme réelle
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(0, 0, 0, 15))
         
@@ -130,33 +217,58 @@ class NodeItem(QGraphicsItem):
         shadow_path.translate(2, 2)
         painter.drawPath(shadow_path)
 
-        # Style de bordure et sélection
         pen = QPen(final_border, b_width)
         if self.isSelected():
             pen.setWidth(b_width + 2)
             pen.setColor(final_border.darker(150))
         painter.setPen(pen)
         painter.setBrush(QBrush(final_bg))
-
-        # Dessin de la forme principale
         painter.drawPath(shape_path)
 
-        # Rendu du texte
+        # Rendu du label principal
+        font_main = QFont('Segoe UI', 11)
+        if self.is_bold: font_main.setBold(True)
+        painter.setFont(font_main)
         painter.setPen(QPen(final_text_color))
-        font = QFont('Segoe UI', 11)
-        if self.is_bold:
-            font.setBold(True)
-        painter.setFont(font)
         
         display_label = self.label
         if self.status == 'urgent' and not display_label.startswith("🚨 "): display_label = "🚨 " + display_label
         elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
         elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
 
-        if self.file_path: display_label += " 📄"
-        if self.url_link: display_label += " 🔗"
+        fm_main = QFontMetrics(font_main)
+        lines = display_label.split('\n')
+        text_main_height = fm_main.height() * len(lines)
+        
+        attachments_to_draw = getattr(self, 'attachments', [])
+        if attachments_to_draw:
+            main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
+        else:
+            main_text_rect = self.rect
 
-        painter.drawText(self.rect, int(Qt.AlignmentFlag.AlignCenter), display_label)
+        painter.drawText(main_text_rect, int(Qt.AlignmentFlag.AlignCenter), display_label)
+
+        # Rendu de la liste unifiée en dessous (Fichiers ET URLs)
+        if attachments_to_draw:
+            font_att = QFont('Segoe UI', 9)
+            font_att.setUnderline(True) 
+            painter.setFont(font_att)
+            
+            if final_text_color.name().lower() in ['#ffffff', '#fff']:
+                painter.setPen(QPen(QColor(240, 240, 240)))
+            else:
+                painter.setPen(QPen(QColor(37, 99, 235))) # Couleur bleu lien hypertexte
+                
+            fm_att = QFontMetrics(font_att)
+            current_y = main_text_rect.bottom() + 4
+            
+            for att in attachments_to_draw:
+                att_text = self._get_attachment_text(att)
+                text_width = fm_att.horizontalAdvance(att_text)
+                current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+                
+                painter.drawText(int(current_x), int(current_y + fm_att.ascent()), att_text)
+                current_y += fm_att.height() + 2
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
@@ -175,11 +287,71 @@ class NodeItem(QGraphicsItem):
                 edge.update_position()
             self.signals.positionChanged.emit()
         return super().itemChange(change, value)
+    
+    def mousePressEvent(self, event):
+        """🟢 Intercepte de la même façon le clic sur un fichier ou sur une URL de la liste."""
+        attachments_to_draw = getattr(self, 'attachments', [])
+        
+        if attachments_to_draw:
+            pos = event.pos()
+            
+            font_main = QFont('Segoe UI', 11)
+            if self.is_bold: font_main.setBold(True)
+            fm_main = QFontMetrics(font_main)
+            text_main_height = fm_main.height() * len(self.label.split('\n'))
+            main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
+            
+            font_att = QFont('Segoe UI', 9)
+            fm_att = QFontMetrics(font_att)
+            current_y = main_text_rect.bottom() + 4
+            
+            for att in attachments_to_draw:
+                att_text = self._get_attachment_text(att)
+                text_width = fm_att.horizontalAdvance(att_text)
+                current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+                file_rect = QRectF(current_x, current_y, text_width, fm_att.height())
+                
+                if file_rect.contains(pos):
+                    scene = self.scene()
+                    if scene and hasattr(scene, 'views') and scene.views():
+                        main_win = scene.views()[0].window()
+                        if hasattr(main_win, 'attachment_controller'):
+                            main_win.attachment_controller.open_specific_file(att)
+                            event.accept()
+                            return 
+                
+                current_y += fm_att.height() + 2
+
+        super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
+        attachments_to_draw = getattr(self, 'attachments', [])
+        pos = event.pos()
+        
+        if attachments_to_draw:
+            font_main = QFont('Segoe UI', 11)
+            if self.is_bold: font_main.setBold(True)
+            fm_main = QFontMetrics(font_main)
+            text_main_height = fm_main.height() * len(self.label.split('\n'))
+            main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
+            
+            font_att = QFont('Segoe UI', 9)
+            fm_att = QFontMetrics(font_att)
+            current_y = main_text_rect.bottom() + 4
+            
+            for att in attachments_to_draw:
+                att_text = self._get_attachment_text(att)
+                text_width = fm_att.horizontalAdvance(att_text)
+                current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+                file_rect = QRectF(current_x, current_y, text_width, fm_att.height())
+                
+                if file_rect.contains(pos):
+                    event.accept()
+                    return 
+                current_y += fm_att.height() + 2
+
         self.signals.itemDoubleClicked.emit(self)
         super().mouseDoubleClickEvent(event)
-
 
 class EdgeItem(QGraphicsPathItem):
     def __init__(self, edge_id, source_node, dest_node, label="", color='#A0AEC0', arrow_dir="none"):
