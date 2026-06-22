@@ -115,7 +115,7 @@ class AttachmentController:
                     msg_box.setWindowTitle("Méthode d'intégration")
                     msg_box.setText(f"Comment souhaitez-vous joindre le fichier :\n'{original_name}' ?")
                     btn_copy = msg_box.addButton("Créer une copie locale", QMessageBox.ButtonRole.AcceptRole)
-                    btn_link = msg_box.addButton("Lien direct (Réseau / Absolu)", QMessageBox.ButtonRole.AcceptRole)
+                    btn_link = msg_box.addButton("Lien direct", QMessageBox.ButtonRole.AcceptRole)
                     msg_box.addButton("Annuler", QMessageBox.ButtonRole.RejectRole)
                     msg_box.exec()
                     

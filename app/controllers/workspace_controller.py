@@ -1,6 +1,5 @@
 import json
 import os
-
 from PyQt6.QtWidgets import QMessageBox, QFileDialog
 from ui.selection_manager import on_selection_changed
 

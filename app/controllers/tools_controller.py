@@ -2,9 +2,7 @@ import json
 import os
 import sys
 import time
-from PyQt6.QtCore import QUrl, Qt
-from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QWidget
+from PyQt6.QtWidgets import QMessageBox, QWidget
 from graphics.items import NodeItem
 
 class ToolsController:

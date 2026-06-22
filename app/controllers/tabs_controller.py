@@ -1,10 +1,5 @@
-import json
 import os
-import sys
-from PyQt6.QtCore import QUrl
-from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QWidget
-from graphics.items import NodeItem
+from PyQt6.QtWidgets import QMessageBox
 
 class TabsController:
     def __init__(self, app):

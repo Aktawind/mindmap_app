@@ -1,9 +1,7 @@
-import json
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QWidget, QVBoxLayout
 from signals import GraphicsSignals
-from graphics.items import NodeItem, EdgeItem
 from ui.selection_manager import on_selection_changed
 
 class MindMapScene(QGraphicsScene):

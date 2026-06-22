@@ -3,7 +3,6 @@ from PyQt6.QtCore import QMarginsF, QRectF
 from PyQt6.QtGui import QColor, QPageLayout, QPageSize, QPainter, QPixmap
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from PyQt6.QtPrintSupport import QPrinter
-
 from graphics.items import NodeItem
 
 class ExportController:

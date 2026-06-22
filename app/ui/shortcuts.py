@@ -1,4 +1,3 @@
-# ui/shortcuts.py
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtCore import Qt
 

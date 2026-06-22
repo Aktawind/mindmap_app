@@ -3,7 +3,7 @@ import os
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from graphics.items import NodeItem
 from graphics.scene import MindMapWorkspace
-from PyQt6.QtCore import QSettings, QTimer
+from PyQt6.QtCore import QTimer
 
 class ProjectService:
     def __init__(self, app):
