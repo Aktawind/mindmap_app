@@ -38,6 +38,11 @@ class WorkspaceController:
             return
 
         self.current_workspace_path = path
+        self.app.settings.setValue(
+            "last_collection_path",
+            path
+        )
+        self.app.settings.sync()
         self.workspace_files = []
 
         # Nettoyage propre des onglets actuels (ils ont déjà été sauvés au-dessus)
@@ -82,21 +87,27 @@ class WorkspaceController:
         else:
             self.app.lbl_workspace_status.setText("📁 Workspace : Aucun")
 
-    def load_workspace(self, path=None):
-        """ Charge une workspace et demande l'enregistrement des fichiers courants au préalable """
+    def load_workspace(self, path=None, is_startup=False):
         if not path:
             path, _ = QFileDialog.getOpenFileName(self.app, "Ouvrir un Espace de travail", "", "Espace Mindy (*.mindy)")
             if not path:
                 return
 
-        # Sécurité : On ne remplace pas la session si l'utilisateur refuse de sauver ses onglets courants
-        if not self._check_and_close_existing_tabs():
-            return
+        if not is_startup:
+            if not self._check_and_close_existing_tabs():
+                return
 
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
+            # 🟢 1. On définit le chemin AVANT toute manipulation
+            self.current_workspace_path = path
+            self.app.settings.setValue(
+                "last_collection_path",
+                path
+            )
+            self.app.settings.sync()
             file_paths = data.get("files", [])
 
             self.app.tabs.blockSignals(True)
@@ -105,21 +116,20 @@ class WorkspaceController:
             finally:
                 self.app.tabs.blockSignals(False)
 
-            self.current_workspace_path = path
             self.workspace_files = []
 
-            # Charger uniquement les fichiers JSON valides sur le disque
             if hasattr(self.app, 'project_service'):
                 for f_path in file_paths:
                     if os.path.exists(f_path):
                         self.app.project_service.load_project_from_path(f_path)
                         self.workspace_files.append(f_path)
 
-                # Si le fichier .mindy était vide, on crée un onglet vierge par défaut
                 if not self.workspace_files:
                     self.app.project_service.new_project()
 
-            self.update_workspace_ui()
+            # 🟢 2. On force une mise à jour explicite de l'UI maintenant que tout est prêt
+            self.update_workspace_ui() 
+            
             if hasattr(self.app, 'tabs_controller'):
                 self.app.tabs_controller.update_title()
 

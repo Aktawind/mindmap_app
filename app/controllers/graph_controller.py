@@ -205,3 +205,23 @@ class GraphController:
                 ws.scene.clearSelection()
                 edge.setSelected(True)
                 self.app.save_state()
+
+    def filter_nodes(self, search_text):
+        """Filtre visuellement les nœuds de la Mind Map en modifiant leur opacité."""
+        ws = self.app.current_workspace()
+        if not ws:
+            return
+        
+        # On passe la recherche en minuscules pour ne pas être sensible à la casse
+        search_text = search_text.lower().strip()
+        
+        # On importe NodeItem ici pour éviter les imports circulaires si nécessaire
+        from graphics.items import NodeItem
+        
+        for item in ws.scene.items():
+            if isinstance(item, NodeItem):
+                # Si la recherche est vide ou si le texte du nœud contient le mot recherché
+                if not search_text or search_text in item.label.lower():
+                    item.setOpacity(1.0)  # Totalement opaque / visible
+                else:
+                    item.setOpacity(0.2)  # Semi-transparent / estompé

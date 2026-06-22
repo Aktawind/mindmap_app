@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QComboBox, QWidget
+from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget
 from PyQt6.QtCore import Qt
-from controllers.tools_controller import ToolsController
+from PyQt6.QtWidgets import QLineEdit, QLabel
 
 def create_toolbar(app_window) -> None:
     """
@@ -30,8 +30,8 @@ def create_toolbar(app_window) -> None:
     """)
 
     # Label de statut
-    app_window.lbl_workspace_status = QLabel("📂 Espace de travail : Aucun", workspace_toolbar)
-    workspace_toolbar.addWidget(app_window.lbl_workspace_status)
+    if hasattr(app_window, 'lbl_workspace_status'):
+        workspace_toolbar.addWidget(app_window.lbl_workspace_status)
     workspace_toolbar.addSeparator()
 
     # Actions d'onglets au sein de l'espace de travail
@@ -106,6 +106,18 @@ def create_toolbar(app_window) -> None:
     """)
     btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
     workspace_toolbar.addWidget(btn_center)
+
+    from PyQt6.QtWidgets import QWidget, QSizePolicy
+    spacer = QWidget()
+    spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    workspace_toolbar.addWidget(spacer)
+    workspace_toolbar.addWidget(QLabel(" 🔍  "))
+    search_input = QLineEdit()
+    search_input.setPlaceholderText("Rechercher un nœud...")
+    search_input.setMaximumWidth(200) # Pour éviter qu'il ne prenne trop de place
+    search_input.setClearButtonEnabled(True) # Ajoute une petite croix pour effacer rapidement
+    search_input.textChanged.connect(app_window.graph_controller.filter_nodes)
+    workspace_toolbar.addWidget(search_input)
 
     # Bouton Ajouter un onglet inséré dans le coin supérieur droit du QTabWidget
     app_window.add_tab_button = QPushButton("➕ Ajouter un onglet", app_window.tabs)

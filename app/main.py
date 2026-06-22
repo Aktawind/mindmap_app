@@ -61,24 +61,34 @@ class MindMapApp(QMainWindow):
         # UI Principale
         self.tabs = QTabWidget()
         self.tabs.setTabsClosable(True)
+        self.tabs.setTabBarAutoHide(False) # Optionnel, mais utile
+        self.tabs.setMovable(True) # Bonus sympa tant qu'à faire !
         self.tabs.tabCloseRequested.connect(self.tabs_controller.close_tab)
         self.tabs.currentChanged.connect(self.tabs_controller.on_tab_changed)
       
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
+
+        from PyQt6.QtWidgets import QLabel
+        self.lbl_workspace_status = QLabel("📂 Espace de travail : Aucun")
+
         self.resize(1600, 900)
         
         self.setup_ui()
         self.setup_shortcuts()
         
-        # 🟢 RESTAURATION SECURISEE : On séquence proprement les chargements au démarrage
-        self.project_service.load_last_project_on_startup()
-      
+        # Un léger délai pour laisser l'interface s'afficher
+        QTimer.singleShot(100, self.initialize_startup_session)
+
+    def initialize_startup_session(self):
+        """Décide au démarrage s'il faut charger la workspace ou le dernier projet."""
         last_workspace = self.settings.value("last_collection_path", "")
+        
         if last_workspace and os.path.exists(last_workspace):
-            # On attend un tout petit peu plus pour éviter la collision d'I/O avec le premier projet
-            QTimer.singleShot(200, lambda: self.workspace_controller.load_workspace(last_workspace))
+            self.workspace_controller.load_workspace(last_workspace, is_startup=True)
+        else:
+            self.project_service.load_last_project_on_startup()
 
     def current_workspace(self) -> MindMapWorkspace:
         try:
