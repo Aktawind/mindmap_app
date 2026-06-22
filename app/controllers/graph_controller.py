@@ -9,6 +9,17 @@ class GraphController:
         """Génère un identifiant unique basé sur le temps pour éviter les collisions d'ID."""
         return f"{prefix}_{int(time.time() * 1000)}"
 
+    def _apply_current_routing_mode(self, edge: EdgeItem) -> None:
+        """Sécurité pour synchroniser le style de l'arête avec l'état actuel de la Toolbar."""
+        if hasattr(self.app, 'btn_toggle_routing') and self.app.btn_toggle_routing:
+            # Si ton EdgeItem utilise un attribut de routage (ex: 'is_curved' ou 'routing_type')
+            # Ajuste le nom de l'attribut ci-dessous selon ton implémentation dans EdgeItem
+            is_curved_mode = self.app.btn_toggle_routing.isChecked()
+            if hasattr(edge, 'is_curved'):
+                edge.is_curved = is_curved_mode
+            elif hasattr(edge, 'set_curved'):
+                edge.set_curved(is_curved_mode)
+
     def add_child_node(self, parent_node):
         """Ajoute un nœud enfant lié au nœud parent fourni et lance l'édition immédiate."""
         ws = self.app.current_workspace()
@@ -50,14 +61,20 @@ class GraphController:
         edge_id = self._generate_unique_id("edge")
         edge = EdgeItem(edge_id, parent_node, new_node, "", color=edge_col)
         
+        # 🟢 CORRECTION : On force l'état visuel du lien dès sa création
+        self._apply_current_routing_mode(edge)
+        
         if hasattr(self.app, 'editing_controller'):
             edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
         
         # Ajout et mise à jour de la scène
         ws.scene.addItem(new_node)
         ws.scene.addItem(edge)
+
+        if hasattr(edge, 'update_position'):
+            edge.update_position()
         
-        # Enregistrement de l'arborescence interne dans les NodeItems (si géré par vos items)
+        # Enregistrement de l'arborescence interne dans les NodeItems
         if hasattr(parent_node, 'edges'): parent_node.edges.append(edge)
         if hasattr(new_node, 'edges'): new_node.edges.append(edge)
         
@@ -109,7 +126,6 @@ class GraphController:
 
     def delete_selected(self):
         """Supprime de manière sécurisée les éléments sélectionnés de la scène."""
-        # CORRECTION : Vérification correcte sur l'editing_controller global de l'application
         if hasattr(self.app, 'editing_controller') and getattr(self.app.editing_controller, 'editor', None) is not None: 
             return
             
@@ -120,16 +136,13 @@ class GraphController:
         
         changed = False
         for item in sel:
-            # SÉCURITÉ : Protection absolue du nœud racine central
             if isinstance(item, NodeItem) and getattr(item, 'node_id', None) == 'root':
                 continue
                 
             if isinstance(item, NodeItem):
-                # CORRECTION : Appel sécurisé via le contrôleur d'attachements de l'application
                 if getattr(item, 'file_path', None) and hasattr(self.app, 'attachment_controller'):
                     self.app.attachment_controller.remove_file_from_attachments(item.file_path)
                 
-                # Nettoyage des références d'arêtes croisées pour éviter les fuites mémoire
                 for edge in list(getattr(item, 'edges', [])):
                     if hasattr(edge, 'source_node') and edge in getattr(edge.source_node, 'edges', []): 
                         edge.source_node.edges.remove(edge)
@@ -163,7 +176,6 @@ class GraphController:
         if len(sel) == 2 and isinstance(sel[0], NodeItem) and isinstance(sel[1], NodeItem):
             node1, node2 = sel[0], sel[1]
             
-            # Vérification anti-doublon
             edges1 = getattr(node1, 'edges', [])
             already_linked = any(
                 (getattr(e, 'source_node', None) == node1 and getattr(e, 'dest_node', None) == node2) or 
@@ -176,10 +188,16 @@ class GraphController:
                 edge_id = self._generate_unique_id("edge")
                 edge = EdgeItem(edge_id, node1, node2, "", color=link_color)
                 
+                # 🟢 CORRECTION : Appliqué également lors d'une connexion manuelle entre 2 nœuds
+                self._apply_current_routing_mode(edge)
+                
                 if hasattr(self.app, 'editing_controller'):
                     edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 
                 ws.scene.addItem(edge)
+
+                if hasattr(edge, 'update_position'):
+                    edge.update_position()
                 
                 if hasattr(node1, 'edges'): node1.edges.append(edge)
                 if hasattr(node2, 'edges'): node2.edges.append(edge)

@@ -23,6 +23,9 @@ class ProjectService:
         # Ajout sécurisé à l'UI
         self.app.tabs.addTab(ws, "[Nouveau Projet]")
         self.app.tabs.setCurrentWidget(ws)
+
+        if hasattr(self.app, 'routing_controller'):
+            self.app.routing_controller.update_routing_button_ui()
         
         # Enregistrement du premier état dans l'historique (au format dict !)
         if hasattr(self.app, 'save_state'):
@@ -57,6 +60,9 @@ class ProjectService:
         
         self.app.tabs.addTab(ws, os.path.basename(path))
         self.app.tabs.setCurrentWidget(ws)
+
+        if hasattr(self.app, 'routing_controller'):
+            self.app.routing_controller.update_routing_button_ui()
         
         # Application de l'état décodé
         if hasattr(self.app, 'serializer'):

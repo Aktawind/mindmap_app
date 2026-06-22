@@ -204,7 +204,11 @@ class EdgeItem(QGraphicsPathItem):
             return
 
         scene = self.scene()
-        mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
+        if hasattr(self, 'is_curved'):
+            # Si True -> curved, si False -> orthogonal/droit (selon ta logique)
+            mode = 'curved' if self.is_curved else 'orthogonal'
+        else:
+            mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
 
         # Détermination globale des faces pour l'orientation des courbes
         dx_centers = self.dest_node.pos().x() - self.source_node.pos().x()
@@ -217,7 +221,7 @@ class EdgeItem(QGraphicsPathItem):
             start_side = "bottom" if dy_centers > 0 else "top"
             end_side = "top" if dy_centers > 0 else "bottom"
 
-        # 🚨 RECONSTRUCTION GÉOMÉTRIQUE : Calcul par intersection vectorielle réelle
+        # Calcul par intersection vectorielle réelle
         def get_exact_intersection(source, target):
             line = QLineF(source.pos(), target.pos())
             # Chargement de la forme vectorielle exacte du nœud mappé dans la scène

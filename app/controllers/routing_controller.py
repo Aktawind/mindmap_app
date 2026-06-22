@@ -14,10 +14,11 @@ class RoutingController:
             return
 
         # Récupération du mode réel actuel de la scène
+        if not hasattr(ws.scene, 'line_routing_mode'):
+            is_button_checked = self.app.btn_toggle_routing.isChecked()
+            ws.scene.line_routing_mode = 'curved' if is_button_checked else 'orthogonal'
         current_mode = getattr(ws.scene, 'line_routing_mode', 'curved')
         
-        # 🚨 CORRECTION CRITIQUE : On force l'état visuel du bouton (coché si courbe, décoché si droit)
-        # On bloque les signaux temporairement pour éviter une boucle infinie d'événements
         self.app.btn_toggle_routing.blockSignals(True)
         self.app.btn_toggle_routing.setChecked(current_mode == 'curved')
         self.app.btn_toggle_routing.blockSignals(False)

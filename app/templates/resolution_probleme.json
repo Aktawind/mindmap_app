@@ -1,0 +1,142 @@
+{
+  "id": "root",
+  "label": "🚨 Problème constaté : [Décrire le symptôme]",
+  "x": 0.0,
+  "y": 0.0,
+  "shape": "box",
+  "bg": "#e53e3e",
+  "border": "#b91c1c",
+  "font_color": "#ffffff",
+  "border_width": 2,
+  "is_bold": true,
+  "file_path": null,
+  "url_link": null,
+  "children": [
+    {
+      "id": "analyse",
+      "label": "🔍 1. Analyse & Causes Racines",
+      "x": -392.0,
+      "y": 0.0,
+      "shape": "box",
+      "bg": "#ffebee",
+      "border": "#ef9a9a",
+      "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
+      "children": [
+        {
+          "id": "node_3",
+          "label": "Pourquoi cela arrive-t-il ? (Niveau 1)",
+          "x": -188.0,
+          "y": -121.0,
+          "shape": "box",
+          "bg": "#ffebee",
+          "border": "#ef9a9a",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": [
+            {
+              "id": "cause_racine",
+              "label": "Pourquoi ? (Niveau 2 -> Cause profonde)",
+              "x": -13.0,
+              "y": -228.0,
+              "shape": "box",
+              "bg": "#ffebee",
+              "border": "#ef9a9a",
+              "font_color": "#333333",
+              "border_width": 1,
+              "is_bold": false,
+              "file_path": null,
+              "url_link": null,
+              "children": [
+                {
+                  "id": "sol_fond",
+                  "label": "Correction définitive (Éliminer la cause)",
+                  "x": 488.0,
+                  "y": -137.0,
+                  "shape": "box",
+                  "bg": "#fff3e0",
+                  "border": "#ffb74d",
+                  "font_color": "#333333",
+                  "border_width": 1,
+                  "is_bold": false,
+                  "file_path": null,
+                  "url_link": null,
+                  "children": [],
+                  "edge_label": "Résout directement"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "node_5",
+          "label": "Impact actuel (Qu'est-ce que ça bloque ?)",
+          "x": -248.0,
+          "y": 138.0,
+          "shape": "box",
+          "bg": "#ffebee",
+          "border": "#ef9a9a",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "solutions",
+      "label": "💡 2. Pistes de Solutions",
+      "x": 373.0,
+      "y": 2.0,
+      "shape": "box",
+      "bg": "#fff3e0",
+      "border": "#ffb74d",
+      "font_color": "#333333",
+      "border_width": 1,
+      "is_bold": false,
+      "file_path": null,
+      "url_link": null,
+      "children": [
+        {
+          "id": "sol_court_terme",
+          "label": "Contenir le problème (Pansement immédiat)",
+          "x": 702.0,
+          "y": -1.0,
+          "shape": "box",
+          "bg": "#fff3e0",
+          "border": "#ffb74d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        },
+        {
+          "id": "sol_fond",
+          "label": "Correction définitive (Éliminer la cause)",
+          "x": 488.0,
+          "y": -137.0,
+          "shape": "box",
+          "bg": "#fff3e0",
+          "border": "#ffb74d",
+          "font_color": "#333333",
+          "border_width": 1,
+          "is_bold": false,
+          "file_path": null,
+          "url_link": null,
+          "children": []
+        }
+      ]
+    }
+  ],
+  "cross_links": []
+}
