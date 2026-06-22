@@ -29,7 +29,7 @@ from controllers.routing_controller import RoutingController
 from controllers.grid_controller import GridController
 from controllers.tabs_controller import TabsController
 
-APP_VERSION  = "1.0.7"
+APP_VERSION  = "1.0.9"
 
 class MindMapApp(QMainWindow):
     def __init__(self):
