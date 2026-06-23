@@ -28,8 +28,9 @@ jobs:
 
     - name: Compiler l'application
       run: |
-        # Remplacement de --onedir par --onefile
-        pyinstaller --name "Mindy" --noconfirm --onefile --windowed --icon="icon.ico" --add-data "icon.ico;." --add-data "templates;templates" main.py
+        # 🚨 FIX AJUSTEMENT DES CHEMINS (app/main.py et app/templates)
+        # Note : Si ton icon.ico est resté à la racine du projet, garde "icon.ico;.", s'il a migré dans app/, change en "app/icon.ico;."
+        pyinstaller --name "Mindy" --noconfirm --onefile --windowed --icon="app/icon.ico" --add-data "app/icon.ico;." --add-data "app/templates;templates" app/main.py
       shell: pwsh
 
     - name: Créer l'archive Zip avec le nom du TAG
@@ -37,7 +38,7 @@ jobs:
         $VERSION = if ("${{ github.ref_name }}" -ne "") { "${{ github.ref_name }}" } else { "manual" }
         $ZIP_NAME = "Mindy_$VERSION.zip"
         
-        # Ici, comme c'est du --onefile, dist/Mindy.exe contient TOUT à l'intérieur
+        # L'exécutable généré par PyInstaller atterrit toujours dans ./dist/ par rapport à la racine d'exécution
         Compress-Archive -Path dist/Mindy.exe -DestinationPath "./$ZIP_NAME"
       shell: pwsh
 
