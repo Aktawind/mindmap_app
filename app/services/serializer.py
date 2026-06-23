@@ -1,4 +1,5 @@
 import json
+import os
 from graphics.items import NodeItem, EdgeItem
 from ui.selection_manager import on_selection_changed
 

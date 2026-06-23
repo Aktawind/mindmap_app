@@ -189,7 +189,6 @@ class AttachmentController:
                 if os.path.isfile(file_path) and filename not in used_paths:
                     try:
                         os.remove(file_path)
-                        print(f"🧹 Fichier orphelin nettoyé : {filename}")
                     except Exception as e:
                         print(f"Impossible de supprimer le fichier orphelin {filename} : {e}")
         except Exception as e:
