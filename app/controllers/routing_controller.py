@@ -20,30 +20,50 @@ class RoutingController:
         current_mode = getattr(ws.scene, 'line_routing_mode', 'curved')
         
         self.app.btn_toggle_routing.blockSignals(True)
+        # Le bouton reste enfoncé si on est en mode courbe
         self.app.btn_toggle_routing.setChecked(current_mode == 'curved')
         self.app.btn_toggle_routing.blockSignals(False)
 
-        # Maintenant on applique le bon texte de manière synchronisée
+        # Synchronisation du texte selon les 4 modes disponibles
         if current_mode == 'curved':
             self.app.btn_toggle_routing.setText("Liens courbes")
-        else:
-            self.app.btn_toggle_routing.setText("Liens droits")
+        elif current_mode == 'orthogonal':
+            self.app.btn_toggle_routing.setText("Liens droits (Coudés)")
+        elif current_mode == 'straight_diagonal':
+            self.app.btn_toggle_routing.setText("Liens diagonaux")
+        elif current_mode == 'straight_elbow':
+            self.app.btn_toggle_routing.setText("Liens coudés droits")
+
+    def set_routing_mode(self, mode_string):
+        """
+        Méthode centralisée pour forcer un mode de routage spécifique.
+        Utile lors du changement automatique de Canvas (ex: Concept Map -> straight_diagonal).
+        """
+        ws = self.app.current_workspace()
+        if not ws or not hasattr(ws, 'scene') or ws.scene is None: 
+            return
+
+        if mode_string in ['curved', 'orthogonal', 'straight_diagonal', 'straight_elbow']:
+            ws.scene.line_routing_mode = mode_string
+            self._apply_routing_to_all_edges(ws)
 
     def toggle_line_routing(self, checked):
-        """Bascule le mode de routage des lignes (courbes vs orthogonales)."""
-        # CORRECTION : Utilisation de la méthode globale harmonisée
+        """Bascule historique du mode de routage (courbes vs orthogonales)."""
         ws = self.app.current_workspace()
         if not ws or not hasattr(ws, 'scene') or ws.scene is None: 
             return
             
-        # Si coché -> 'curved' (courbe), sinon -> 'orthogonal'
+        # Si coché -> 'curved', sinon -> 'orthogonal'
         ws.scene.line_routing_mode = 'curved' if checked else 'orthogonal'
-        
-        # Met à jour le texte du bouton
+        self._apply_routing_to_all_edges(ws)
+
+    def _apply_routing_to_all_edges(self, workspace):
+        """Méthode interne pour recalculer la géométrie de tous les liens de la scène."""
+        # Met à jour le texte du bouton ou des menus connectés
         self.update_routing_button_ui()
         
         # Force chaque ligne à recalculer son tracé géométrique
-        for item in ws.scene.items():
+        for item in workspace.scene.items():
             if isinstance(item, EdgeItem):
                 if hasattr(item, 'update_position'):
                     item.update_position()
@@ -53,7 +73,7 @@ class RoutingController:
                     item.update()
         
         # Rafraîchit l'affichage de la scène et sauvegarde l'état
-        ws.scene.update()
+        workspace.scene.update()
         if hasattr(self.app, 'save_state'):
             self.app.save_state()
 

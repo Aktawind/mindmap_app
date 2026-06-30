@@ -63,7 +63,7 @@ class MindMapControlView(QGraphicsView):
         self._moved_nodes_start_positions = {}
 
     def mousePressEvent(self, event):
-        # 🚨 FIX GÉOMÉTRIQUE : Extraction des coordonnées relatives strictes au Viewport de Qt
+        #FIX GÉOMÉTRIQUE : Extraction des coordonnées relatives strictes au Viewport de Qt
         viewport_pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
 
         if event.button() == Qt.MouseButton.RightButton:

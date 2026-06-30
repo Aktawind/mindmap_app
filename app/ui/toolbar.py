@@ -1,11 +1,10 @@
-from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget
+from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget, QLineEdit, QSizePolicy
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLineEdit, QLabel
 
 def create_toolbar(app_window) -> None:
     """
     Initialise et configure la barre d'outils supérieure de l'espace de travail
-    avec le comportement d'origine pour le routage des lignes.
+    avec le support des types de Canvas et des 4 modes de routage de lignes.
     """
     # Vérification stricte des dépendances indispensables
     required_attrs = [
@@ -27,6 +26,8 @@ def create_toolbar(app_window) -> None:
         QPushButton { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 4px 8px; font-size: 12px; color: #1e293b; }
         QPushButton:hover { background: #E2E8F0; }
         QLabel { font-size: 11px; color: #475569; font-weight: bold; }
+        QComboBox { border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 6px; background: white; color: #1e293b; font-size: 12px; min-width: 130px; }
+        QComboBox:hover { border-color: #94a3b8; }
     """)
 
     # Label de statut
@@ -65,14 +66,56 @@ def create_toolbar(app_window) -> None:
     app_window.btn_snap.clicked.connect(app_window.grid_controller.toggle_snap_to_grid)
     workspace_toolbar.addWidget(app_window.btn_snap)
 
-    # 🔄 RESTAURATION DE TON COMPORTEMENT SPÉCIFIQUE : Bouton Liens courbes 
-    app_window.btn_toggle_routing = QPushButton("Liens courbes", workspace_toolbar)
-    app_window.btn_toggle_routing.setCheckable(True)
-    app_window.btn_toggle_routing.setStyleSheet("""
-        QPushButton { padding: 6px 15px; border: 1px solid #ccc; border-radius: 4px; background: #ffffff; font-weight: bold; color: #1e293b; }
-    """)
-    app_window.btn_toggle_routing.clicked.connect(app_window.routing_controller.toggle_line_routing)
-    workspace_toolbar.addWidget(app_window.btn_toggle_routing)
+    workspace_toolbar.addSeparator()
+
+    # 🟢 AJOUT : Sélecteur Global du Type de Canvas (MindMap vs Concept Map)
+    app_window.canvas_mode_combo = QComboBox(workspace_toolbar)
+    app_window.canvas_mode_combo.addItem("🧠 Mode MindMap", "MINDMAP")
+    app_window.canvas_mode_combo.addItem("🗺️ Mode Concept Map", "CONCEPT_MAP")
+    app_window.canvas_mode_combo.setToolTip("Changer la logique de structure graphique globale")
+    
+    def on_canvas_mode_changed(index):
+        selected_mode = app_window.canvas_mode_combo.itemData(index)
+        app_window.current_canvas_mode = selected_mode
+        
+        if hasattr(app_window, 'routing_controller') and hasattr(app_window, 'routing_mode_combo'):
+            if selected_mode == "CONCEPT_MAP":
+                # Concept Map -> Passage automatique en Coudés Droits (Arondis)
+                app_window.routing_controller.set_routing_mode("straight_elbow")
+                route_idx = app_window.routing_mode_combo.findData("straight_elbow")
+                if route_idx != -1:
+                    app_window.routing_mode_combo.setCurrentIndex(route_idx)
+            else:
+                # MindMap -> Retour automatique aux liens courbes
+                app_window.routing_controller.set_routing_mode("curved")
+                route_idx = app_window.routing_mode_combo.findData("curved")
+                if route_idx != -1:
+                    app_window.routing_mode_combo.setCurrentIndex(route_idx)
+
+        # 4. FIX PERSISTANCE : On pousse le changement dans le système d'Undo/Redo
+        if hasattr(app_window, 'save_state'):
+            app_window.save_state()
+
+    app_window.canvas_mode_combo.currentIndexChanged.connect(on_canvas_mode_changed)
+    workspace_toolbar.addWidget(app_window.canvas_mode_combo)
+
+    # 🟢 MODIFICATION : Remplacement de l'ancien bouton unique "Liens courbes" par le sélecteur à 4 choix de routage
+    app_window.routing_mode_combo = QComboBox(workspace_toolbar)
+    app_window.routing_mode_combo.addItem("Liens Courbes", "curved")
+    app_window.routing_mode_combo.addItem("Liens Orthogonaux", "orthogonal")
+    app_window.routing_mode_combo.addItem("Liens Diagonaux", "straight_diagonal")
+    app_window.routing_mode_combo.addItem("Liens Coudés", "straight_elbow")
+    app_window.routing_mode_combo.setToolTip("Choisir la forme géométrique des arêtes")
+
+    def on_routing_mode_changed(index):
+        mode = app_window.routing_mode_combo.itemData(index)
+        if hasattr(app_window, 'routing_controller'):
+            app_window.routing_controller.set_routing_mode(mode)
+
+    app_window.routing_mode_combo.currentIndexChanged.connect(on_routing_mode_changed)
+    workspace_toolbar.addWidget(app_window.routing_mode_combo)
+
+    workspace_toolbar.addSeparator()
     
     # ComboBox des modèles (Templates)
     app_window.template_combo = QComboBox(workspace_toolbar)
@@ -89,9 +132,7 @@ def create_toolbar(app_window) -> None:
     app_window.template_combo.addItem("☀️ Daily Capsule", "daily_capsule.json")
     app_window.template_combo.addItem("🔋 Santé Mentale et Énergie", "sante_mentale_energie.json")
     app_window.template_combo.addItem("🚨 Urgence Colère", "urgence_colere.json")
-    app_window.template_combo.setStyleSheet("""
-        QComboBox { border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 5px; background: white; color: #1e293b; }
-    """)
+    
     app_window.template_combo.currentIndexChanged.connect(
         lambda idx, window=app_window: window.tools_controller.apply_template(idx)
     )
@@ -107,15 +148,15 @@ def create_toolbar(app_window) -> None:
     btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
     workspace_toolbar.addWidget(btn_center)
 
-    from PyQt6.QtWidgets import QWidget, QSizePolicy
     spacer = QWidget()
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     workspace_toolbar.addWidget(spacer)
+    
     workspace_toolbar.addWidget(QLabel(" 🔍  "))
     search_input = QLineEdit()
     search_input.setPlaceholderText("Rechercher un nœud...")
-    search_input.setMaximumWidth(200) # Pour éviter qu'il ne prenne trop de place
-    search_input.setClearButtonEnabled(True) # Ajoute une petite croix pour effacer rapidement
+    search_input.setMaximumWidth(200)
+    search_input.setClearButtonEnabled(True)
     search_input.textChanged.connect(app_window.graph_controller.filter_nodes)
     workspace_toolbar.addWidget(search_input)
 

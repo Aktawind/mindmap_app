@@ -88,15 +88,33 @@ def on_selection_changed(app) -> None:
             # Ajuste la taille physique de la barre pour qu'elle s'adapte au plus près de son contenu (évite le blanc à droite)
             app.style_bar.adjustSize()
         
+        # --- SYNCHRONISATION DES VALEURS DU NOEUD VERS LES COMBOBOX ---
         if hasattr(app, 'shape_combo') and app.shape_combo:
             app.shape_combo.blockSignals(True)
-            app.shape_combo.setCurrentIndex(app.shape_combo.findData(getattr(target_node, 'shape_type', '')))
+            app.shape_combo.setCurrentIndex(app.shape_combo.findData(getattr(target_node, 'shape_type', 'box')))
             app.shape_combo.blockSignals(False)
         
         if hasattr(app, 'status_combo') and app.status_combo:
             app.status_combo.blockSignals(True)
-            app.status_combo.setCurrentIndex(app.status_combo.findData(getattr(target_node, 'status', '')))
+            app.status_combo.setCurrentIndex(app.status_combo.findData(getattr(target_node, 'status', 'none')))
             app.status_combo.blockSignals(False)
+
+        if hasattr(app, 'priority_combo') and app.priority_combo:
+            app.priority_combo.blockSignals(True)
+            app.priority_combo.setCurrentIndex(app.priority_combo.findData(getattr(target_node, 'priority', 'none')))
+            app.priority_combo.blockSignals(False)
+
+        if hasattr(app, 'btn_compact') and app.btn_compact:
+            app.btn_compact.blockSignals(True)
+            app.btn_compact.setChecked(getattr(target_node, 'is_compact', False))
+            app.btn_compact.blockSignals(False)
+
+        if hasattr(app, 'btn_set_date') and app.btn_set_date:
+            node_date = getattr(target_node, 'date', None)
+            if node_date:
+                app.btn_set_date.setText(f"📅 {node_date}")
+            else:
+                app.btn_set_date.setText("📅 Échéance")
             
     elif selected_edges:
         # S'il n'y a pas de nœud mais au moins une branche

@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-    QFrame, QComboBox
+    QFrame, QComboBox, QInputDialog
 )
 from PyQt6.QtGui import QFont
+from PyQt6.QtCore import QDate
 from controllers.tools_controller import ToolsController
 
 def create_node_toolbar(app_window) -> None:
@@ -29,7 +30,8 @@ def create_node_toolbar(app_window) -> None:
         #StyleBar { background: white; border-radius: 20px; border: 1px solid #e2e8f0; }
         #StyleBar QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 12px; color: #1e293b; }
         #StyleBar QPushButton:hover { background: #e2e8f0; }
-        #StyleBar QComboBox { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px; border-radius: 8px; min-width: 110px; color: #1e293b; }
+        #StyleBar QPushButton:checked { background: #cbd5e1; font-weight: bold; }
+        #StyleBar QComboBox { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px; border-radius: 8px; min-width: 100px; color: #1e293b; }
     """)
     style_layout = QHBoxLayout(app_window.style_bar)
     style_layout.setContentsMargins(10, 5, 10, 5)
@@ -52,6 +54,7 @@ def create_node_toolbar(app_window) -> None:
     app_window.shape_combo.addItem("Rectangle", "box")
     app_window.shape_combo.addItem("Losange", "diamond")
     app_window.shape_combo.addItem("Ellipse", "ellipse")
+    app_window.shape_combo.addItem("Parallélogramme", "parallelogram")
     app_window.shape_combo.currentIndexChanged.connect(app_window.style_controller.on_shape_combo_changed)
     nc_layout.addWidget(app_window.shape_combo)
     
@@ -66,6 +69,28 @@ def create_node_toolbar(app_window) -> None:
     nc_layout.addWidget(app_window.status_combo)
 
     nc_layout.addWidget(ToolsController.create_separator(app_window))
+
+    # 🟢 AJOUTS PARAMÈTRES DE NOEUD : Priorité, Date & Mode Compact
+    app_window.priority_combo = QComboBox(app_window.node_controls)
+    app_window.priority_combo.addItem("⚪️ Priorité Normale", "none")
+    app_window.priority_combo.addItem("🟡 Priorité Moyenne", "mid")
+    app_window.priority_combo.addItem("🔴 Priorité Haute", "high")
+    if hasattr(app_window.style_controller, 'on_priority_combo_changed'):
+        app_window.priority_combo.currentIndexChanged.connect(app_window.style_controller.on_priority_combo_changed)
+    nc_layout.addWidget(app_window.priority_combo)
+
+    app_window.btn_set_date = QPushButton("📅 Échéance", app_window.node_controls)
+    if hasattr(app_window.style_controller, 'prompt_node_date'):
+        app_window.btn_set_date.clicked.connect(app_window.style_controller.prompt_node_date)
+    nc_layout.addWidget(app_window.btn_set_date)
+
+    app_window.btn_compact = QPushButton("🗜️ Compact", app_window.node_controls)
+    app_window.btn_compact.setCheckable(True)
+    if hasattr(app_window.style_controller, 'toggle_compact_mode'):
+        app_window.btn_compact.clicked.connect(app_window.style_controller.toggle_compact_mode)
+    nc_layout.addWidget(app_window.btn_compact)
+
+    nc_layout.addWidget(ToolsController.create_separator(app_window))
     
     # Palette de couleurs
     colors_palette = [
@@ -77,7 +102,6 @@ def create_node_toolbar(app_window) -> None:
         btn = QPushButton(app_window.node_controls)
         btn.setFixedSize(22, 22)
         btn.setStyleSheet(f"background: {color}; border: 2px solid {border}; border-radius: 11px;")
-        # Nettoyage du lambda pour ignorer le signal booléen de PyQt
         btn.clicked.connect(lambda _, c=color, b=border: app_window.style_controller.change_color(c, b))
         nc_layout.addWidget(btn)
         
@@ -134,7 +158,6 @@ def create_node_toolbar(app_window) -> None:
     cc_layout.addWidget(btn_connect)
     style_layout.addWidget(app_window.connect_controls)
     
-    # Cacher la barre par défaut au démarrage
     app_window.style_bar.hide()
     
     # 5. Overlay d'aide contextuel

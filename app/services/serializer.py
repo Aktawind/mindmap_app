@@ -27,8 +27,7 @@ class MindMapSerializer:
         def serialize_node(node):
             if not node: return None
             
-            # 🚨 SÉCURITÉ ANTI-BOUCLE INFINIE À LA SAUVEGARDE
-            # Si le nœud a déjà été traité dans l'arbre, on s'arrête pour éviter la récursion infinie
+            # SÉCURITÉ ANTI-BOUCLE INFINIE À LA SAUVEGARDE
             if node.node_id in serialized_node_ids:
                 return None
                 
@@ -48,16 +47,18 @@ class MindMapSerializer:
                 "status": getattr(node, 'status', 'none'),
                 "attachments": getattr(node, 'attachments', []),
                 "url_link": getattr(node, 'url_link', None),
+                # 🟢 AJOUT : Nouvelles métadonnées étendues des nœuds
+                "date": getattr(node, 'date', None),
+                "priority": getattr(node, 'priority', None),
+                "is_compact": getattr(node, 'is_compact', False),
                 "children": []
             }
             
             for edge in getattr(node, 'edges', []):
                 if getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node:
                     
-                    # 🚨 SÉCURITÉ SUPPLÉMENTAIRE : On vérifie si l'enfant n'est pas un ancêtre déjà visité
+                    # SÉCURITÉ SUPPLÉMENTAIRE
                     if edge.dest_node.node_id in serialized_node_ids:
-                        # Si oui, ce lien n'est pas un enfant naturel de l'arbre, c'est un cross-link !
-                        # On ne le sérialise pas comme enfant pour éviter la boucle.
                         continue
                         
                     natural_edges.add(edge)
@@ -70,6 +71,7 @@ class MindMapSerializer:
 
         # Structuration propre du JSON global
         state = {
+            "current_canvas_mode": getattr(self.app, 'current_canvas_mode', 'MINDMAP'), # 🟢 AJOUT : Mode global du Canvas
             "global_line_routing": getattr(ws.scene, 'line_routing_mode', 'curved'),
             "snap_to_grid": getattr(ws.scene, 'snap_to_grid', False),
             "root": serialize_node(root),
@@ -77,7 +79,7 @@ class MindMapSerializer:
             "cross_links": []
         }
 
-        # Collecte des nœuds orphelins (non rattachés à l'arbre principal)
+        # Collecte des nœuds orphelins
         for node in nodes:
             if node.node_id not in serialized_node_ids:
                 state["orphan_nodes"].append({
@@ -93,10 +95,14 @@ class MindMapSerializer:
                     "is_bold": getattr(node, 'is_bold', False),
                     "status": getattr(node, 'status', 'none'),
                     "attachments": getattr(node, 'attachments', []),
-                    "url_link": getattr(node, 'url_link', None)
+                    "url_link": getattr(node, 'url_link', None),
+                    # 🟢 AJOUT : Nouvelles métadonnées pour les nœuds orphelins
+                    "date": getattr(node, 'date', None),
+                    "priority": getattr(node, 'priority', None),
+                    "is_compact": getattr(node, 'is_compact', False)
                 })
 
-        # Collecte des liens transversaux (liens personnalisés créés par l'utilisateur)
+        # Collecte des liens transversaux (Cross Links)
         for edge in edges:
             if edge not in natural_edges and getattr(edge, 'source_node', None) and getattr(edge, 'dest_node', None):
                 state["cross_links"].append({
@@ -111,7 +117,6 @@ class MindMapSerializer:
     
     def apply_state(self, state_data):
         """Applique l'état sauvegardé à la scène courante."""
-        # 🚨 FIX CRITIQUE : Si on reçoit une chaîne JSON (str), on la décode en dictionnaire
         if isinstance(state_data, str):
             try:
                 state_data = json.loads(state_data)
@@ -119,17 +124,14 @@ class MindMapSerializer:
                 print(f"Erreur lors du décodage du state_str : {e}")
                 return
 
-        # Si ton code extrait un sous-objet pour root_data, assure-visualisation qu'il est décodé aussi
         root_data = state_data.get("root", state_data) if isinstance(state_data, dict) else {}
         
-        # Si root_data est resté un string pour une raison X ou Y, on le décode à son tour
         if isinstance(root_data, str):
             try:
                 root_data = json.loads(root_data)
             except:
                 root_data = {}
 
-        """Restaure l'état complet du workspace depuis des données sérialisées."""
         ws = self.app.current_workspace()
         if not ws or state_data is None: return
         
@@ -149,6 +151,12 @@ class MindMapSerializer:
         ws.scene.line_routing_mode = root_data.get("global_line_routing", "curved")
         ws.scene.snap_to_grid = root_data.get("snap_to_grid", False)
         
+        # 🟢 AJOUT : Restauration et synchronisation du mode de Canvas global de l'application
+        if "current_canvas_mode" in root_data:
+            self.app.current_canvas_mode = root_data["current_canvas_mode"]
+        else:
+            self.app.current_canvas_mode = 'MINDMAP' # Fallback rétrocompatible
+        
         # Synchronisation de l'interface graphique globale
         if hasattr(self.app, 'workspace_controller'):
             self.app.workspace_controller.sync_workspace_ui({
@@ -165,7 +173,7 @@ class MindMapSerializer:
             
             node_id = data.get("id") or ('root' if parent_node is None else f"node_{node_counter[0]}")
             
-            # 🚨 SÉCURITÉ ANTI-DOUBLON : Si le nœud existe déjà, on ne le recrée pas !
+            # 🚨 SÉCURITÉ ANTI-DOUBLON
             if node_id in created_nodes:
                 return created_nodes[node_id]
                 
@@ -190,11 +198,15 @@ class MindMapSerializer:
             )
             node.border_width = data.get("border_width", 1)
 
+            # 🟢 AJOUT : Injection des nouvelles métadonnées récupérées (avec fallbacks sûrs)
+            node.date = data.get("date", None)
+            node.priority = data.get("priority", None)
+            node.is_compact = data.get("is_compact", False)
+
             if "attachments" in data:
                 node.attachments = data["attachments"]
             else:
                 node.attachments = []
-                # Fallback : Si c'est un vieux fichier avec l'ancienne clé unique unique file_path
                 old_path = data.get("file_path")
                 if old_path:
                     node.attachments.append({
@@ -209,7 +221,7 @@ class MindMapSerializer:
                 node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 
             ws.scene.addItem(node)
-            created_nodes[node_id] = node  # Enregistrement immédiat
+            created_nodes[node_id] = node
 
             if parent_node:
                 edge_counter[0] += 1
@@ -234,11 +246,10 @@ class MindMapSerializer:
         tree_root_data = root_data.get("root") if "root" in root_data else root_data
         deserialize_node(tree_root_data)
 
-        # 2. Restauration des nœuds orphelins (Protégés par la sécurité anti-doublon)
+        # 2. Restauration des nœuds orphelins
         for orphan in root_data.get("orphan_nodes", []):
             node_id = orphan.get("id")
             
-            # 🚨 SÉCURITÉ ICI AUSSI : Si déjà créé via l'arbre, on saute !
             if node_id in created_nodes:
                 continue
                 
@@ -250,6 +261,11 @@ class MindMapSerializer:
                 is_bold=orphan.get("is_bold", False), status=orphan.get("status", "none")
             )
             node.border_width = orphan.get("border_width", 1)
+
+            # 🟢 AJOUT : Injection des nouvelles métadonnées pour les nœuds orphelins également
+            node.date = orphan.get("date", None)
+            node.priority = orphan.get("priority", None)
+            node.is_compact = orphan.get("is_compact", False)
 
             if "attachments" in orphan:
                 node.attachments = orphan["attachments"]
@@ -271,7 +287,7 @@ class MindMapSerializer:
             ws.scene.addItem(node)
             created_nodes[node_id] = node
 
-        # Restauration des liens transversaux personnalisés (Cross Links)
+        # 3. Restauration des liens transversaux (Cross Links)
         for cl in root_data.get("cross_links", []):
             source = created_nodes.get(cl["from"])
             dest = created_nodes.get(cl["to"])
@@ -284,13 +300,12 @@ class MindMapSerializer:
                 
                 ws.scene.addItem(edge)
                 
-                # CORRECTION CRITIQUE : Liaison en mémoire pour les liens transversaux
                 if not hasattr(source, 'edges'): source.edges = []
                 if not hasattr(dest, 'edges'): dest.edges = []
                 source.edges.append(edge)
                 dest.edges.append(edge)
 
-        # Rafraîchissement géométrique forcé de toutes les arêtes après routage
+        # Rafraîchissement géométrique forcé de toutes les arêtes
         for item in ws.scene.items():
             if isinstance(item, EdgeItem):
                 if hasattr(item, 'update_position'): item.update_position()
@@ -300,6 +315,6 @@ class MindMapSerializer:
         ws.is_applying_state = False
         on_selection_changed(self.app)
 
-        # 🚨 LE FIX ICI : Force le bouton de la toolbar à lire l'état qui vient d'être chargé !
+        # Force le bouton ou le widget de la toolbar à lire l'état qui vient d'être chargé
         if hasattr(self.app, 'routing_controller'):
             self.app.routing_controller.update_routing_button_ui()

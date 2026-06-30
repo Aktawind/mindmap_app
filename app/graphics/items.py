@@ -22,6 +22,11 @@ class NodeItem(QGraphicsItem):
         self.bg_color = QColor(bg)
         self.border_color = QColor(border)
         self.font_color = QColor(font_color)
+        
+        self.date = None       
+        self.status = 'none'
+        self.priority = 'none'  
+        self.is_compact = False 
 
         self.attachments = []
         
@@ -69,27 +74,26 @@ class NodeItem(QGraphicsItem):
 
     def _get_attachment_text(self, att):
         """Méthode utilitaire pour uniformiser le préfixe textuel et tronquer les noms trop longs."""
-        MAX_CHARS = 25  # 💡 Ajuste cette valeur selon tes préférences
-        
+        MAX_CHARS = 25  # Ajuste cette valeur selon tes préférences
         name = att.get("name", "")
         
-        # Si c'est une URL, le nom commence déjà par "🔗 " dans notre logique
         if att.get("type") == "url":
-            # On retire le symbole pour compter les vrais caractères du texte
             clean_name = name.replace("🔗 ", "")
             if len(clean_name) > MAX_CHARS:
                 name = f"🔗 {clean_name[:MAX_CHARS]}..."
             return name
         else:
-            # Pour un fichier, on tronque le nom avant d'ajouter le préfixe "📎 "
             if len(name) > MAX_CHARS:
                 name = f"{name[:MAX_CHARS]}..."
             return f"📎 {name}"
 
     def hoverMoveEvent(self, event):
-        """🟢 Change le curseur en petite main si la souris survole n'importe quelle pièce jointe (Fichier ou URL)."""
+        if self.is_compact:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            super().hoverMoveEvent(event)
+            return
+
         attachments_to_draw = getattr(self, 'attachments', [])
-        
         if attachments_to_draw:
             pos = event.pos()
             
@@ -103,13 +107,15 @@ class NodeItem(QGraphicsItem):
             fm_att = QFontMetrics(font_att)
             current_y = main_text_rect.bottom() + 4
             
+            if self.date:
+                current_y += fm_att.height() + 2
+            
             for att in attachments_to_draw:
                 att_text = self._get_attachment_text(att)
                 text_width = fm_att.horizontalAdvance(att_text)
                 current_x = self.rect.left() + (self.rect.width() - text_width) / 2
                 file_rect = QRectF(current_x, current_y, text_width, fm_att.height())
                 
-                # Si le curseur est sur l'élément -> Petite main
                 if file_rect.contains(pos):
                     self.setCursor(Qt.CursorShape.PointingHandCursor)
                     super().hoverMoveEvent(event)
@@ -125,7 +131,7 @@ class NodeItem(QGraphicsItem):
         super().hoverLeaveEvent(event)
 
     def recalculate_size(self):
-        """Calcule dynamiquement la taille du nœud selon le texte principal et la liste globale d'attachements."""
+        """Calcule dynamiquement la taille du nœud selon le texte principal, la date et les attachements."""
         font_main = QFont('Segoe UI', 11)
         if self.is_bold: font_main.setBold(True)
         fm_main = QFontMetrics(font_main)
@@ -139,12 +145,20 @@ class NodeItem(QGraphicsItem):
         max_width = max(fm_main.horizontalAdvance(line) for line in lines) if lines else 0
         total_height = fm_main.height() * len(lines) if lines else fm_main.height()
 
-        # Calcul pour la liste unifiée d'attachements (Fichiers & Liens)
+        if self.date and not self.is_compact:
+            font_date = QFont('Segoe UI', 9)
+            fm_date = QFontMetrics(font_date)
+            date_text = f"📅 {self.date}"
+            w_date = fm_date.horizontalAdvance(date_text)
+            if w_date > max_width:
+                max_width = w_date
+            total_height += fm_date.height() + 2
+
         attachments_to_draw = getattr(self, 'attachments', [])
-        if attachments_to_draw:
+        if attachments_to_draw and not self.is_compact:
             font_att = QFont('Segoe UI', 9)
             fm_att = QFontMetrics(font_att)
-            total_height += 8 # Marge d'espacement (padding)
+            total_height += 8
             
             for att in attachments_to_draw:
                 att_text = self._get_attachment_text(att)
@@ -162,34 +176,12 @@ class NodeItem(QGraphicsItem):
         elif self.shape_type == 'ellipse':
             width = int(width * 1.2)
             height = max(total_height + 35, 55)
+        elif self.shape_type == 'parallelogram':
+            width = int(width * 1.3)
 
         self.rect = QRectF(-width/2, -height/2, width, height)
         self.prepareGeometryChange()
-
-    def node_shape_path(self):
-        path = QPainterPath()
-        if self.shape_type == 'ellipse':
-            path.addEllipse(self.rect)
-        elif self.shape_type == 'diamond':
-            path.moveTo(self.rect.left() + self.rect.width()/2, self.rect.top())
-            path.lineTo(self.rect.right(), self.rect.top() + self.rect.height()/2)
-            path.lineTo(self.rect.left() + self.rect.width()/2, self.rect.bottom())
-            path.lineTo(self.rect.left(), self.rect.top() + self.rect.height()/2)
-            path.closeSubpath()
-        else:
-            path.addRoundedRect(self.rect, 6, 6)
-        return path
-
-    def shape(self):
-        return self.node_shape_path()
-
-    def update_edges(self):
-        for edge in self.edges:
-            edge.update_position()
-
-    def boundingRect(self):
-        padding = self.border_width + 6
-        return self.rect.adjusted(-padding, -padding, padding, padding)
+        self.update_edges()
 
     def paint(self, painter, option, widget=None):
         final_bg = self.bg_color
@@ -197,17 +189,32 @@ class NodeItem(QGraphicsItem):
         final_text_color = self.font_color
         b_width = self.border_width
 
+        # 1. Gestion des couleurs de fond et de texte selon le Statut
         if self.status == 'urgent':
             final_border = QColor("#E53E3E")
             b_width = 3
         elif self.status == 'progress':
-            final_bg = QColor("#FEF3C7")
-            final_border = QColor("#D97706")
-            final_text_color = QColor("#92400E")
+            # FIX: On ne change plus la couleur du fond ni du texte, on garde les styles par défaut
+            pass
         elif self.status == 'done':
             final_bg = QColor("#D1FAE5")
             final_border = QColor("#059669")
             final_text_color = QColor("#065F46")
+
+        # 2. FIX PRIORITÉ : Modification des bordures (si le statut n'est pas déjà 'urgent')
+        if self.status != 'urgent':
+            priority_val = getattr(self, 'priority', 'none')
+            if priority_val in (None, 'none'):
+                priority_val = 'none'
+            if priority_val == 'high':
+                final_border = QColor("#E53E3E") # Rouge
+                b_width = 3
+            elif priority_val == 'mid':
+                final_border = QColor("#DD6B20") # Orange
+                b_width = 3
+            elif priority_val == 'none':
+                # Bordure classique classique, pas de mise en forme particulière
+                pass
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(0, 0, 0, 15))
@@ -225,7 +232,6 @@ class NodeItem(QGraphicsItem):
         painter.setBrush(QBrush(final_bg))
         painter.drawPath(shape_path)
 
-        # Rendu du label principal
         font_main = QFont('Segoe UI', 11)
         if self.is_bold: font_main.setBold(True)
         painter.setFont(font_main)
@@ -241,14 +247,29 @@ class NodeItem(QGraphicsItem):
         text_main_height = fm_main.height() * len(lines)
         
         attachments_to_draw = getattr(self, 'attachments', [])
-        if attachments_to_draw:
+        if (attachments_to_draw or self.date) and not self.is_compact:
             main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
         else:
             main_text_rect = self.rect
 
         painter.drawText(main_text_rect, int(Qt.AlignmentFlag.AlignCenter), display_label)
 
-        # Rendu de la liste unifiée en dessous (Fichiers ET URLs)
+        if self.is_compact:
+            return
+
+        current_y = main_text_rect.bottom() + 4
+
+        if self.date:
+            font_date = QFont('Segoe UI', 9)
+            painter.setFont(font_date)
+            painter.setPen(QPen(final_text_color.lighter(120) if final_text_color.name().lower() in ['#ffffff', '#fff'] else QColor('#4A5568')))
+            fm_date = QFontMetrics(font_date)
+            date_text = f"📅 {self.date}"
+            text_width = fm_date.horizontalAdvance(date_text)
+            current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+            painter.drawText(int(current_x), int(current_y + fm_date.ascent()), date_text)
+            current_y += fm_date.height() + 2
+
         if attachments_to_draw:
             font_att = QFont('Segoe UI', 9)
             font_att.setUnderline(True) 
@@ -257,10 +278,9 @@ class NodeItem(QGraphicsItem):
             if final_text_color.name().lower() in ['#ffffff', '#fff']:
                 painter.setPen(QPen(QColor(240, 240, 240)))
             else:
-                painter.setPen(QPen(QColor(37, 99, 235))) # Couleur bleu lien hypertexte
+                painter.setPen(QPen(QColor(37, 99, 235)))
                 
             fm_att = QFontMetrics(font_att)
-            current_y = main_text_rect.bottom() + 4
             
             for att in attachments_to_draw:
                 att_text = self._get_attachment_text(att)
@@ -269,6 +289,43 @@ class NodeItem(QGraphicsItem):
                 
                 painter.drawText(int(current_x), int(current_y + fm_att.ascent()), att_text)
                 current_y += fm_att.height() + 2
+
+    def node_shape_path(self):
+        path = QPainterPath()
+        if self.shape_type == 'ellipse':
+            path.addEllipse(self.rect)
+        elif self.shape_type == 'diamond':
+            path.moveTo(self.rect.left() + self.rect.width()/2, self.rect.top())
+            path.lineTo(self.rect.right(), self.rect.top() + self.rect.height()/2)
+            path.lineTo(self.rect.left() + self.rect.width()/2, self.rect.bottom())
+            path.lineTo(self.rect.left(), self.rect.top() + self.rect.height()/2)
+            path.closeSubpath()
+        elif self.shape_type == 'parallelogram':
+            skew = self.rect.height() * 0.35
+            p1 = QPointF(self.rect.left() + skew, self.rect.top())
+            p2 = QPointF(self.rect.right(), self.rect.top())
+            p3 = QPointF(self.rect.right() - skew, self.rect.bottom())
+            p4 = QPointF(self.rect.left(), self.rect.bottom())
+            
+            path.moveTo(p1)
+            path.lineTo(p2)
+            path.lineTo(p3)
+            path.lineTo(p4)
+            path.closeSubpath()
+        else:
+            path.addRoundedRect(self.rect, 6, 6)
+        return path
+
+    def shape(self):
+        return self.node_shape_path()
+
+    def update_edges(self):
+        for edge in self.edges:
+            edge.update_position()
+
+    def boundingRect(self):
+        padding = self.border_width + 6
+        return self.rect.adjusted(-padding, -padding, padding, padding)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
@@ -283,28 +340,43 @@ class NodeItem(QGraphicsItem):
                 self.setPos(x, y)
                 self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
-            for edge in self.edges:
-                edge.update_position()
+            self.update_edges()
             self.signals.positionChanged.emit()
         return super().itemChange(change, value)
     
     def mousePressEvent(self, event):
-        """🟢 Intercepte de la même façon le clic sur un fichier ou sur une URL de la liste."""
+        if self.is_compact:
+            super().mousePressEvent(event)
+            return
+
         attachments_to_draw = getattr(self, 'attachments', [])
-        
         if attachments_to_draw:
             pos = event.pos()
-            
             font_main = QFont('Segoe UI', 11)
             if self.is_bold: font_main.setBold(True)
             fm_main = QFontMetrics(font_main)
-            text_main_height = fm_main.height() * len(self.label.split('\n'))
+            
+            prefix = ""
+            if self.status == 'urgent': prefix += "🚨 "
+            elif self.status == 'progress': prefix += "⏳ "
+            elif self.status == 'done': prefix += "✅ "
+            if self.priority: prefix += f"{self.priority} "
+            
+            display_label = self.label
+            if prefix and not display_label.startswith(prefix):
+                if not any(display_label.startswith(p) for p in ["🚨 ", "⏳ ", "✅ ", "P1 ", "P2 ", "P3 ", "P4 "]):
+                    display_label = prefix + display_label
+
+            text_main_height = fm_main.height() * len(display_label.split('\n'))
             main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
             
             font_att = QFont('Segoe UI', 9)
             fm_att = QFontMetrics(font_att)
             current_y = main_text_rect.bottom() + 4
             
+            if self.date:
+                current_y += fm_att.height() + 2
+
             for att in attachments_to_draw:
                 att_text = self._get_attachment_text(att)
                 text_width = fm_att.horizontalAdvance(att_text)
@@ -325,6 +397,11 @@ class NodeItem(QGraphicsItem):
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
+        if self.is_compact:
+            self.signals.itemDoubleClicked.emit(self)
+            super().mouseDoubleClickEvent(event)
+            return
+
         attachments_to_draw = getattr(self, 'attachments', [])
         pos = event.pos()
         
@@ -339,6 +416,9 @@ class NodeItem(QGraphicsItem):
             fm_att = QFontMetrics(font_att)
             current_y = main_text_rect.bottom() + 4
             
+            if self.date:
+                current_y += fm_att.height() + 2
+
             for att in attachments_to_draw:
                 att_text = self._get_attachment_text(att)
                 text_width = fm_att.horizontalAdvance(att_text)
@@ -352,6 +432,7 @@ class NodeItem(QGraphicsItem):
 
         self.signals.itemDoubleClicked.emit(self)
         super().mouseDoubleClickEvent(event)
+
 
 class EdgeItem(QGraphicsPathItem):
     def __init__(self, edge_id, source_node, dest_node, label="", color='#A0AEC0', arrow_dir="none"):
@@ -377,72 +458,88 @@ class EdgeItem(QGraphicsPathItem):
 
         scene = self.scene()
         if hasattr(self, 'is_curved'):
-            # Si True -> curved, si False -> orthogonal/droit (selon ta logique)
             mode = 'curved' if self.is_curved else 'orthogonal'
         else:
             mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
 
-        # Détermination globale des faces pour l'orientation des courbes
-        dx_centers = self.dest_node.pos().x() - self.source_node.pos().x()
-        dy_centers = self.dest_node.pos().y() - self.source_node.pos().y()
+        # 🟢 FIX COLLAGE : Utilisation directe de self.rect mappé pour un contact au pixel près
+        s_rect = self.source_node.rect
+        d_rect = self.dest_node.rect
         
-        if abs(dx_centers) > abs(dy_centers):
-            start_side = "right" if dx_centers > 0 else "left"
-            end_side = "left" if dx_centers > 0 else "right"
+        s_center = self.source_node.mapToScene(s_rect.center())
+        d_center = self.dest_node.mapToScene(d_rect.center())
+        
+        if abs(s_center.x() - d_center.x()) > abs(s_center.y() - d_center.y()):
+            # Connexion Horizontale (Milieu Gauche / Droite)
+            if s_center.x() < d_center.x():
+                start = self.source_node.mapToScene(QPointF(s_rect.right(), s_rect.top() + s_rect.height() / 2))
+                end = self.dest_node.mapToScene(QPointF(d_rect.left(), d_rect.top() + d_rect.height() / 2))
+                start_side, end_side = "right", "left"
+            else:
+                start = self.source_node.mapToScene(QPointF(s_rect.left(), s_rect.top() + s_rect.height() / 2))
+                end = self.dest_node.mapToScene(QPointF(d_rect.right(), d_rect.top() + d_rect.height() / 2))
+                start_side, end_side = "left", "right"
         else:
-            start_side = "bottom" if dy_centers > 0 else "top"
-            end_side = "top" if dy_centers > 0 else "bottom"
-
-        # Calcul par intersection vectorielle réelle
-        def get_exact_intersection(source, target):
-            line = QLineF(source.pos(), target.pos())
-            # Chargement de la forme vectorielle exacte du nœud mappé dans la scène
-            path = source.mapToScene(source.node_shape_path())
-            
-            # Dichotomie sur 50 segments pour intercepter la frontière vectorielle exacte
-            intersect_point = source.pos()
-            for i in range(100):
-                t = i / 100.0
-                p = line.pointAt(t)
-                if not path.contains(p):
-                    intersect_point = p
-                    break
-            return intersect_point
-
-        start = get_exact_intersection(self.source_node, self.dest_node)
-        end = get_exact_intersection(self.dest_node, self.source_node)
+            # Connexion Verticale (Milieu Haut / Bas)
+            if s_center.y() < d_center.y():
+                start = self.source_node.mapToScene(QPointF(s_rect.left() + s_rect.width() / 2, s_rect.bottom()))
+                end = self.dest_node.mapToScene(QPointF(d_rect.left() + d_rect.width() / 2, d_rect.top()))
+                start_side, end_side = "bottom", "top"
+            else:
+                start = self.source_node.mapToScene(QPointF(s_rect.left() + s_rect.width() / 2, s_rect.top()))
+                end = self.dest_node.mapToScene(QPointF(d_rect.left() + d_rect.width() / 2, d_rect.bottom()))
+                start_side, end_side = "top", "bottom"
 
         path = QPainterPath()
         path.moveTo(start)
         
-        if mode == 'orthogonal':
-            dx = abs(self.dest_node.pos().x() - self.source_node.pos().x())
-            dy = abs(self.dest_node.pos().y() - self.source_node.pos().y())
+        # --- MOTEUR DE ROUTAGE ---
+        if mode == 'straight_diagonal':
+            path.lineTo(end)
             
-            if dy > dx:
-                mid_y = start.y() + (end.y() - start.y()) / 2
-                path.lineTo(start.x(), mid_y)
-                path.lineTo(end.x(), mid_y)
+        elif mode == 'straight_elbow':
+            if start_side in ('left', 'right'):
+                corner = QPointF(start.x() + (end.x() - start.x()) / 2, end.y())
+                approach_dist = min(12, abs(corner.x() - start.x()))
+                approach = QPointF(corner.x() - math.copysign(approach_dist, end.x() - start.x()), start.y())
+                leave_dist = min(12, abs(end.y() - corner.y()))
+                leave = QPointF(corner.x(), corner.y() - math.copysign(leave_dist, end.y() - start.y()))
+                
+                path.lineTo(approach)
+                path.quadTo(corner, leave)
             else:
+                corner = QPointF(end.x(), start.y() + (end.y() - start.y()) / 2)
+                approach_dist = min(12, abs(corner.y() - start.y()))
+                approach = QPointF(start.x(), corner.y() - math.copysign(approach_dist, end.y() - start.y()))
+                leave_dist = min(12, abs(end.x() - corner.x()))
+                leave = QPointF(corner.x() - math.copysign(leave_dist, end.x() - corner.x()), corner.y())
+                
+                path.lineTo(approach)
+                path.quadTo(corner, leave)
+            path.lineTo(end)
+            
+        elif mode == 'orthogonal':
+            if start_side in ('left', 'right'):
                 mid_x = start.x() + (end.x() - start.x()) / 2
                 path.lineTo(mid_x, start.y())
                 path.lineTo(mid_x, end.y())
+            else:
+                mid_y = start.y() + (end.y() - start.y()) / 2
+                path.lineTo(start.x(), mid_y)
+                path.lineTo(end.x(), mid_y)
             path.lineTo(end)
+            
         else:
             dx = end.x() - start.x()
             dy = end.y() - start.y()
             
             ctrl_x1, ctrl_y1 = start.x(), start.y()
-            if start_side in ('left', 'right'):
-                ctrl_x1 += dx / 2
-            else:
-                ctrl_y1 += dy / 2
+            if start_side in ('left', 'right'): ctrl_x1 += dx / 2
+            else: ctrl_y1 += dy / 2
 
             ctrl_x2, ctrl_y2 = end.x(), end.y()
-            if end_side in ('left', 'right'):
-                ctrl_x2 -= dx / 2
-            else:
-                ctrl_y2 -= dy / 2
+            if end_side in ('left', 'right'): ctrl_x2 -= dx / 2
+            else: ctrl_y2 -= dy / 2
             
             path.cubicTo(ctrl_x1, ctrl_y1, ctrl_x2, ctrl_y2, end.x(), end.y())
         
@@ -472,7 +569,6 @@ class EdgeItem(QGraphicsPathItem):
 
         path = self.path()
         painter.drawPath(path)
-
         color = pen.color()
 
         if self.arrow_dir in ("forward", "both") and path.length() > 0:

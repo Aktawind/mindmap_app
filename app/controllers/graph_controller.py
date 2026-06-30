@@ -1,4 +1,5 @@
 import time
+from PyQt6.QtCore import QPointF
 from graphics.items import BRANCH_PALETTES, NodeItem, EdgeItem
 
 class GraphController:
@@ -12,8 +13,6 @@ class GraphController:
     def _apply_current_routing_mode(self, edge: EdgeItem) -> None:
         """Sécurité pour synchroniser le style de l'arête avec l'état actuel de la Toolbar."""
         if hasattr(self.app, 'btn_toggle_routing') and self.app.btn_toggle_routing:
-            # Si ton EdgeItem utilise un attribut de routage (ex: 'is_curved' ou 'routing_type')
-            # Ajuste le nom de l'attribut ci-dessous selon ton implémentation dans EdgeItem
             is_curved_mode = self.app.btn_toggle_routing.isChecked()
             if hasattr(edge, 'is_curved'):
                 edge.is_curved = is_curved_mode
@@ -61,7 +60,7 @@ class GraphController:
         edge_id = self._generate_unique_id("edge")
         edge = EdgeItem(edge_id, parent_node, new_node, "", color=edge_col)
         
-        # 🟢 CORRECTION : On force l'état visuel du lien dès sa création
+        # On force l'état visuel du lien dès sa création
         self._apply_current_routing_mode(edge)
         
         if hasattr(self.app, 'editing_controller'):
@@ -87,11 +86,28 @@ class GraphController:
             self.app.editing_controller.start_inline_editing(new_node)
 
     def calculate_smart_position(self, parent_node):
-        """Calcule un emplacement libre à droite du nœud parent sans chevauchement."""
+        """Calcule un emplacement libre. Si un Canvas structuré ou une Concept Map est actif, l'arbre automatique est débrayé."""
         ws = self.app.current_workspace()
         if not ws or not parent_node:
             return 150, 0
             
+        # --- DÉBRAYAGE SI HORS DU MODE MINDMAP CLASSIQUE ---
+        # Si un mode de Canvas (ex: CONCEPT_MAP, KANBAN, EISENHOWER...) est activé, on évite d'empiler à droite toute.
+        current_canvas_mode = getattr(self.app, 'current_canvas_mode', 'MINDMAP')
+        if current_canvas_mode != 'MINDMAP':
+            # Répartition circulaire pour éviter les superpositions en mode Concept Map
+            import math
+            existing_children_count = len([edge for edge in parent_node.edges if edge.source_node == parent_node])
+            
+            # Calcul de l'angle basé sur le nombre d'enfants existants (45° par enfant)
+            angle = existing_children_count * (2 * math.pi / 8) 
+            radius = 150  # Distance fixe du parent
+            
+            x = parent_node.pos().x() + radius * math.cos(angle)
+            y = parent_node.pos().y() + radius * math.sin(angle)
+            return (x, y)
+
+        # Logique de positionnement MindMap classique (à droite)
         parent_w = parent_node.rect.width() if hasattr(parent_node, 'rect') else 100
         parent_right_edge = parent_node.pos().x() + (parent_w / 2)
         target_x = parent_right_edge + 150
@@ -188,7 +204,6 @@ class GraphController:
                 edge_id = self._generate_unique_id("edge")
                 edge = EdgeItem(edge_id, node1, node2, "", color=link_color)
                 
-                # 🟢 CORRECTION : Appliqué également lors d'une connexion manuelle entre 2 nœuds
                 self._apply_current_routing_mode(edge)
                 
                 if hasattr(self.app, 'editing_controller'):
@@ -212,16 +227,12 @@ class GraphController:
         if not ws:
             return
         
-        # On passe la recherche en minuscules pour ne pas être sensible à la casse
         search_text = search_text.lower().strip()
-        
-        # On importe NodeItem ici pour éviter les imports circulaires si nécessaire
         from graphics.items import NodeItem
         
         for item in ws.scene.items():
             if isinstance(item, NodeItem):
-                # Si la recherche est vide ou si le texte du nœud contient le mot recherché
                 if not search_text or search_text in item.label.lower():
-                    item.setOpacity(1.0)  # Totalement opaque / visible
+                    item.setOpacity(1.0)
                 else:
-                    item.setOpacity(0.2)  # Semi-transparent / estompé
+                    item.setOpacity(0.2)
