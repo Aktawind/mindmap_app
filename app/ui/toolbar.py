@@ -68,38 +68,7 @@ def create_toolbar(app_window) -> None:
 
     workspace_toolbar.addSeparator()
 
-    # 🟢 AJOUT : Sélecteur Global du Type de Canvas (MindMap vs Concept Map)
-    app_window.canvas_mode_combo = QComboBox(workspace_toolbar)
-    app_window.canvas_mode_combo.addItem("🧠 Mode MindMap", "MINDMAP")
-    app_window.canvas_mode_combo.addItem("🗺️ Mode Concept Map", "CONCEPT_MAP")
-    app_window.canvas_mode_combo.setToolTip("Changer la logique de structure graphique globale")
-    
-    def on_canvas_mode_changed(index):
-        selected_mode = app_window.canvas_mode_combo.itemData(index)
-        app_window.current_canvas_mode = selected_mode
-        
-        if hasattr(app_window, 'routing_controller') and hasattr(app_window, 'routing_mode_combo'):
-            if selected_mode == "CONCEPT_MAP":
-                # Concept Map -> Passage automatique en Coudés Droits (Arondis)
-                app_window.routing_controller.set_routing_mode("straight_elbow")
-                route_idx = app_window.routing_mode_combo.findData("straight_elbow")
-                if route_idx != -1:
-                    app_window.routing_mode_combo.setCurrentIndex(route_idx)
-            else:
-                # MindMap -> Retour automatique aux liens courbes
-                app_window.routing_controller.set_routing_mode("curved")
-                route_idx = app_window.routing_mode_combo.findData("curved")
-                if route_idx != -1:
-                    app_window.routing_mode_combo.setCurrentIndex(route_idx)
-
-        # 4. FIX PERSISTANCE : On pousse le changement dans le système d'Undo/Redo
-        if hasattr(app_window, 'save_state'):
-            app_window.save_state()
-
-    app_window.canvas_mode_combo.currentIndexChanged.connect(on_canvas_mode_changed)
-    workspace_toolbar.addWidget(app_window.canvas_mode_combo)
-
-    # 🟢 MODIFICATION : Remplacement de l'ancien bouton unique "Liens courbes" par le sélecteur à 4 choix de routage
+    # Remplacement de l'ancien bouton unique "Liens courbes" par le sélecteur à 4 choix de routage
     app_window.routing_mode_combo = QComboBox(workspace_toolbar)
     app_window.routing_mode_combo.addItem("Liens Courbes", "curved")
     app_window.routing_mode_combo.addItem("Liens Orthogonaux", "orthogonal")

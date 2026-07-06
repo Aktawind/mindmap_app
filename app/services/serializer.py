@@ -71,7 +71,6 @@ class MindMapSerializer:
 
         # Structuration propre du JSON global
         state = {
-            "current_canvas_mode": getattr(self.app, 'current_canvas_mode', 'MINDMAP'), # 🟢 AJOUT : Mode global du Canvas
             "global_line_routing": getattr(ws.scene, 'line_routing_mode', 'curved'),
             "snap_to_grid": getattr(ws.scene, 'snap_to_grid', False),
             "root": serialize_node(root),
@@ -149,12 +148,6 @@ class MindMapSerializer:
         # Restauration des configurations globales de la scène
         ws.scene.line_routing_mode = root_data.get("global_line_routing", "curved")
         ws.scene.snap_to_grid = root_data.get("snap_to_grid", False)
-        
-        # 🟢 AJOUT : Restauration et synchronisation du mode de Canvas global de l'application
-        if "current_canvas_mode" in root_data:
-            self.app.current_canvas_mode = root_data["current_canvas_mode"]
-        else:
-            self.app.current_canvas_mode = 'MINDMAP' # Fallback rétrocompatible
         
         # Synchronisation de l'interface graphique globale
         if hasattr(self.app, 'workspace_controller'):

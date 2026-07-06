@@ -187,19 +187,19 @@ class WorkspaceController:
             self.app.btn_snap.setChecked(ui_state.get("snap_to_grid", False))
             self.app.btn_snap.blockSignals(False)
 
-        if hasattr(self.app, 'btn_toggle_routing') and self.app.btn_toggle_routing:
-            is_curved = (ui_state.get("line_routing_mode", "curved") == "curved")
-            self.app.btn_toggle_routing.blockSignals(True)
-            self.app.btn_toggle_routing.setChecked(is_curved)
-            self.app.btn_toggle_routing.blockSignals(False)
+        if hasattr(self.app, 'routing_mode_combo') and self.app.routing_mode_combo:
+            combo = self.app.routing_mode_combo
+            mode = ui_state.get("line_routing_mode", "curved")
+            combo.blockSignals(True)
+            index = combo.findData(mode)
+            if index < 0:
+                index = combo.findData("curved")  # fallback sécurité
+            if index >= 0:
+                combo.setCurrentIndex(index)
+            combo.blockSignals(False)
 
         if hasattr(self.app, 'on_selection_changed'):
             self.app.on_selection_changed()
-
-        if hasattr(self.app, 'canvas_mode_combo') and self.app.canvas_mode_combo:
-            self.app.canvas_mode_combo.blockSignals(True)
-            self.app.canvas_mode_combo.setCurrentText(self.app.current_canvas_mode)
-            self.app.canvas_mode_combo.blockSignals(False)
 
     def center_on_graph(self):
         ws = self.app.current_workspace()

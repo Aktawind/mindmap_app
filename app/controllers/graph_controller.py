@@ -91,23 +91,7 @@ class GraphController:
         if not ws or not parent_node:
             return 150, 0
             
-        # --- DÉBRAYAGE SI HORS DU MODE MINDMAP CLASSIQUE ---
-        # Si un mode de Canvas (ex: CONCEPT_MAP, KANBAN, EISENHOWER...) est activé, on évite d'empiler à droite toute.
-        current_canvas_mode = getattr(self.app, 'current_canvas_mode', 'MINDMAP')
-        if current_canvas_mode != 'MINDMAP':
-            # Répartition circulaire pour éviter les superpositions en mode Concept Map
-            import math
-            existing_children_count = len([edge for edge in parent_node.edges if edge.source_node == parent_node])
-            
-            # Calcul de l'angle basé sur le nombre d'enfants existants (45° par enfant)
-            angle = existing_children_count * (2 * math.pi / 8) 
-            radius = 150  # Distance fixe du parent
-            
-            x = parent_node.pos().x() + radius * math.cos(angle)
-            y = parent_node.pos().y() + radius * math.sin(angle)
-            return (x, y)
-
-        # Logique de positionnement MindMap classique (à droite)
+        # Logique de positionnement MindMap
         parent_w = parent_node.rect.width() if hasattr(parent_node, 'rect') else 100
         parent_right_edge = parent_node.pos().x() + (parent_w / 2)
         target_x = parent_right_edge + 150

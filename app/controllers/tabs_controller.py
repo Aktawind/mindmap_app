@@ -62,15 +62,18 @@ class TabsController:
         # 1. Synchronisation sécurisée du mode de routage des lignes
         if hasattr(ws, 'scene') and ws.scene is not None:
             current_mode = getattr(ws.scene, 'line_routing_mode', 'curved')
-            is_curved = (current_mode == 'curved')
-            
-            if hasattr(self.app, 'btn_toggle_routing') and self.app.btn_toggle_routing is not None:
-                self.app.btn_toggle_routing.blockSignals(True)
-                self.app.btn_toggle_routing.setChecked(is_curved)
-                self.app.btn_toggle_routing.blockSignals(False)
-                
-                if hasattr(self.app, 'routing_controller'):
-                    self.app.routing_controller.update_routing_button_ui()
+            combo = getattr(self.app, 'routing_mode_combo', None)
+
+            if combo is not None:
+                combo.blockSignals(True)
+                # retrouver l'index correspondant au mode actuel
+                index = combo.findData(current_mode)
+                if index >= 0:
+                    combo.setCurrentIndex(index)
+                combo.blockSignals(False)
+
+            if hasattr(self.app, 'routing_controller'):
+                self.app.routing_controller.update_routing_button_ui()
 
             # 2. Synchronisation sécurisée de l'aimant de la grille
             if hasattr(self.app, 'btn_snap') and self.app.btn_snap is not None:
