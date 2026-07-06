@@ -172,7 +172,6 @@ class WorkspaceController:
             self.workspace_files.remove(file_path)
             self.auto_save_workspace()
             
-            # 🔥 CORRECTION FLUX : Fermeture immédiate de l'onglet visuel devenu obsolète
             idx = self.app.tabs.currentIndex()
             if idx >= 0:
                 self.app.tabs_controller.close_tab(idx)
@@ -196,6 +195,11 @@ class WorkspaceController:
 
         if hasattr(self.app, 'on_selection_changed'):
             self.app.on_selection_changed()
+
+        if hasattr(self.app, 'canvas_mode_combo') and self.app.canvas_mode_combo:
+            self.app.canvas_mode_combo.blockSignals(True)
+            self.app.canvas_mode_combo.setCurrentText(self.app.current_canvas_mode)
+            self.app.canvas_mode_combo.blockSignals(False)
 
     def center_on_graph(self):
         ws = self.app.current_workspace()

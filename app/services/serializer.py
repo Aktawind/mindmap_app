@@ -1,5 +1,6 @@
 import json
 import os
+from platform import node
 from graphics.items import NodeItem, EdgeItem
 from ui.selection_manager import on_selection_changed
 
@@ -47,9 +48,8 @@ class MindMapSerializer:
                 "status": getattr(node, 'status', 'none'),
                 "attachments": getattr(node, 'attachments', []),
                 "url_link": getattr(node, 'url_link', None),
-                # 🟢 AJOUT : Nouvelles métadonnées étendues des nœuds
                 "date": getattr(node, 'date', None),
-                "priority": getattr(node, 'priority', None),
+                "priority": getattr(node, 'priority', "none"),
                 "is_compact": getattr(node, 'is_compact', False),
                 "children": []
             }
@@ -96,9 +96,8 @@ class MindMapSerializer:
                     "status": getattr(node, 'status', 'none'),
                     "attachments": getattr(node, 'attachments', []),
                     "url_link": getattr(node, 'url_link', None),
-                    # 🟢 AJOUT : Nouvelles métadonnées pour les nœuds orphelins
                     "date": getattr(node, 'date', None),
-                    "priority": getattr(node, 'priority', None),
+                    "priority": getattr(node, 'priority', "none"),
                     "is_compact": getattr(node, 'is_compact', False)
                 })
 
@@ -198,9 +197,9 @@ class MindMapSerializer:
             )
             node.border_width = data.get("border_width", 1)
 
-            # 🟢 AJOUT : Injection des nouvelles métadonnées récupérées (avec fallbacks sûrs)
             node.date = data.get("date", None)
-            node.priority = data.get("priority", None)
+            priority = data.get("priority")          
+            node.priority = priority if priority == 'null' else "none"
             node.is_compact = data.get("is_compact", False)
 
             if "attachments" in data:
@@ -262,9 +261,8 @@ class MindMapSerializer:
             )
             node.border_width = orphan.get("border_width", 1)
 
-            # 🟢 AJOUT : Injection des nouvelles métadonnées pour les nœuds orphelins également
             node.date = orphan.get("date", None)
-            node.priority = orphan.get("priority", None)
+            node.priority = orphan.get("priority", "none")
             node.is_compact = orphan.get("is_compact", False)
 
             if "attachments" in orphan:
