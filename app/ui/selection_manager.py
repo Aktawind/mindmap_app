@@ -70,15 +70,20 @@ def on_selection_changed(app) -> None:
         target_node = selected_nodes[0]
         
         # 🟢 GESTION DYNAMIQUE ET VISUELLE DES BOUTONS OUVRIR / DISSOCIER
-        is_active = bool(hasattr(target_node, 'attachments') and target_node.attachments)
+        is_active_file = bool(hasattr(target_node, 'attachments') and target_node.attachments)
+        is_active_image = bool(hasattr(target_node, 'image_path') and target_node.image_path)
         
         if hasattr(app, 'btn_open') and app.btn_open:
-            app.btn_open.setVisible(is_active)
-            app.btn_open.setEnabled(is_active)
+            app.btn_open.setVisible(is_active_file)
+            app.btn_open.setEnabled(is_active_file)
             
         if hasattr(app, 'btn_detach') and app.btn_detach:
-            app.btn_detach.setVisible(is_active)
-            app.btn_detach.setEnabled(is_active)
+            app.btn_detach.setVisible(is_active_file)
+            app.btn_detach.setEnabled(is_active_file)
+
+        if hasattr(app, 'btn_img_h') and app.btn_img_h:
+            app.btn_img_h.setVisible(is_active_image)
+            app.btn_img_h.setEnabled(is_active_image)
 
         if hasattr(app, 'style_bar') and app.style_bar:
             layout = app.style_bar.layout()

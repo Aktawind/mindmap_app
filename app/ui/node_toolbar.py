@@ -132,6 +132,16 @@ def create_node_toolbar(app_window) -> None:
     btn_url = QPushButton("🔗 URL", app_window.node_controls)
     btn_url.clicked.connect(app_window.attachment_controller.attach_url)
     nc_layout.addWidget(btn_url)
+
+    btn_img = QPushButton("🏞️ Image", app_window.node_controls)
+    btn_img.clicked.connect(app_window.image_controller.attach_image_to_selected)
+    nc_layout.addWidget(btn_img)
+
+    # Petit bouton bonus pour redimensionner la hauteur de l'image du nœud
+    app_window.btn_img_h = QPushButton("↕️ H-Img", app_window.node_controls)
+    app_window.btn_img_h.setToolTip("Modifier la hauteur de l'image")
+    app_window.btn_img_h.clicked.connect(app_window.image_controller.change_image_height)
+    nc_layout.addWidget(app_window.btn_img_h)
     
     app_window.btn_open = QPushButton("📂 Ouvrir", app_window.node_controls)
     app_window.btn_open.setStyleSheet("background: #2D3748; color: white;")
@@ -187,6 +197,7 @@ def create_node_toolbar(app_window) -> None:
         "<b>Commandes :</b><br>"
         "- Double-clic vide : Nouveau nœud<br>"
         "- Double-clic : Éditer le texte<br>"
+        "- Maj + Entrée : Retour à la ligne<br>"
         "- Sélect + Tab : Ajouter une branche<br>"
         "- Ctrl+C / Ctrl+V : Copier/Coller<br>"
         "- Ctrl + Clic : Sélectionner 2 nœuds<br>"
@@ -195,5 +206,5 @@ def create_node_toolbar(app_window) -> None:
     )
     lbl.setFont(QFont("Segoe UI", 9))
     ol_layout.addWidget(lbl)
-    app_window.overlay.resize(230, 140)
+    app_window.overlay.resize(230, 155)  # 📐 Ajusté à 155 pour laisser de la place au texte
     app_window.overlay.move(20, 100)

@@ -28,8 +28,9 @@ from controllers.tools_controller import ToolsController
 from controllers.routing_controller import RoutingController
 from controllers.grid_controller import GridController
 from controllers.tabs_controller import TabsController
+from controllers.image_controller import ImageController
 
-APP_VERSION  = "1.0.9"
+APP_VERSION  = "1.0.12"
 
 class MindMapApp(QMainWindow):
     def __init__(self):
@@ -57,6 +58,7 @@ class MindMapApp(QMainWindow):
         self.grid_controller = GridController(self)
         self.routing_controller = RoutingController(self)
         self.tabs_controller = TabsController(self)
+        self.image_controller = ImageController(self)
 
         # UI Principale
         self.tabs = QTabWidget()
@@ -133,6 +135,10 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws:
             return
+        
+        if getattr(ws, 'is_applying_state', False):
+            return
+        
         current_state = self.serializer.get_state()
         self.history_service.save_state(ws, current_state)
         self.tabs_controller.update_title()

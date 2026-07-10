@@ -1,7 +1,7 @@
 import math
 import os
 from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF
-from PyQt6.QtGui import QColor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, QPolygonF, QPainterPathStroker
+from PyQt6.QtGui import QColor, QCursor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, QPixmap, QPolygonF, QPainterPathStroker
 from PyQt6.QtWidgets import QGraphicsItem, QGraphicsPathItem
 from signals import GraphicsSignals
 
@@ -15,7 +15,8 @@ BRANCH_PALETTES = [
 
 class NodeItem(QGraphicsItem):
     def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', 
-                 file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False, **kwargs):
+                 file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False, 
+                 image_path=None, image_height=150, **kwargs):
         super().__init__()
         self.node_id = node_id
         self.label = label
@@ -50,6 +51,13 @@ class NodeItem(QGraphicsItem):
 
         self.file_path = None  # Obsolète
         self.url_link = None   # Obsolète (géré par self.attachments)
+
+        # Propriétés d'image
+        self.image_path = image_path
+        self.image_height = image_height
+        self.pixmap_cache = None
+        self._last_loaded_path = None
+
         self.is_bold = is_bold
         self.is_italic = is_italic
         self.is_strikethrough = is_strikethrough
@@ -73,6 +81,34 @@ class NodeItem(QGraphicsItem):
     def remove_edge(self, edge):
         if edge in self.edges:
             self.edges.remove(edge)
+
+    def get_scaled_image_size(self):
+        """Calcule la taille de l'image en gardant le ratio basé sur la hauteur configurée."""
+        if not self.image_path or not os.path.exists(self.image_path):
+            return 0, 0
+            
+        if self.pixmap_cache is None or self._last_loaded_path != self.image_path:
+            raw_pixmap = QPixmap(self.image_path)
+            if raw_pixmap.isNull():
+                return 0, 0
+                
+            # 🎯 AMÉLIORATION QUALITÉ : On redimensionne le Pixmap dès le chargement en cache
+            # en utilisant Qt.TransformationMode.SmoothTransformation (Bilinaire/Trilinaire)
+            ratio = raw_pixmap.width() / raw_pixmap.height()
+            target_w = int(self.image_height * ratio)
+            
+            self.pixmap_cache = raw_pixmap.scaled(
+                target_w, 
+                self.image_height, 
+                Qt.AspectRatioMode.KeepAspectRatio, 
+                Qt.TransformationMode.SmoothTransformation # 🌟 Ligne magique pour la netteté
+            )
+            self._last_loaded_path = self.image_path
+            
+        if self.pixmap_cache.isNull():
+            return 0, 0
+            
+        return self.pixmap_cache.width(), self.pixmap_cache.height()
 
     def _get_attachment_text(self, att):
         """Méthode utilitaire pour uniformiser le préfixe textuel et tronquer les noms trop longs."""
@@ -134,6 +170,33 @@ class NodeItem(QGraphicsItem):
 
     def recalculate_size(self):
         """Calcule dynamiquement la taille du nœud selon le texte principal, la date et les attachements."""
+        # Si une image valide est présente, la taille du nœud dépend uniquement d'elle
+        if self.image_path and os.path.exists(self.image_path):
+            # 🎯 FIX : On force la re-création du Pixmap mis à l'échelle pour prendre en compte la NOUVELLE hauteur
+            raw_pixmap = QPixmap(self.image_path)
+            if not raw_pixmap.isNull():
+                ratio = raw_pixmap.width() / raw_pixmap.height()
+                target_w = int(self.image_height * ratio)
+                self.pixmap_cache = raw_pixmap.scaled(
+                    target_w, self.image_height,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self._last_loaded_path = self.image_path
+
+            img_w, img_h = self.get_scaled_image_size()
+            
+            if img_w > 0 and img_h > 0:
+                padding = 20
+                width = img_w + padding
+                height = img_h + padding
+                
+                self.rect = QRectF(-width / 2, -height / 2, width, height)
+                self.prepareGeometryChange()
+                if hasattr(self, 'update_edges'):
+                    self.update_edges()
+                return
+        
         font_main = QFont('Segoe UI', 11)
         if self.is_bold: font_main.setBold(True)
         if getattr(self, 'is_italic', False):
@@ -191,6 +254,7 @@ class NodeItem(QGraphicsItem):
         self.update_edges()
 
     def paint(self, painter, option, widget=None):
+        # 1. Dessinez les ombres et le fond
         final_bg = self.bg_color
         final_border = self.border_color
         final_text_color = self.font_color
@@ -238,6 +302,22 @@ class NodeItem(QGraphicsItem):
         painter.setPen(pen)
         painter.setBrush(QBrush(final_bg))
         painter.drawPath(shape_path)
+
+        # 2. Gestion de l'affichage Image VS Texte
+        if self.image_path and os.path.exists(self.image_path):
+            img_w, img_h = self.get_scaled_image_size()
+            if self.pixmap_cache and not self.pixmap_cache.isNull():
+                
+                # 🎯 CORRECTION : On se base sur le vrai rectangle de délimitation du nœud
+                node_rect = self.boundingRect()
+                
+                # On calcule les coordonnées X et Y pour centrer l'image au milieu du rectangle bleu
+                rect_x = node_rect.x() + (node_rect.width() - img_w) / 2
+                rect_y = node_rect.y() + (node_rect.height() - img_h) / 2
+                
+                # Dessin de l'image au bon endroit
+                painter.drawPixmap(int(rect_x), int(rect_y), img_w, img_h, self.pixmap_cache)
+                return  # On coupe ici pour masquer le texte
 
         font_main = QFont('Segoe UI', 11)
         if self.is_bold: font_main.setBold(True)

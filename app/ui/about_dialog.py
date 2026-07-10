@@ -15,8 +15,9 @@ def show_app_about_dialog(app_window, version_str):
     <ul>
         <li>Routage de lignes dynamique</li>
         <li>Gestion multi-onglets et espace de travail</li>
-        <li>Système de Snap to Grid</li>
-        <li>Ajout de pièces jointes et de liens URL sur les nœuds</li>
+        <li>Système de Snap to Grid (Grille magnétique)</li>
+        <li>Intégration d'images haute qualité avec redimensionnement automatique des nœuds</li>
+        <li>Ajout de pièces jointes locales et de liens URL sur les nœuds</li>
     </ul>
     <br>
     <p><small>© 2026 Mindy App. Tous droits réservés.</small></p>

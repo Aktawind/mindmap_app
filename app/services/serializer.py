@@ -50,6 +50,8 @@ class MindMapSerializer:
                 "status": getattr(node, 'status', 'none'),
                 "attachments": getattr(node, 'attachments', []),
                 "url_link": getattr(node, 'url_link', None),
+                "image_path": getattr(node, 'image_path', None),
+                "image_height": getattr(node, 'image_height', 150),
                 "date": getattr(node, 'date', None),
                 "priority": getattr(node, 'priority', "none"),
                 "is_compact": getattr(node, 'is_compact', False),
@@ -99,6 +101,8 @@ class MindMapSerializer:
                     "status": getattr(node, 'status', 'none'),
                     "attachments": getattr(node, 'attachments', []),
                     "url_link": getattr(node, 'url_link', None),
+                    "image_path": getattr(node, 'image_path', None),
+                    "image_height": getattr(node, 'image_height', 150),
                     "date": getattr(node, 'date', None),
                     "priority": getattr(node, 'priority', "none"),
                     "is_compact": getattr(node, 'is_compact', False)
@@ -168,6 +172,8 @@ class MindMapSerializer:
             if not data: return None
             
             node_id = data.get("id") or ('root' if parent_node is None else f"node_{node_counter[0]}")
+            img_path = data.get("image_path", None)
+            img_height = data.get("image_height", 150)
             
             # 🚨 SÉCURITÉ ANTI-DOUBLON
             if node_id in created_nodes:
@@ -191,7 +197,8 @@ class MindMapSerializer:
                 shape=data.get("shape", "box"), bg=bg, border=border, font_color=font_color,
                 file_path=data.get("file_path"), url_link=data.get("url_link"), 
                 is_bold=data.get("is_bold", False),  is_italic=data.get("is_italic", False), 
-                is_strikethrough=data.get("is_strikethrough", False), status=status
+                is_strikethrough=data.get("is_strikethrough", False), status=status,
+                image_path=img_path, image_height=img_height,
             )
             node.border_width = data.get("border_width", 1)
 
@@ -249,6 +256,9 @@ class MindMapSerializer:
             
             if node_id in created_nodes:
                 continue
+
+            img_path = orphan.get("image_path", None)
+            img_height = orphan.get("image_height", 150)
                 
             node = NodeItem(
                 node_id, orphan.get("label", ""), orphan.get("x", 0.0), orphan.get("y", 0.0),
@@ -256,7 +266,8 @@ class MindMapSerializer:
                 border=orphan.get("border", '#3B82F6'), font_color=orphan.get("font_color", '#ffffff'),
                 file_path=orphan.get("file_path"), url_link=orphan.get("url_link"),
                 is_bold=orphan.get("is_bold", False), is_italic=orphan.get("is_italic", False),
-                is_strikethrough=orphan.get("is_strikethrough", False), status=orphan.get("status", "none")
+                is_strikethrough=orphan.get("is_strikethrough", False), status=orphan.get("status", "none"),
+                image_path=img_path, image_height=img_height,
             )
             node.border_width = orphan.get("border_width", 1)
 
@@ -311,6 +322,10 @@ class MindMapSerializer:
 
         ws.is_applying_state = False
         on_selection_changed(self.app)
+
+        if hasattr(self.app, 'image_controller'):
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, self.app.image_controller.cleanup_orphaned_images)
 
         # Force le bouton ou le widget de la toolbar à lire l'état qui vient d'être chargé
         if hasattr(self.app, 'routing_controller'):
