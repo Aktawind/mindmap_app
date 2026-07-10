@@ -45,6 +45,8 @@ class MindMapSerializer:
                 "font_color": node.font_color.name() if hasattr(node, 'font_color') else '#ffffff',
                 "border_width": getattr(node, 'border_width', 1),
                 "is_bold": getattr(node, 'is_bold', False),
+                "is_italic": getattr(node, 'is_italic', False),       
+                "is_strikethrough": getattr(node, 'is_strikethrough', False), 
                 "status": getattr(node, 'status', 'none'),
                 "attachments": getattr(node, 'attachments', []),
                 "url_link": getattr(node, 'url_link', None),
@@ -92,6 +94,8 @@ class MindMapSerializer:
                     "font_color": node.font_color.name() if hasattr(node, 'font_color') else '#ffffff',
                     "border_width": getattr(node, 'border_width', 1),
                     "is_bold": getattr(node, 'is_bold', False),
+                    "is_italic": getattr(node, 'is_italic', False),
+                    "is_strikethrough": getattr(node, 'is_strikethrough', False),
                     "status": getattr(node, 'status', 'none'),
                     "attachments": getattr(node, 'attachments', []),
                     "url_link": getattr(node, 'url_link', None),
@@ -186,7 +190,8 @@ class MindMapSerializer:
                 node_id, clean_label, x, y,
                 shape=data.get("shape", "box"), bg=bg, border=border, font_color=font_color,
                 file_path=data.get("file_path"), url_link=data.get("url_link"), 
-                is_bold=data.get("is_bold", False), status=status
+                is_bold=data.get("is_bold", False),  is_italic=data.get("is_italic", False), 
+                is_strikethrough=data.get("is_strikethrough", False), status=status
             )
             node.border_width = data.get("border_width", 1)
 
@@ -250,7 +255,8 @@ class MindMapSerializer:
                 shape=orphan.get("shape", "box"), bg=orphan.get("bg", '#60A5FA'),
                 border=orphan.get("border", '#3B82F6'), font_color=orphan.get("font_color", '#ffffff'),
                 file_path=orphan.get("file_path"), url_link=orphan.get("url_link"),
-                is_bold=orphan.get("is_bold", False), status=orphan.get("status", "none")
+                is_bold=orphan.get("is_bold", False), is_italic=orphan.get("is_italic", False),
+                is_strikethrough=orphan.get("is_strikethrough", False), status=orphan.get("status", "none")
             )
             node.border_width = orphan.get("border_width", 1)
 

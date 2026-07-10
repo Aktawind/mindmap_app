@@ -47,7 +47,25 @@ def create_node_toolbar(app_window) -> None:
     btn_bold.setStyleSheet("QPushButton { padding: 0px; margin: 0px; }")
     btn_bold.clicked.connect(app_window.style_controller.toggle_bold)
     nc_layout.addWidget(btn_bold)
-    
+
+    btn_italic = QPushButton("Italic", app_window.node_controls)
+    font_it = QFont("Arial", 10)
+    font_it.setItalic(True)
+    btn_italic.setFont(font_it)
+    btn_italic.setFixedSize(45, 26)
+    btn_italic.setStyleSheet("QPushButton { padding: 0px; margin: 0px; }")
+    btn_italic.clicked.connect(app_window.style_controller.toggle_italic)
+    nc_layout.addWidget(btn_italic)
+
+    btn_strike = QPushButton("Strike", app_window.node_controls)
+    font_st = QFont("Arial", 10)
+    font_st.setStrikeOut(True)
+    btn_strike.setFont(font_st)
+    btn_strike.setFixedSize(45, 26)
+    btn_strike.setStyleSheet("QPushButton { padding: 0px; margin: 0px; }")
+    btn_strike.clicked.connect(app_window.style_controller.toggle_strikethrough)
+    nc_layout.addWidget(btn_strike)
+   
     nc_layout.addWidget(ToolsController.create_separator(app_window))
     
     app_window.shape_combo = QComboBox(app_window.node_controls)

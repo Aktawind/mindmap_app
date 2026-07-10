@@ -117,6 +117,8 @@ class ToolsController:
                 "border": src.border_color.name() if hasattr(src, 'border_color') else '#3B82F6',
                 "font_color": src.font_color.name() if hasattr(src, 'font_color') else '#ffffff',
                 "is_bold": getattr(src, 'is_bold', False),
+                "is_italic": getattr(src, 'is_italic', False),
+                "is_strikethrough": getattr(src, 'is_strikethrough', False),
                 "status": getattr(src, 'status', 'none'),
                 "notes": getattr(src, 'notes', ''),
                 "file_path": getattr(src, 'file_path', None),

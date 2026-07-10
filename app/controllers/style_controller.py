@@ -61,6 +61,34 @@ class StyleController:
                 node.update()
             self.app.save_state()
 
+    def toggle_italic(self):
+        """Bascule le format italique sur les nœuds sélectionnés."""
+        ws = self.app.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        if nodes:
+            for node in nodes:
+                node.is_italic = not getattr(node, 'is_italic', False)
+                if hasattr(node, 'recalculate_size'):
+                    node.recalculate_size()
+                node.update()
+            self.app.save_state()
+
+    def toggle_strikethrough(self):
+        """Bascule le format barré sur les nœuds sélectionnés."""
+        ws = self.app.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        if nodes:
+            for node in nodes:
+                node.is_strikethrough = not getattr(node, 'is_strikethrough', False)
+                if hasattr(node, 'recalculate_size'):
+                    node.recalculate_size()
+                node.update()
+            self.app.save_state()
+
     def on_shape_combo_changed(self, index):
         if getattr(self, '_updating_ui', False):
             return

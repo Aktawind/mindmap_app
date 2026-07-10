@@ -14,7 +14,8 @@ BRANCH_PALETTES = [
 ]
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', file_path=None, url_link=None, is_bold=False, status='none'):
+    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', 
+                 file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False, **kwargs):
         super().__init__()
         self.node_id = node_id
         self.label = label
@@ -50,7 +51,8 @@ class NodeItem(QGraphicsItem):
         self.file_path = None  # Obsolète
         self.url_link = None   # Obsolète (géré par self.attachments)
         self.is_bold = is_bold
-        self.status = status 
+        self.is_italic = is_italic
+        self.is_strikethrough = is_strikethrough
         self.border_width = 1
        
         self.setPos(x, y)
@@ -134,6 +136,11 @@ class NodeItem(QGraphicsItem):
         """Calcule dynamiquement la taille du nœud selon le texte principal, la date et les attachements."""
         font_main = QFont('Segoe UI', 11)
         if self.is_bold: font_main.setBold(True)
+        if getattr(self, 'is_italic', False):
+            font_main.setItalic(True)
+        if getattr(self, 'is_strikethrough', False):
+            font_main.setStrikeOut(True)
+        
         fm_main = QFontMetrics(font_main)
         
         display_label = self.label
@@ -234,6 +241,10 @@ class NodeItem(QGraphicsItem):
 
         font_main = QFont('Segoe UI', 11)
         if self.is_bold: font_main.setBold(True)
+        if getattr(self, 'is_italic', False):
+            font_main.setItalic(True)
+        if getattr(self, 'is_strikethrough', False):
+            font_main.setStrikeOut(True)
         painter.setFont(font_main)
         painter.setPen(QPen(final_text_color))
         
