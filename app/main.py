@@ -30,7 +30,7 @@ from controllers.grid_controller import GridController
 from controllers.tabs_controller import TabsController
 from controllers.image_controller import ImageController
 
-APP_VERSION  = "1.0.12"
+APP_VERSION  = "1.0.13"
 
 class MindMapApp(QMainWindow):
     def __init__(self):
