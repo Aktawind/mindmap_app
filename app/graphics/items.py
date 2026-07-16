@@ -16,7 +16,7 @@ BRANCH_PALETTES = [
 class NodeItem(QGraphicsItem):
     def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', 
                  file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False, 
-                 image_path=None, image_height=150, **kwargs):
+                 image_path=None, image_height=150, status='none', priority='none', is_compact=False, **kwargs):
         super().__init__()
         self.node_id = node_id
         self.label = label
@@ -26,9 +26,9 @@ class NodeItem(QGraphicsItem):
         self.font_color = QColor(font_color)
         
         self.date = None       
-        self.status = 'none'
-        self.priority = 'none'  
-        self.is_compact = False 
+        self.status = status
+        self.priority = priority  
+        self.is_compact = is_compact 
 
         self.attachments = []
         

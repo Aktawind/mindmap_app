@@ -266,7 +266,10 @@ class MindMapSerializer:
                 border=orphan.get("border", '#3B82F6'), font_color=orphan.get("font_color", '#ffffff'),
                 file_path=orphan.get("file_path"), url_link=orphan.get("url_link"),
                 is_bold=orphan.get("is_bold", False), is_italic=orphan.get("is_italic", False),
-                is_strikethrough=orphan.get("is_strikethrough", False), status=orphan.get("status", "none"),
+                is_strikethrough=orphan.get("is_strikethrough", False), 
+                status=orphan.get("status", "none"), 
+                priority=orphan.get("priority", "none"), 
+                is_compact=orphan.get("is_compact", False), 
                 image_path=img_path, image_height=img_height,
             )
             node.border_width = orphan.get("border_width", 1)
