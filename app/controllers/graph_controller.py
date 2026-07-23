@@ -1,5 +1,5 @@
 import time
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, QRectF
 from graphics.items import BRANCH_PALETTES, NodeItem, EdgeItem
 
 class GraphController:
@@ -86,43 +86,77 @@ class GraphController:
             self.app.editing_controller.start_inline_editing(new_node)
 
     def calculate_smart_position(self, parent_node):
-        """Calcule un emplacement libre. Si un Canvas structuré ou une Concept Map est actif, l'arbre automatique est débrayé."""
+        """Calcule l'emplacement le plus proche autour du parent en testant les 4 directions."""
         ws = self.app.current_workspace()
         if not ws or not parent_node:
             return 150, 0
-            
-        # Logique de positionnement MindMap
-        parent_w = parent_node.rect.width() if hasattr(parent_node, 'rect') else 100
-        parent_right_edge = parent_node.pos().x() + (parent_w / 2)
-        target_x = parent_right_edge + 150
+
+        p_pos = parent_node.pos()
+        p_rect = parent_node.rect if hasattr(parent_node, 'rect') else QRectF(-50, -20, 100, 40)
         
-        child_edges = [e for e in parent_node.edges if e.source_node == parent_node] if hasattr(parent_node, 'edges') else []
-        if child_edges:
-            lowest_y = parent_node.pos().y()
-            for e in child_edges:
-                if hasattr(e, 'dest_node') and e.dest_node.pos().y() > lowest_y: 
-                    lowest_y = e.dest_node.pos().y()
-            target_y = lowest_y + 85
-        else:
-            target_y = parent_node.pos().y()
+        # Marge de la branche (espace suffisant pour laisser passer le lien/arête)
+        margin_x = 70
+        margin_y = 50
 
-        all_nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
-        if len(all_nodes) <= 1:
-            return target_x, target_y
+        # Récupération de tous les autres nœuds pour détecter les collisions
+        all_nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem) and i != parent_node]
 
-        overlap = True
-        iterations = 0
-        while overlap and iterations < 100:
-            overlap = False
-            iterations += 1
+        # 4 directions candidates à tester autour du parent (Droites, Gauche, Bas, Haut)
+        candidates = [
+            # Droite
+            QPointF(p_pos.x() + (p_rect.width() / 2) + margin_x + 50, p_pos.y()),
+            # Gauche
+            QPointF(p_pos.x() - (p_rect.width() / 2) - margin_x - 50, p_pos.y()),
+            # Bas
+            QPointF(p_pos.x(), p_pos.y() + (p_rect.height() / 2) + margin_y + 20),
+            # Haut
+            QPointF(p_pos.x(), p_pos.y() - (p_rect.height() / 2) - margin_y - 20),
+        ]
+
+        # Définition des dimensions estimées d'un nouveau nœud
+        node_w, node_h = 120, 40
+
+        for pos in candidates:
+            cand_rect = QRectF(pos.x() - node_w / 2, pos.y() - node_h / 2, node_w, node_h)
+            
+            # Vérification de collision avec un autre nœud
+            has_collision = False
             for n in all_nodes:
-                if n == parent_node: 
-                    continue
-                if abs(n.pos().x() - target_x) < 180 and abs(n.pos().y() - target_y) < 65:
-                    target_y += 85
-                    overlap = True
+                n_rect = QRectF(n.pos().x() - n.rect.width() / 2, n.pos().y() - n.rect.height() / 2, n.rect.width(), n.rect.height())
+                # On ajoute une petite zone de sécurité autour des nœuds existants
+                if cand_rect.intersects(n_rect.adjusted(-20, -20, 20, 20)):
+                    has_collision = True
                     break
-        return target_x, target_y
+
+            if not has_collision:
+                return pos.x(), pos.y()
+
+        # Si les 4 positions directes sont occupées, on cherche en spirale autour du parent
+        angle = 0
+        distance = max(p_rect.width(), p_rect.height()) + 80
+        while distance < 2000:
+            import math
+            rad = math.radians(angle)
+            test_x = p_pos.x() + distance * math.cos(rad)
+            test_y = p_pos.y() + distance * math.sin(rad)
+            
+            cand_rect = QRectF(test_x - node_w / 2, test_y - node_h / 2, node_w, node_h)
+            has_collision = False
+            for n in all_nodes:
+                n_rect = QRectF(n.pos().x() - n.rect.width() / 2, n.pos().y() - n.rect.height() / 2, n.rect.width(), n.rect.height())
+                if cand_rect.intersects(n_rect.adjusted(-20, -20, 20, 20)):
+                    has_collision = True
+                    break
+
+            if not has_collision:
+                return test_x, test_y
+
+            angle += 45
+            if angle >= 360:
+                angle = 0
+                distance += 60
+
+        return p_pos.x() + 150, p_pos.y()
 
     def delete_selected(self):
         """Supprime de manière sécurisée les éléments sélectionnés de la scène."""
