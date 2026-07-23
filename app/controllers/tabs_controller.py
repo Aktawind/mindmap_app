@@ -89,14 +89,20 @@ class TabsController:
             self.app.workspace_controller.update_workspace_ui()
 
     def update_title(self):
-        """Actualise dynamiquement le titre de l'onglet et de la fenêtre principale."""
+        """Actualise dynamiquement le titre de l'onglet et de la fenêtre principale (sans .json)."""
         ws = self.app.current_workspace()
         if not ws: return
         
         idx = self.app.tabs.currentIndex()
         if idx < 0: return
 
-        base_title = os.path.basename(ws.current_file_path) if getattr(ws, 'current_file_path', None) else "[Nouveau Projet]"
+        if getattr(ws, 'current_file_path', None):
+            # Récupère le nom du fichier et retire l'extension .json
+            file_name = os.path.basename(ws.current_file_path)
+            base_title = os.path.splitext(file_name)[0] if file_name.endswith('.json') else file_name
+        else:
+            base_title = "[Nouveau Projet]"
+
         suffix = " *" if getattr(ws, 'is_dirty', False) else ""
         display_title = base_title + suffix
         
