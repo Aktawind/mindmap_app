@@ -172,13 +172,16 @@ class AttachmentController:
 
         # 1. Collecter tous les chemins de fichiers relatifs utilisés par tous les nœuds de la scène
         used_paths = set()
-        for item in ws.scene.items():
-            if isinstance(item, NodeItem):
-                attachments = getattr(item, 'attachments', [])
-                for att in attachments:
-                    if att.get("type") == "file" and att.get("is_local_copy") and att.get("path"):
-                        # Stocke le nom du fichier physique (ex: "file_123_0.pdf")
-                        used_paths.add(os.path.basename(att["path"]))
+        if hasattr(self.app, 'tabs'):
+            for i in range(self.app.tabs.count()):
+                tab_ws = self.app.tabs.widget(i)
+                if hasattr(tab_ws, 'scene') and tab_ws.scene:
+                    for item in tab_ws.scene.items():
+                        if isinstance(item, NodeItem):
+                            attachments = getattr(item, 'attachments', [])
+                            for att in attachments:
+                                if att.get("type") == "file" and att.get("is_local_copy") and att.get("path"):
+                                    used_paths.add(os.path.basename(att["path"]))
 
         # 2. Lister les fichiers physiques présents dans le dossier .mindmap_attachments
         try:

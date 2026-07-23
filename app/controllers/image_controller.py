@@ -57,6 +57,10 @@ class ImageController:
             if hasattr(node, 'recalculate_size'):
                 node.recalculate_size()
             node.update()
+
+            ws.is_dirty = True
+            if hasattr(self.app, 'tabs_controller'):
+                self.app.tabs_controller.update_title()
             
             self.app.save_state()
             
@@ -106,11 +110,14 @@ class ImageController:
         # 1. Lister toutes les images actuellement utilisées par les nœuds de la scène
         from graphics.items import NodeItem
         used_images = set()
-        for item in ws.scene.items():
-            if isinstance(item, NodeItem) and getattr(item, 'image_path', None):
-                # 🎯 NORMALISATION TOTALEMENT SÉCURISÉE DES CHEMINS
-                normalized_path = os.path.abspath(os.path.normpath(item.image_path))
-                used_images.add(normalized_path)
+        if hasattr(self.app, 'tabs'):
+            for i in range(self.app.tabs.count()):
+                tab_ws = self.app.tabs.widget(i)
+                if hasattr(tab_ws, 'scene') and tab_ws.scene:
+                    for item in tab_ws.scene.items():
+                        if isinstance(item, NodeItem) and getattr(item, 'image_path', None):
+                            normalized_path = os.path.abspath(os.path.normpath(item.image_path))
+                            used_images.add(normalized_path)
 
         valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp')
         
