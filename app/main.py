@@ -5,6 +5,8 @@ from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtCore import QSettings, QTimer
 from PyQt6 import sip
 
+from services.updater_service import check_for_updates
+from services.updater_service import CURRENT_VERSION as APP_VERSION
 from graphics.scene import MindMapWorkspace
 
 from ui.menus import create_menus
@@ -29,8 +31,6 @@ from controllers.routing_controller import RoutingController
 from controllers.grid_controller import GridController
 from controllers.tabs_controller import TabsController
 from controllers.image_controller import ImageController
-
-APP_VERSION  = "1.0.13"
 
 class MindMapApp(QMainWindow):
     def __init__(self):
@@ -82,6 +82,8 @@ class MindMapApp(QMainWindow):
         
         # Un léger délai pour laisser l'interface s'afficher
         QTimer.singleShot(100, self.initialize_startup_session)
+
+        check_for_updates(self)
 
     def initialize_startup_session(self):
         """Décide au démarrage s'il faut charger la workspace ou le dernier projet."""

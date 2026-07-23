@@ -5,7 +5,7 @@ def show_app_about_dialog(app_window, version_str):
     """Affiche la boîte de dialogue 'À propos' de l'application avec un rendu HTML garanti."""
     about_text = f"""
     <h3>Mindy — Éditeur de Mind Mapping</h3>
-    <p><b>Version :</b> v{version_str}</p>
+    <p><b>Version :</b> {version_str}</p>
     <p><b>Développeur :</b> Audrey DEAL</p>
     <hr>
     <p>Mindy est une application intuitive conçue pour structurer vos idées, 
