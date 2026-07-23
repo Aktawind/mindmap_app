@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['app\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[('icon.ico', '.'), ('templates', 'templates')],
+    datas=[('app/icon.ico', '.'), ('app/templates', 'templates')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -19,27 +19,21 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='Mindy',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.ico'],
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='Mindy',
+    icon=['app\\icon.ico'],
 )
