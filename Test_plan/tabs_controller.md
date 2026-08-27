@@ -1,3 +1,0 @@
-Test de l'étoile de modification (*) : Modifiez un nœud dans un onglet. Vérifiez que l'étoile * apparaît bien dans l'onglet. Changez d'onglet, puis revenez : l'étoile doit être persistante et le bouton de routage doit reprendre exactement l'état de l'onglet actif.
-
-Test de l'annulation de sauvegarde : Fermez un onglet non sauvegardé. Quand la boîte de dialogue surgit, cliquez sur "Yes" (Enregistrer). Le sérialiseur ouvre un explorateur de fichiers. Cliquez sur "Annuler". L'onglet doit rester ouvert sans causer de bug graphique ou de fermeture forcée.
