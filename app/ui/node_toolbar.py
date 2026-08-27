@@ -116,13 +116,32 @@ def create_node_toolbar(app_window) -> None:
         ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'), 
         ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')
     ]
-    for color, border in colors_palette:            
+    for color, border in colors_palette:
         btn = QPushButton(app_window.node_controls)
         btn.setFixedSize(22, 22)
         btn.setStyleSheet(f"background: {color}; border: 2px solid {border}; border-radius: 11px;")
         btn.clicked.connect(lambda _, c=color, b=border: app_window.style_controller.change_color(c, b))
         nc_layout.addWidget(btn)
-        
+
+    # Palette de couleurs personnalisées (ajoutées par l'utilisateur, sauvegardées, supprimables)
+    app_window.custom_colors_widget = QWidget(app_window.node_controls)
+    app_window.custom_colors_layout = QHBoxLayout(app_window.custom_colors_widget)
+    app_window.custom_colors_layout.setContentsMargins(0, 0, 0, 0)
+    app_window.custom_colors_layout.setSpacing(4)
+    nc_layout.addWidget(app_window.custom_colors_widget)
+
+    btn_add_custom_color = QPushButton("+", app_window.node_controls)
+    btn_add_custom_color.setFixedSize(22, 22)
+    btn_add_custom_color.setToolTip("Ajouter une couleur personnalisée à la palette")
+    btn_add_custom_color.setStyleSheet(
+        "QPushButton { border: 2px dashed #94A3B8; border-radius: 11px; padding: 0px; font-weight: bold; color: #64748B; } "
+        "QPushButton:hover { background: #E2E8F0; }"
+    )
+    btn_add_custom_color.clicked.connect(app_window.style_controller.add_custom_color)
+    nc_layout.addWidget(btn_add_custom_color)
+
+    app_window.style_controller.refresh_custom_color_buttons()
+
     nc_layout.addWidget(ToolsController.create_separator(app_window))
     
     btn_attach = QPushButton("📎 Fichier", app_window.node_controls)
@@ -192,19 +211,38 @@ def create_node_toolbar(app_window) -> None:
     app_window.overlay = QFrame(app_window)
     app_window.overlay.setStyleSheet("background: rgba(255,255,255,0.95); border-radius: 8px; border: 1px solid #ddd; color: #2d3748;")
     ol_layout = QVBoxLayout(app_window.overlay)
-    
+
+    ol_header = QHBoxLayout()
+    ol_header.setContentsMargins(0, 0, 0, 0)
+    ol_title = QLabel("<b>Commandes :</b>", app_window.overlay)
+    ol_header.addWidget(ol_title)
+    ol_header.addStretch()
+    btn_close_overlay = QPushButton("✕", app_window.overlay)
+    btn_close_overlay.setFixedSize(18, 18)
+    btn_close_overlay.setStyleSheet(
+        "QPushButton { padding: 0px; margin: 0px; border: none; background: transparent; color: #888; font-weight: bold; } "
+        "QPushButton:hover { color: #333; }"
+    )
+    btn_close_overlay.clicked.connect(lambda: app_window.action_toggle_shortcuts.setChecked(False))
+    ol_header.addWidget(btn_close_overlay)
+    ol_layout.addLayout(ol_header)
+
     lbl = QLabel(
-        "<b>Commandes :</b><br>"
         "- Double-clic vide : Nouveau nœud<br>"
         "- Double-clic : Éditer le texte<br>"
         "- Maj + Entrée : Retour à la ligne<br>"
         "- Sélect + Tab : Ajouter une branche<br>"
         "- Ctrl+C / Ctrl+V : Copier/Coller<br>"
         "- Ctrl + Clic : Sélectionner 2 nœuds<br>"
-        "- Suppr : Supprimer l'élément", 
+        "- Suppr : Supprimer l'élément",
         app_window.overlay
     )
     lbl.setFont(QFont("Segoe UI", 9))
     ol_layout.addWidget(lbl)
-    app_window.overlay.resize(230, 155)  # 📐 Ajusté à 155 pour laisser de la place au texte
+    app_window.overlay.resize(230, 175)  # 📐 Ajusté pour laisser de la place au bouton de fermeture
     app_window.overlay.move(20, 100)
+
+    show_overlay = app_window.settings.value("show_shortcuts_overlay", True, type=bool)
+    app_window.overlay.setVisible(show_overlay)
+    if hasattr(app_window, 'action_toggle_shortcuts') and app_window.action_toggle_shortcuts is not None:
+        app_window.action_toggle_shortcuts.setChecked(show_overlay)

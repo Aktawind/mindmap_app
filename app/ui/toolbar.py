@@ -111,8 +111,8 @@ def create_toolbar(app_window) -> None:
     btn_center = QPushButton("Auto Center", workspace_toolbar)
     btn_center.setToolTip("Centrer la vue sur le nœud principal")
     btn_center.setStyleSheet("""
-        QPushButton { background-color: #3B82F6; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
-        QPushButton:hover { background-color: #2563EB; }
+        QPushButton { background-color: #64748B; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #475569; }
     """)
     btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
     workspace_toolbar.addWidget(btn_center)

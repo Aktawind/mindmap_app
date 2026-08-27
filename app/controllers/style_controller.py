@@ -1,6 +1,8 @@
+import json
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QInputDialog
-from graphics.items import NodeItem
+from PyQt6.QtWidgets import QInputDialog, QMessageBox, QColorDialog, QPushButton
+from graphics.items import NodeItem, compute_contrast_font_color
 
 class StyleController:
     def __init__(self, app):
@@ -38,6 +40,7 @@ class StyleController:
         # 1. On applique la couleur au nœud actuel
         node.bg_color = QColor(bg_color)
         node.border_color = QColor(border_color)
+        node.font_color = QColor(compute_contrast_font_color(bg_color))
         node.update()
 
         # 2. Descente récursive vers les enfants via les arêtes naturelles
@@ -45,6 +48,72 @@ class StyleController:
             for edge in node.edges:
                 if getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node:
                     self.apply_color_downward(edge.dest_node, bg_color, border_color, visited)
+
+    def load_custom_colors(self):
+        raw = self.app.settings.value("custom_node_colors", "[]")
+        try:
+            colors = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError):
+            colors = []
+        return colors if isinstance(colors, list) else []
+
+    def save_custom_colors(self, colors):
+        self.app.settings.setValue("custom_node_colors", json.dumps(colors))
+
+    def refresh_custom_color_buttons(self):
+        layout = getattr(self.app, 'custom_colors_layout', None)
+        if layout is None:
+            return
+
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        for hex_color in self.load_custom_colors():
+            border = QColor(hex_color).darker(130).name()
+            btn = QPushButton()
+            btn.setFixedSize(22, 22)
+            btn.setToolTip("Clic : appliquer  •  Clic droit : supprimer")
+            btn.setStyleSheet(f"background: {hex_color}; border: 2px solid {border}; border-radius: 11px;")
+            btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            btn.clicked.connect(lambda checked, c=hex_color, b=border: self.change_color(c, b))
+            btn.customContextMenuRequested.connect(lambda pos, c=hex_color: self.remove_custom_color(c))
+            layout.addWidget(btn)
+
+    def add_custom_color(self):
+        ws = self.app.current_workspace()
+        sel = ws.scene.selectedItems() if ws else []
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        initial = nodes[0].bg_color if nodes else QColor('#60A5FA')
+
+        color = QColorDialog.getColor(initial, self.app, "Choisir une couleur personnalisée")
+        if not color.isValid():
+            return
+
+        hex_color = color.name()
+        colors = self.load_custom_colors()
+        if hex_color not in colors:
+            colors.append(hex_color)
+            self.save_custom_colors(colors)
+            self.refresh_custom_color_buttons()
+
+        self.change_color(hex_color, color.darker(130).name())
+
+    def remove_custom_color(self, hex_color):
+        colors = self.load_custom_colors()
+        if hex_color not in colors:
+            return
+        reply = QMessageBox.question(
+            self.app, "Supprimer la couleur",
+            "Supprimer cette couleur personnalisée de la palette ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            colors.remove(hex_color)
+            self.save_custom_colors(colors)
+            self.refresh_custom_color_buttons()
 
     def toggle_bold(self):
         ws = self.app.current_workspace()
