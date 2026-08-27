@@ -13,7 +13,7 @@ BRANCH_PALETTES = [
     {'bg': '#FFEBEE', 'border': '#EF9A9A', 'text': '#333333', 'edge': '#EF9A9A'}
 ]
 
-MAX_CHARS_PER_LINE = 28
+MAX_CHARS_PER_LINE = 40
 
 
 def compute_contrast_font_color(bg_hex):

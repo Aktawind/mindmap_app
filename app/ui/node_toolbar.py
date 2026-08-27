@@ -162,11 +162,6 @@ def create_node_toolbar(app_window) -> None:
     app_window.btn_img_h.clicked.connect(app_window.image_controller.change_image_height)
     nc_layout.addWidget(app_window.btn_img_h)
     
-    app_window.btn_open = QPushButton("📂 Ouvrir", app_window.node_controls)
-    app_window.btn_open.setStyleSheet("background: #2D3748; color: white;")
-    app_window.btn_open.clicked.connect(app_window.attachment_controller.open_file)
-    nc_layout.addWidget(app_window.btn_open)
-
     app_window.btn_detach = QPushButton("❌ Dissocier", app_window.node_controls)
     app_window.btn_detach.setStyleSheet("background: #FED7D7; color: #C53030;")
     app_window.btn_detach.clicked.connect(app_window.attachment_controller.detach_links)
@@ -234,12 +229,13 @@ def create_node_toolbar(app_window) -> None:
         "- Sélect + Tab : Ajouter une branche<br>"
         "- Ctrl+C / Ctrl+V : Copier/Coller<br>"
         "- Ctrl + Clic : Sélectionner 2 nœuds<br>"
-        "- Suppr : Supprimer l'élément",
+        "- Suppr : Supprimer l'élément<br>"
+        "- Clic droit sur couleur perso : Supprimer",
         app_window.overlay
     )
     lbl.setFont(QFont("Segoe UI", 9))
     ol_layout.addWidget(lbl)
-    app_window.overlay.resize(230, 175)  # 📐 Ajusté pour laisser de la place au bouton de fermeture
+    app_window.overlay.resize(260, 190)  # 📐 Ajusté pour laisser de la place au bouton de fermeture
     app_window.overlay.move(20, 100)
 
     show_overlay = app_window.settings.value("show_shortcuts_overlay", True, type=bool)

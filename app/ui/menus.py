@@ -19,9 +19,14 @@ def create_menus(app_window):
     # MENU FICHIER
     # ==========================================
     file_menu = menu_bar.addMenu("Fichier")
+
+    workspace_menu = file_menu.addMenu("Espaces de travail")
+    workspace_menu.addAction("📄 Nouvel espace de travail", app_window.workspace_controller.new_workspace)
+    workspace_menu.addAction("📂 Ouvrir un espace de travail", app_window.workspace_controller.load_workspace)
+
+    file_menu.addSeparator()
     
     file_menu.addAction("📄 Nouveau mindmap", lambda: app_window.project_service.new_project())
-    file_menu.addSeparator()
     file_menu.addAction("📂 Ouvrir un mindmap", app_window.project_service.load_project)
     
     # Sécurisation des actions avec raccourcis (on évite le chaînage destructeur de pointeur)
@@ -32,11 +37,6 @@ def create_menus(app_window):
     
     file_menu.addAction("💾 Enregistrer sous...", lambda: app_window.project_service.save_project(force_save_as=True))
 
-    file_menu.addSeparator()
-    workspace_menu = file_menu.addMenu("Espaces de travail")
-    workspace_menu.addAction("📄 Nouvel espace de travail", app_window.workspace_controller.new_workspace)
-    workspace_menu.addAction("📂 Ouvrir un espace de travail", app_window.workspace_controller.load_workspace)
-    
     # ==========================================
     # MENU ÉDITION
     # ==========================================
@@ -76,7 +76,7 @@ def create_menus(app_window):
     # MENU AFFICHAGE
     # ==========================================
     display_menu = menu_bar.addMenu("Affichage")
-    app_window.action_toggle_shortcuts = display_menu.addAction("Afficher l'encart des raccourcis")
+    app_window.action_toggle_shortcuts = display_menu.addAction("Afficher les raccourcis")
     app_window.action_toggle_shortcuts.setCheckable(True)
     app_window.action_toggle_shortcuts.setChecked(True)
     app_window.action_toggle_shortcuts.toggled.connect(lambda checked: _toggle_shortcuts_overlay(app_window, checked))
