@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget, QLineEdit, QSizePolicy
 from PyQt6.QtCore import Qt
+from services.template_service import refresh_template_combo
 
 def create_toolbar(app_window) -> None:
     """
@@ -86,22 +87,10 @@ def create_toolbar(app_window) -> None:
 
     workspace_toolbar.addSeparator()
     
-    # ComboBox des modèles (Templates)
+    # ComboBox des modèles (Templates), peuplée dynamiquement depuis le dossier des templates
     app_window.template_combo = QComboBox(workspace_toolbar)
-    app_window.template_combo.addItem("Choisir un template...")
-    app_window.template_combo.addItem("🎯 Cadrage d'Idée", "cadrage_idee.json")
-    app_window.template_combo.addItem("🔍 Résolution de Problème", "resolution_probleme.json")
-    app_window.template_combo.addItem("⏳ Organisation des priorités", "gestion_temps.json")
-    app_window.template_combo.addItem("🧠 Brain Dump", "brain_dump.json")
-    app_window.template_combo.addItem("🚀 Onboarding Technique", "onboarding_technique.json")
-    app_window.template_combo.addItem("🎨 Hub Multi-Passions", "hub_passions.json")
-    app_window.template_combo.addItem("✈️ Organisation d'un Voyage", "organisation_voyage.json")
-    app_window.template_combo.addItem("🗣️ Préparation Réunion", "preparation_reunion.json")
-    app_window.template_combo.addItem("🏁 Rétrospective de Fin de Projet", "retro_projet.json")
-    app_window.template_combo.addItem("☀️ Daily Capsule", "daily_capsule.json")
-    app_window.template_combo.addItem("🔋 Santé Mentale et Énergie", "sante_mentale_energie.json")
-    app_window.template_combo.addItem("🚨 Urgence Colère", "urgence_colere.json")
-    
+    refresh_template_combo(app_window)
+
     app_window.template_combo.currentIndexChanged.connect(
         lambda idx, window=app_window: window.tools_controller.apply_template(idx)
     )

@@ -17,6 +17,7 @@ CURRENT_VERSION = "v1.1.0"
 class CheckUpdateThread(QThread):
     """Thread secondaire pour vérifier silencieusement les mises à jour sans bloquer l'UI."""
     update_available = pyqtSignal(str, str)  # tag_name, download_url
+    check_finished = pyqtSignal(bool, str)  # (mise_a_jour_trouvee, message_erreur_ou_vide)
 
     def run(self):
         try:
@@ -26,7 +27,7 @@ class CheckUpdateThread(QThread):
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     latest_version = data.get('tag_name', '')
-                    
+
                     if latest_version and latest_version != CURRENT_VERSION:
                         assets = data.get('assets', [])
                         download_url = None
@@ -34,11 +35,18 @@ class CheckUpdateThread(QThread):
                             if asset['name'].endswith('.exe') or asset['name'].endswith('.zip'):
                                 download_url = asset['browser_download_url']
                                 break
-                        
+
                         if download_url:
                             self.update_available.emit(latest_version, download_url)
+                            self.check_finished.emit(True, "")
+                            return
+
+                    self.check_finished.emit(False, "")
+                else:
+                    self.check_finished.emit(False, f"HTTP {response.status}")
         except Exception as e:
             print(f"Erreur vérification mise à jour : {e}")
+            self.check_finished.emit(False, str(e))
 
 
 class DownloadThread(QThread):
@@ -58,10 +66,15 @@ class DownloadThread(QThread):
             self.finished_signal.emit(False, str(e))
 
 
-def check_for_updates(parent_widget):
-    """Point d'entrée pour démarrer la recherche de mises à jour."""
+def check_for_updates(parent_widget, silent=True):
+    """Point d'entrée pour démarrer la recherche de mises à jour.
+
+    En mode silencieux (démarrage de l'application), rien ne s'affiche si aucune
+    mise à jour n'est trouvée. En mode manuel (menu À propos), une popup confirme
+    à l'utilisateur que le logiciel est à jour, ou signale une erreur réseau.
+    """
     thread = CheckUpdateThread(parent_widget)
-    
+
     def on_update_found(version, download_url):
         reply = QMessageBox.question(
             parent_widget,
@@ -73,7 +86,22 @@ def check_for_updates(parent_widget):
         if reply == QMessageBox.StandardButton.Yes:
             perform_update(parent_widget, download_url)
 
+    def on_check_finished(update_found, error_msg):
+        if update_found or silent:
+            return
+        if error_msg:
+            QMessageBox.warning(
+                parent_widget, "Vérification impossible",
+                "Impossible de vérifier les mises à jour.\nVérifiez votre connexion internet."
+            )
+        else:
+            QMessageBox.information(
+                parent_widget, "À jour",
+                f"Vous utilisez déjà la dernière version de Mindy ({CURRENT_VERSION})."
+            )
+
     thread.update_available.connect(on_update_found)
+    thread.check_finished.connect(on_check_finished)
     thread.start()
     # Référence conservée pour éviter que le thread ne soit nettoyé par le garbage collector
     parent_widget._update_thread = thread

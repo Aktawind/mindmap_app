@@ -34,22 +34,32 @@ class ExportController:
         
         ws.scene.clearSelection()
         ratio = self.app.devicePixelRatioF() if hasattr(self.app, 'devicePixelRatioF') else self.app.devicePixelRatio()
-        
-        pixmap = QPixmap(int(rect.width() * ratio), int(rect.height() * ratio))
+
+        # 🎯 Sur-échantillonnage pour un export haute résolution (proche de 300 DPI, quel que soit l'écran)
+        HIGH_RES_SCALE = 3.0
+        total_scale = ratio * HIGH_RES_SCALE
+
+        # Sécurité mémoire : on plafonne la plus grande dimension de l'image générée
+        MAX_DIMENSION = 12000
+        largest_side = max(rect.width(), rect.height()) * total_scale
+        if largest_side > MAX_DIMENSION:
+            total_scale *= MAX_DIMENSION / largest_side
+
+        pixmap = QPixmap(max(1, int(rect.width() * total_scale)), max(1, int(rect.height() * total_scale)))
         pixmap.setDevicePixelRatio(ratio)
         pixmap.fill(QColor('#f8f9fa'))
-        
+
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
-        
-        painter.scale(ratio, ratio)
+
+        painter.scale(total_scale, total_scale)
         target_rect = QRectF(0, 0, rect.width(), rect.height())
-        
+
         ws.scene.render(painter, target=target_rect, source=rect)
         painter.end()
-        
+
         if not pixmap.save(path, "PNG", 100):
             QMessageBox.critical(self.app, "Erreur", "Impossible d'enregistrer l'image sur le disque.")
 

@@ -1,5 +1,6 @@
 from PyQt6.QtGui import QKeySequence, QAction
 from services.updater_service import check_for_updates
+from ui.template_manager_dialog import show_template_manager_dialog
 
 
 def _toggle_shortcuts_overlay(app_window, checked):
@@ -63,7 +64,10 @@ def create_menus(app_window):
     paste_action.setShortcut(QKeySequence("Ctrl+V"))
     paste_action.triggered.connect(app_window.tools_controller.paste_node)
     edit_menu.addAction(paste_action)
-    
+
+    edit_menu.addSeparator()
+    edit_menu.addAction("🗂️ Gérer les templates", lambda: show_template_manager_dialog(app_window))
+
     # ==========================================
     # MENU EXPORTER
     # ==========================================
@@ -86,4 +90,4 @@ def create_menus(app_window):
     # ==========================================
     about_menu = menu_bar.addMenu("À propos")
     about_menu.addAction("À propos de Mindy", app_window.show_about_dialog)
-    about_menu.addAction("🔄 Vérifier les mises à jour", lambda: check_for_updates(app_window))
+    about_menu.addAction("🔄 Vérifier les mises à jour", lambda: check_for_updates(app_window, silent=False))
