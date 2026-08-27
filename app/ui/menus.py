@@ -1,4 +1,13 @@
 from PyQt6.QtGui import QKeySequence, QAction
+from services.updater_service import check_for_updates
+
+
+def _toggle_shortcuts_overlay(app_window, checked):
+    """Affiche/masque l'encart des raccourcis et mémorise le choix de l'utilisateur."""
+    if hasattr(app_window, 'overlay') and app_window.overlay is not None:
+        app_window.overlay.setVisible(checked)
+    app_window.settings.setValue("show_shortcuts_overlay", checked)
+
 
 def create_menus(app_window):
     """Construit et ajoute les menus à la barre de menus de la fenêtre principale."""
@@ -64,7 +73,17 @@ def create_menus(app_window):
     export_menu.addAction("Exporter en Markdown", app_window.export_controller.export_md)
 
     # ==========================================
+    # MENU AFFICHAGE
+    # ==========================================
+    display_menu = menu_bar.addMenu("Affichage")
+    app_window.action_toggle_shortcuts = display_menu.addAction("Afficher l'encart des raccourcis")
+    app_window.action_toggle_shortcuts.setCheckable(True)
+    app_window.action_toggle_shortcuts.setChecked(True)
+    app_window.action_toggle_shortcuts.toggled.connect(lambda checked: _toggle_shortcuts_overlay(app_window, checked))
+
+    # ==========================================
     # MENU À PROPOS
     # ==========================================
     about_menu = menu_bar.addMenu("À propos")
     about_menu.addAction("À propos de Mindy", app_window.show_about_dialog)
+    about_menu.addAction("🔄 Vérifier les mises à jour", lambda: check_for_updates(app_window))

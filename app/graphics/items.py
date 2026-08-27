@@ -13,6 +13,39 @@ BRANCH_PALETTES = [
     {'bg': '#FFEBEE', 'border': '#EF9A9A', 'text': '#333333', 'edge': '#EF9A9A'}
 ]
 
+MAX_CHARS_PER_LINE = 28
+
+
+def compute_contrast_font_color(bg_hex):
+    """Renvoie '#ffffff' ou '#000000' selon la luminance du fond, pour rester lisible."""
+    color = QColor(bg_hex)
+    luminance = (0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()) / 255
+    return '#000000' if luminance > 0.6 else '#ffffff'
+
+
+def wrap_line(line, max_chars=MAX_CHARS_PER_LINE):
+    """Découpe une ligne trop longue en plusieurs lignes, en coupant sur les espaces si possible."""
+    if len(line) <= max_chars:
+        return [line]
+
+    wrapped = []
+    current = ""
+    for word in line.split(' '):
+        candidate = f"{current} {word}".strip()
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            if current:
+                wrapped.append(current)
+                current = ""
+            while len(word) > max_chars:
+                wrapped.append(word[:max_chars])
+                word = word[max_chars:]
+            current = word
+    if current:
+        wrapped.append(current)
+    return wrapped
+
 class NodeItem(QGraphicsItem):
     def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', 
                  file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False, 
@@ -168,6 +201,18 @@ class NodeItem(QGraphicsItem):
         self.setCursor(Qt.CursorShape.ArrowCursor)
         super().hoverLeaveEvent(event)
 
+    def build_main_display_label(self):
+        """Construit le texte principal (préfixe de statut + retour à la ligne automatique)."""
+        display_label = self.label
+        if self.status == 'urgent' and not display_label.startswith("🚨 "): display_label = "🚨 " + display_label
+        elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
+        elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
+
+        wrapped_lines = []
+        for line in display_label.split('\n'):
+            wrapped_lines.extend(wrap_line(line))
+        return '\n'.join(wrapped_lines)
+
     def recalculate_size(self):
         """Calcule dynamiquement la taille du nœud selon le texte principal, la date et les attachements."""
         # Si une image valide est présente, la taille du nœud dépend uniquement d'elle
@@ -205,12 +250,8 @@ class NodeItem(QGraphicsItem):
             font_main.setStrikeOut(True)
         
         fm_main = QFontMetrics(font_main)
-        
-        display_label = self.label
-        if self.status == 'urgent' and not display_label.startswith("🚨 "): display_label = "🚨 " + display_label
-        elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
-        elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
 
+        display_label = self.build_main_display_label()
         lines = display_label.split('\n')
         max_width = max(fm_main.horizontalAdvance(line) for line in lines) if lines else 0
         total_height = fm_main.height() * len(lines) if lines else fm_main.height()
@@ -327,11 +368,8 @@ class NodeItem(QGraphicsItem):
             font_main.setStrikeOut(True)
         painter.setFont(font_main)
         painter.setPen(QPen(final_text_color))
-        
-        display_label = self.label
-        if self.status == 'urgent' and not display_label.startswith("🚨 "): display_label = "🚨 " + display_label
-        elif self.status == 'progress' and not display_label.startswith("⏳ "): display_label = "⏳ " + display_label
-        elif self.status == 'done' and not display_label.startswith("✅ "): display_label = "✅ " + display_label
+
+        display_label = self.build_main_display_label()
 
         fm_main = QFontMetrics(font_main)
         lines = display_label.split('\n')

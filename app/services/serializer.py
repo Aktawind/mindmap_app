@@ -70,6 +70,7 @@ class MindMapSerializer:
                     if child_data:
                         child_data["edge_label"] = getattr(edge, 'label', '')
                         child_data["edge_arrow_dir"] = getattr(edge, 'arrow_dir', 'none')
+                        child_data["edge_color"] = edge.color.name() if hasattr(edge, 'color') else None
                         data["children"].append(child_data)
             return data
 
@@ -229,7 +230,8 @@ class MindMapSerializer:
 
             if parent_node:
                 edge_counter[0] += 1
-                edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
+                default_edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
+                edge_color = data.get("edge_color") or default_edge_color
                 edge = EdgeItem(f"edge_{edge_counter[0]}", parent_node, node, data.get("edge_label", ""), color=edge_color, arrow_dir=data.get("edge_arrow_dir", "none"))
                 
                 if hasattr(self.app, 'editing_controller'):

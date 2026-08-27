@@ -1,5 +1,7 @@
 import json
 import os
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QMessageBox, QFileDialog
 from ui.selection_manager import on_selection_changed
 
@@ -85,6 +87,34 @@ class WorkspaceController:
             self.app.lbl_workspace_status.setText(f"📁 Workspace :  {name} ({count} carte{'s' if count > 1 else ''})")
         else:
             self.app.lbl_workspace_status.setText("📁 Workspace : Aucun")
+        self.refresh_workspace_tab_indicators()
+
+    def _workspace_tab_icon(self):
+        """Petit pastille bleue utilisée pour marquer les onglets faisant partie de l'espace de travail actif."""
+        if not hasattr(self, '_cached_tab_icon'):
+            pixmap = QPixmap(10, 10)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor('#3B82F6'))
+            painter.drawEllipse(0, 0, 10, 10)
+            painter.end()
+            self._cached_tab_icon = QIcon(pixmap)
+        return self._cached_tab_icon
+
+    def refresh_workspace_tab_indicators(self):
+        """Marque visuellement les onglets qui font partie de l'espace de travail actif."""
+        if not hasattr(self.app, 'tabs') or self.app.tabs is None:
+            return
+
+        icon = self._workspace_tab_icon()
+        for i in range(self.app.tabs.count()):
+            ws = self.app.tabs.widget(i)
+            file_path = getattr(ws, 'current_file_path', None) if ws else None
+            in_workspace = bool(file_path and file_path in self.workspace_files)
+            self.app.tabs.setTabIcon(i, icon if in_workspace else QIcon())
+            self.app.tabs.setTabToolTip(i, "Fait partie de l'espace de travail actif" if in_workspace else "")
 
     def load_workspace(self, path=None, is_startup=False):
         if not path:
