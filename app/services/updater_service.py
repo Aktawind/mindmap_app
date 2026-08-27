@@ -170,6 +170,13 @@ rem Relance la nouvelle version
 cd /d "{install_dir}"
 start "" "{exe_name}"
 
+rem 🚨 FIX : on laisse le temps au bootloader du nouvel exécutable de terminer sa
+rem validation de sécurité (qui vérifie son processus parent) AVANT que ce script
+rem (le parent en question) ne se termine. Sans cette pause, ce cmd.exe peut
+rem disparaître trop tôt et le nouvel exécutable échoue avec
+rem "Security validation failure: failed to obtain executable path for parent process".
+timeout /t 3 /nobreak > nul
+
 rem Nettoyage
 rd /s /q "{temp_dir}"
 exit
@@ -177,11 +184,26 @@ exit
                 with open(bat_path, "w", encoding="utf-8") as f:
                     f.write(bat_script)
 
-                # Lancement du script Batch
+                # Lancement du script Batch, complètement détaché du processus actuel :
+                # - DETACHED_PROCESS / CREATE_NEW_PROCESS_GROUP : évite qu'il soit tué en
+                #   cascade si ce processus est rattaché à une console ou un groupe de
+                #   processus qui disparaît avec lui.
+                # - CREATE_BREAKAWAY_FROM_JOB : l'échappe de tout Job Object (Windows
+                #   Terminal, certains lanceurs/EDR) qui tuerait ses enfants à la fermeture
+                #   de ce processus — sinon le script (et donc le relais vers la nouvelle
+                #   version) peut être interrompu par le os._exit(0) ci-dessous.
+                if os.name == 'nt':
+                    DETACHED_PROCESS = 0x00000008
+                    CREATE_NEW_PROCESS_GROUP = 0x00000200
+                    CREATE_BREAKAWAY_FROM_JOB = 0x01000000
+                    creation_flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
+                else:
+                    creation_flags = 0
+
                 subprocess.Popen(
-                    [bat_path], 
-                    creationflags=0 if os.name == 'nt' else 0,
-                    shell=True
+                    ["cmd.exe", "/c", bat_path] if os.name == 'nt' else [bat_path],
+                    creationflags=creation_flags,
+                    close_fds=True,
                 )
 
                 # --- CHANGEMENT CLÉ ICI ---
