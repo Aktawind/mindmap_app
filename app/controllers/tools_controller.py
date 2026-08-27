@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import sys
@@ -104,7 +105,7 @@ class ToolsController:
                 QMessageBox.warning(self.app, "Erreur", f"Fichier template introuvable :\n{template_path}")
 
     def copy_selected(self):
-        """Copie le nœud sélectionné dans le presse-papier interne."""
+        """Copie le nœud sélectionné dans le presse-papier interne (partagé entre tous les onglets)."""
         ws = self.app.current_workspace()
         if not ws: return
         sel = ws.scene.selectedItems()
@@ -120,49 +121,56 @@ class ToolsController:
                 "is_italic": getattr(src, 'is_italic', False),
                 "is_strikethrough": getattr(src, 'is_strikethrough', False),
                 "status": getattr(src, 'status', 'none'),
+                "priority": getattr(src, 'priority', 'none'),
+                "date": getattr(src, 'date', None),
+                "is_compact": getattr(src, 'is_compact', False),
                 "notes": getattr(src, 'notes', ''),
-                "file_path": getattr(src, 'file_path', None),
-                "url_link": getattr(src, 'url_link', None)
+                "attachments": copy.deepcopy(getattr(src, 'attachments', [])),
+                "image_path": getattr(src, 'image_path', None),
+                "image_height": getattr(src, 'image_height', 150),
             }
 
     def paste_node(self):
-        """Colle le nœud stocké à l'emplacement central de la vue courante."""
+        """Colle le nœud stocké à l'emplacement central de la vue courante (fonctionne d'un onglet à l'autre)."""
         ws = self.app.current_workspace()
         if not ws or not self._clipboard_node: return
-        
+
         data = self._clipboard_node
-        
+
         # 🚨 FIX ANTI-COLLISION : ID basé sur un horodatage milliseconde pour garantir l'unicité stricte
         new_id = f"node_paste_{int(time.time() * 1000)}"
-        
+
         center = ws.view.mapToScene(ws.view.viewport().rect().center())
         x, y = center.x(), center.y()
-        
+
         if getattr(ws.scene, 'snap_to_grid', False):
             x = round(x / 20) * 20
             y = round(y / 20) * 20
 
         new_node = NodeItem(
             new_id, data["label"], x, y,
-            shape=data["shape"], bg=data["bg"], border=data["border"], font_color=data["font_color"]
+            shape=data["shape"], bg=data["bg"], border=data["border"], font_color=data["font_color"],
+            is_bold=data["is_bold"], is_italic=data.get("is_italic", False),
+            is_strikethrough=data.get("is_strikethrough", False), status=data["status"],
+            priority=data.get("priority", "none"), is_compact=data.get("is_compact", False),
+            image_path=data.get("image_path"), image_height=data.get("image_height", 150),
         )
-        new_node.is_bold = data["is_bold"]
-        new_node.status = data["status"]
         if hasattr(new_node, 'notes'): new_node.notes = data["notes"]
-        new_node.file_path = data["file_path"]
-        new_node.url_link = data["url_link"]
-        
+        new_node.date = data.get("date")
+        new_node.attachments = copy.deepcopy(data.get("attachments", []))
+        new_node.recalculate_size()
+
         # Liaison dynamique vers le gestionnaire d'édition textuelle
         if hasattr(self.app, 'editing_controller') and self.app.editing_controller:
             new_node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
         elif hasattr(self.app, 'start_inline_editing'):
             new_node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
-        
+
         ws.scene.addItem(new_node)
-        
+
         if hasattr(self.app, 'save_state'):
             self.app.save_state()
-        
+
         ws.scene.clearSelection()
         new_node.setSelected(True)
 
