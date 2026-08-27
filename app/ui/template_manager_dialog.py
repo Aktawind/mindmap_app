@@ -54,7 +54,13 @@ class TemplateManagerDialog(QDialog):
         return item.data(Qt.ItemDataRole.UserRole)
 
     def _current_tab_root_tree(self):
-        """Construit l'arbre 'root' (avec cross_links à plat) prêt à être sauvegardé comme template."""
+        """Construit l'arbre 'root' (avec cross_links et orphan_nodes à plat) prêt à être sauvegardé comme template.
+
+        Un nœud relié uniquement via "Relier les nœuds" (et non via une branche parent/enfant
+        classique) est un "orphan_node" dans le modèle de données : il n'a pas de parent dans
+        l'arbre, mais reste bien connecté via un cross_link. On l'inclut donc explicitement dans
+        le template, avec ses cross_links, plutôt que de le perdre silencieusement.
+        """
         ws = self.app_window.current_workspace()
         if not ws:
             QMessageBox.warning(self, "Aucun onglet", "Aucune mind map n'est actuellement ouverte.")
@@ -68,13 +74,7 @@ class TemplateManagerDialog(QDialog):
 
         root_tree = dict(root_tree)
         root_tree["cross_links"] = state.get("cross_links", [])
-
-        orphan_count = len(state.get("orphan_nodes", []))
-        if orphan_count:
-            QMessageBox.information(
-                self, "Nœuds orphelins ignorés",
-                f"{orphan_count} nœud(s) non reliés à l'idée centrale ne seront pas inclus dans le template."
-            )
+        root_tree["orphan_nodes"] = state.get("orphan_nodes", [])
         return root_tree
 
     def add_template(self):
