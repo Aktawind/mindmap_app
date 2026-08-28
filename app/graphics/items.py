@@ -18,11 +18,11 @@ MAX_CHARS_PER_LINE = 40
 # Formats de nœud prédéfinis : chacun ajuste la police (famille/taille/italique)
 # et un facteur d'échelle appliqué à la taille finale du nœud.
 NODE_FORMATS = {
-    'default':     {'label': '⬜ Standard',       'font_family': 'Segoe UI',      'font_size': 11, 'italic': False, 'size_scale': 1.0},
-    'pro':         {'label': '💼 Professionnel',  'font_family': 'Georgia',       'font_size': 12, 'italic': False, 'size_scale': 1.15},
-    'decale':      {'label': '🤪 Décalé',         'font_family': 'Comic Sans MS', 'font_size': 12, 'italic': False, 'size_scale': 1.25},
-    'style':       {'label': '✨ Stylé',          'font_family': 'Georgia',       'font_size': 13, 'italic': True,  'size_scale': 1.1},
-    'decontracte': {'label': '😎 Décontracté',    'font_family': 'Verdana',       'font_size': 10, 'italic': False, 'size_scale': 0.9},
+    'default':     {'label': 'Standard',       'font_family': 'Segoe UI',      'font_size': 11, 'italic': False, 'size_scale': 1.0},
+    'pro':         {'label': 'Professionnel',  'font_family': 'Georgia',       'font_size': 12, 'italic': False, 'size_scale': 1.15},
+    'decale':      {'label': 'Décalé',         'font_family': 'Comic Sans MS', 'font_size': 14, 'italic': False, 'size_scale': 1.25},
+    'style':       {'label': 'Stylé',          'font_family': 'Georgia',       'font_size': 14, 'italic': True,  'size_scale': 1.1},
+    'decontracte': {'label': 'Décontracté',    'font_family': 'Verdana',       'font_size': 14, 'italic': False, 'size_scale': 0.9},
 }
 DEFAULT_NODE_FORMAT = 'default'
 
