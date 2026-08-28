@@ -57,6 +57,7 @@ def create_menus(app_window):
     # MENU AFFICHAGE
     # ==========================================
     display_menu = menu_bar.addMenu("Affichage")
+    app_window.display_menu = display_menu
     app_window.action_toggle_shortcuts = display_menu.addAction("Afficher les raccourcis")
     app_window.action_toggle_shortcuts.setCheckable(True)
     app_window.action_toggle_shortcuts.setChecked(True)

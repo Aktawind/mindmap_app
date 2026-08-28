@@ -111,25 +111,15 @@ class MindMapApp(QMainWindow):
         self.setCentralWidget(self.tabs)
         create_menus(self)
         create_toolbar(self)
-        create_node_toolbar(self) # C'est ici que self.style_bar et self.overlay doivent être créés
+        create_node_toolbar(self)  # C'est ici que self.style_dock et self.overlay doivent être créés
 
     def setup_shortcuts(self):
         setup_app_shortcuts(self)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # 🟢 PROTECTION : On vérifie l'existence des attributs dynamiques pour éviter le crash au démarrage
-        if hasattr(self, 'style_bar') and self.style_bar is not None:
-            self.reposition_style_bar()
         if hasattr(self, 'overlay') and self.overlay is not None:
             self.overlay.raise_()
-
-    def reposition_style_bar(self):
-        if hasattr(self, 'style_bar') and self.style_bar is not None:
-            self.style_bar.adjustSize()
-            x = (self.width() - self.style_bar.width()) // 2
-            y = self.height() - self.style_bar.height() - 30
-            self.style_bar.move(x, y)
 
     def closeEvent(self, event):
         if hasattr(self, 'tools_controller'):
@@ -172,7 +162,4 @@ if __name__ == '__main__':
     app.setFont(QFont("Segoe UI", 10))
     window = MindMapApp()
     window.show()
-    
-    # Sécurité géométrique
-    QTimer.singleShot(50, window.reposition_style_bar)
     sys.exit(app.exec())

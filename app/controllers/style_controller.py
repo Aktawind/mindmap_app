@@ -71,7 +71,8 @@ class StyleController:
             if widget:
                 widget.deleteLater()
 
-        for hex_color in self.load_custom_colors():
+        columns = 6
+        for i, hex_color in enumerate(self.load_custom_colors()):
             border = QColor(hex_color).darker(130).name()
             btn = QPushButton()
             btn.setFixedSize(22, 22)
@@ -80,7 +81,8 @@ class StyleController:
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             btn.clicked.connect(lambda checked, c=hex_color, b=border: self.change_color(c, b))
             btn.customContextMenuRequested.connect(lambda pos, c=hex_color: self.remove_custom_color(c))
-            layout.addWidget(btn)
+            row, col = divmod(i, columns)
+            layout.addWidget(btn, row, col)
 
     def add_custom_color(self):
         ws = self.app.current_workspace()
