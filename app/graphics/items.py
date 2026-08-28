@@ -15,6 +15,17 @@ BRANCH_PALETTES = [
 
 MAX_CHARS_PER_LINE = 40
 
+# Formats de nœud prédéfinis : chacun ajuste la police (famille/taille/italique)
+# et un facteur d'échelle appliqué à la taille finale du nœud.
+NODE_FORMATS = {
+    'default':     {'label': '⬜ Standard',       'font_family': 'Segoe UI',      'font_size': 11, 'italic': False, 'size_scale': 1.0},
+    'pro':         {'label': '💼 Professionnel',  'font_family': 'Georgia',       'font_size': 12, 'italic': False, 'size_scale': 1.15},
+    'decale':      {'label': '🤪 Décalé',         'font_family': 'Comic Sans MS', 'font_size': 12, 'italic': False, 'size_scale': 1.25},
+    'style':       {'label': '✨ Stylé',          'font_family': 'Georgia',       'font_size': 13, 'italic': True,  'size_scale': 1.1},
+    'decontracte': {'label': '😎 Décontracté',    'font_family': 'Verdana',       'font_size': 10, 'italic': False, 'size_scale': 0.9},
+}
+DEFAULT_NODE_FORMAT = 'default'
+
 
 def compute_contrast_font_color(bg_hex):
     """Renvoie '#ffffff' ou '#000000' selon la luminance du fond, pour rester lisible."""
@@ -49,7 +60,8 @@ def wrap_line(line, max_chars=MAX_CHARS_PER_LINE):
 class NodeItem(QGraphicsItem):
     def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff',
                  file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False,
-                 image_path=None, image_height=150, status='none', priority='none', is_compact=False, notes='', **kwargs):
+                 image_path=None, image_height=150, status='none', priority='none', is_compact=False, notes='',
+                 node_format=DEFAULT_NODE_FORMAT, **kwargs):
         super().__init__()
         self.node_id = node_id
         self.label = label
@@ -63,6 +75,7 @@ class NodeItem(QGraphicsItem):
         self.priority = priority
         self.is_compact = is_compact
         self.notes = notes or ''
+        self.node_format = node_format if node_format in NODE_FORMATS else DEFAULT_NODE_FORMAT
 
         self.attachments = []
         
@@ -221,12 +234,25 @@ class NodeItem(QGraphicsItem):
             wrapped_lines.extend(wrap_line(line))
         return '\n'.join(wrapped_lines)
 
+    def get_node_format(self):
+        return NODE_FORMATS.get(getattr(self, 'node_format', DEFAULT_NODE_FORMAT), NODE_FORMATS[DEFAULT_NODE_FORMAT])
+
+    def _build_main_font(self):
+        """Construit la police du texte principal à partir du format de nœud choisi (famille/taille/italique)
+        combiné aux bascules manuelles (gras/italique/barré)."""
+        fmt = self.get_node_format()
+        font = QFont(fmt['font_family'], fmt['font_size'])
+        if self.is_bold: font.setBold(True)
+        if getattr(self, 'is_italic', False) or fmt.get('italic', False):
+            font.setItalic(True)
+        if getattr(self, 'is_strikethrough', False):
+            font.setStrikeOut(True)
+        return font
+
     def _get_main_text_rect(self):
         """Rectangle occupé par le texte principal (identique au calcul utilisé dans paint()),
         pour que les zones cliquables (pièces jointes, notes) restent alignées avec ce qui est affiché."""
-        font_main = QFont('Segoe UI', 11)
-        if self.is_bold: font_main.setBold(True)
-        fm_main = QFontMetrics(font_main)
+        fm_main = QFontMetrics(self._build_main_font())
         display_label = self.build_main_display_label()
         text_main_height = fm_main.height() * len(display_label.split('\n'))
         return QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
@@ -260,14 +286,7 @@ class NodeItem(QGraphicsItem):
                     self.update_edges()
                 return
         
-        font_main = QFont('Segoe UI', 11)
-        if self.is_bold: font_main.setBold(True)
-        if getattr(self, 'is_italic', False):
-            font_main.setItalic(True)
-        if getattr(self, 'is_strikethrough', False):
-            font_main.setStrikeOut(True)
-        
-        fm_main = QFontMetrics(font_main)
+        fm_main = QFontMetrics(self._build_main_font())
 
         display_label = self.build_main_display_label()
         lines = display_label.split('\n')
@@ -319,6 +338,10 @@ class NodeItem(QGraphicsItem):
             height = max(total_height + 35, 55)
         elif self.shape_type == 'parallelogram':
             width = int(width * 1.3)
+
+        size_scale = self.get_node_format().get('size_scale', 1.0)
+        width = int(width * size_scale)
+        height = int(height * size_scale)
 
         self.rect = QRectF(-width/2, -height/2, width, height)
         self.prepareGeometryChange()
@@ -390,12 +413,7 @@ class NodeItem(QGraphicsItem):
                 painter.drawPixmap(int(rect_x), int(rect_y), img_w, img_h, self.pixmap_cache)
                 return  # On coupe ici pour masquer le texte
 
-        font_main = QFont('Segoe UI', 11)
-        if self.is_bold: font_main.setBold(True)
-        if getattr(self, 'is_italic', False):
-            font_main.setItalic(True)
-        if getattr(self, 'is_strikethrough', False):
-            font_main.setStrikeOut(True)
+        font_main = self._build_main_font()
         painter.setFont(font_main)
         painter.setPen(QPen(final_text_color))
 

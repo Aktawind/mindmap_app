@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import QDate
 from controllers.tools_controller import ToolsController
+from graphics.items import NODE_FORMATS
 
 def create_node_toolbar(app_window) -> None:
     """
@@ -75,7 +76,16 @@ def create_node_toolbar(app_window) -> None:
     app_window.shape_combo.addItem("Parallélogramme", "parallelogram")
     app_window.shape_combo.currentIndexChanged.connect(app_window.style_controller.on_shape_combo_changed)
     nc_layout.addWidget(app_window.shape_combo)
-    
+
+    nc_layout.addWidget(ToolsController.create_separator(app_window))
+
+    app_window.format_combo = QComboBox(app_window.node_controls)
+    app_window.format_combo.setToolTip("Format du nœud (taille et police)")
+    for key, fmt in NODE_FORMATS.items():
+        app_window.format_combo.addItem(fmt['label'], key)
+    app_window.format_combo.currentIndexChanged.connect(app_window.style_controller.on_format_combo_changed)
+    nc_layout.addWidget(app_window.format_combo)
+
     nc_layout.addWidget(ToolsController.create_separator(app_window))
 
     app_window.status_combo = QComboBox(app_window.node_controls)

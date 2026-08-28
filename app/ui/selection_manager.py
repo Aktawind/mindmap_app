@@ -98,7 +98,12 @@ def on_selection_changed(app) -> None:
             app.shape_combo.blockSignals(True)
             app.shape_combo.setCurrentIndex(app.shape_combo.findData(getattr(target_node, 'shape_type', 'box')))
             app.shape_combo.blockSignals(False)
-        
+
+        if hasattr(app, 'format_combo') and app.format_combo:
+            app.format_combo.blockSignals(True)
+            app.format_combo.setCurrentIndex(app.format_combo.findData(getattr(target_node, 'node_format', 'default')))
+            app.format_combo.blockSignals(False)
+
         if hasattr(app, 'status_combo') and app.status_combo:
             app.status_combo.blockSignals(True)
             app.status_combo.setCurrentIndex(app.status_combo.findData(getattr(target_node, 'status', 'none')))
