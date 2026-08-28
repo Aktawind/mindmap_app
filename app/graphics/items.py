@@ -170,12 +170,7 @@ class NodeItem(QGraphicsItem):
         if attachments_to_draw or has_notes:
             pos = event.pos()
 
-            font_main = QFont('Segoe UI', 11)
-            if self.is_bold: font_main.setBold(True)
-            fm_main = QFontMetrics(font_main)
-            text_main_height = fm_main.height() * len(self.label.split('\n'))
-            main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
-
+            main_text_rect = self._get_main_text_rect()
             font_att = QFont('Segoe UI', 9)
             fm_att = QFontMetrics(font_att)
             current_y = main_text_rect.bottom() + 4
@@ -225,6 +220,16 @@ class NodeItem(QGraphicsItem):
         for line in display_label.split('\n'):
             wrapped_lines.extend(wrap_line(line))
         return '\n'.join(wrapped_lines)
+
+    def _get_main_text_rect(self):
+        """Rectangle occupé par le texte principal (identique au calcul utilisé dans paint()),
+        pour que les zones cliquables (pièces jointes, notes) restent alignées avec ce qui est affiché."""
+        font_main = QFont('Segoe UI', 11)
+        if self.is_bold: font_main.setBold(True)
+        fm_main = QFontMetrics(font_main)
+        display_label = self.build_main_display_label()
+        text_main_height = fm_main.height() * len(display_label.split('\n'))
+        return QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
 
     def recalculate_size(self):
         """Calcule dynamiquement la taille du nœud selon le texte principal, la date et les attachements."""
@@ -401,7 +406,7 @@ class NodeItem(QGraphicsItem):
         text_main_height = fm_main.height() * len(lines)
         
         attachments_to_draw = getattr(self, 'attachments', [])
-        if (attachments_to_draw or self.date) and not self.is_compact:
+        if (attachments_to_draw or self.date or getattr(self, 'notes', '')) and not self.is_compact:
             main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
         else:
             main_text_rect = self.rect
@@ -524,24 +529,8 @@ class NodeItem(QGraphicsItem):
         attachments_to_draw = getattr(self, 'attachments', [])
         if attachments_to_draw or getattr(self, 'notes', ''):
             pos = event.pos()
-            font_main = QFont('Segoe UI', 11)
-            if self.is_bold: font_main.setBold(True)
-            fm_main = QFontMetrics(font_main)
+            main_text_rect = self._get_main_text_rect()
 
-            prefix = ""
-            if self.status == 'urgent': prefix += "🚨 "
-            elif self.status == 'progress': prefix += "⏳ "
-            elif self.status == 'done': prefix += "✅ "
-            if self.priority: prefix += f"{self.priority} "
-            
-            display_label = self.label
-            if prefix and not display_label.startswith(prefix):
-                if not any(display_label.startswith(p) for p in ["🚨 ", "⏳ ", "✅ ", "P1 ", "P2 ", "P3 ", "P4 "]):
-                    display_label = prefix + display_label
-
-            text_main_height = fm_main.height() * len(display_label.split('\n'))
-            main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
-            
             font_att = QFont('Segoe UI', 9)
             fm_att = QFontMetrics(font_att)
             current_y = main_text_rect.bottom() + 4
@@ -593,12 +582,8 @@ class NodeItem(QGraphicsItem):
         pos = event.pos()
 
         if attachments_to_draw or getattr(self, 'notes', ''):
-            font_main = QFont('Segoe UI', 11)
-            if self.is_bold: font_main.setBold(True)
-            fm_main = QFontMetrics(font_main)
-            text_main_height = fm_main.height() * len(self.label.split('\n'))
-            main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
-            
+            main_text_rect = self._get_main_text_rect()
+
             font_att = QFont('Segoe UI', 9)
             fm_att = QFontMetrics(font_att)
             current_y = main_text_rect.bottom() + 4
