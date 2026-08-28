@@ -47,9 +47,9 @@ def wrap_line(line, max_chars=MAX_CHARS_PER_LINE):
     return wrapped
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff', 
-                 file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False, 
-                 image_path=None, image_height=150, status='none', priority='none', is_compact=False, **kwargs):
+    def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff',
+                 file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False,
+                 image_path=None, image_height=150, status='none', priority='none', is_compact=False, notes='', **kwargs):
         super().__init__()
         self.node_id = node_id
         self.label = label
@@ -57,11 +57,12 @@ class NodeItem(QGraphicsItem):
         self.bg_color = QColor(bg)
         self.border_color = QColor(border)
         self.font_color = QColor(font_color)
-        
-        self.date = None       
+
+        self.date = None
         self.status = status
-        self.priority = priority  
-        self.is_compact = is_compact 
+        self.priority = priority
+        self.is_compact = is_compact
+        self.notes = notes or ''
 
         self.attachments = []
         
@@ -165,35 +166,47 @@ class NodeItem(QGraphicsItem):
             return
 
         attachments_to_draw = getattr(self, 'attachments', [])
-        if attachments_to_draw:
+        has_notes = bool(getattr(self, 'notes', ''))
+        if attachments_to_draw or has_notes:
             pos = event.pos()
-            
+
             font_main = QFont('Segoe UI', 11)
             if self.is_bold: font_main.setBold(True)
             fm_main = QFontMetrics(font_main)
             text_main_height = fm_main.height() * len(self.label.split('\n'))
             main_text_rect = QRectF(self.rect.left(), self.rect.top() + 10, self.rect.width(), text_main_height)
-            
+
             font_att = QFont('Segoe UI', 9)
             fm_att = QFontMetrics(font_att)
             current_y = main_text_rect.bottom() + 4
-            
+
             if self.date:
                 current_y += fm_att.height() + 2
-            
+
             for att in attachments_to_draw:
                 att_text = self._get_attachment_text(att)
                 text_width = fm_att.horizontalAdvance(att_text)
                 current_x = self.rect.left() + (self.rect.width() - text_width) / 2
                 file_rect = QRectF(current_x, current_y, text_width, fm_att.height())
-                
+
                 if file_rect.contains(pos):
                     self.setCursor(Qt.CursorShape.PointingHandCursor)
                     super().hoverMoveEvent(event)
                     return
-                
+
                 current_y += fm_att.height() + 2
-                
+
+            if has_notes:
+                notes_text = "📝 Notes"
+                text_width = fm_att.horizontalAdvance(notes_text)
+                current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+                notes_rect = QRectF(current_x, current_y, text_width, fm_att.height())
+
+                if notes_rect.contains(pos):
+                    self.setCursor(Qt.CursorShape.PointingHandCursor)
+                    super().hoverMoveEvent(event)
+                    return
+
         self.setCursor(Qt.CursorShape.ArrowCursor)
         super().hoverMoveEvent(event)
 
@@ -266,18 +279,30 @@ class NodeItem(QGraphicsItem):
             total_height += fm_date.height() + 2
 
         attachments_to_draw = getattr(self, 'attachments', [])
+        has_notes = bool(getattr(self, 'notes', '')) and not self.is_compact
         if attachments_to_draw and not self.is_compact:
             font_att = QFont('Segoe UI', 9)
             fm_att = QFontMetrics(font_att)
             total_height += 8
-            
+
             for att in attachments_to_draw:
                 att_text = self._get_attachment_text(att)
                 w_att = fm_att.horizontalAdvance(att_text)
                 if w_att > max_width:
                     max_width = w_att
                 total_height += fm_att.height() + 2
-        
+
+        if has_notes:
+            font_notes = QFont('Segoe UI', 9)
+            fm_notes = QFontMetrics(font_notes)
+            if not attachments_to_draw:
+                total_height += 8
+            notes_text = "📝 Notes"
+            w_notes = fm_notes.horizontalAdvance(notes_text)
+            if w_notes > max_width:
+                max_width = w_notes
+            total_height += fm_notes.height() + 2
+
         width = max(max_width + 30, 100)
         height = max(total_height + 20, 40)
         
@@ -415,9 +440,27 @@ class NodeItem(QGraphicsItem):
                 att_text = self._get_attachment_text(att)
                 text_width = fm_att.horizontalAdvance(att_text)
                 current_x = self.rect.left() + (self.rect.width() - text_width) / 2
-                
+
                 painter.drawText(int(current_x), int(current_y + fm_att.ascent()), att_text)
                 current_y += fm_att.height() + 2
+
+        if getattr(self, 'notes', ''):
+            font_notes = QFont('Segoe UI', 9)
+            font_notes.setUnderline(True)
+            painter.setFont(font_notes)
+
+            if final_text_color.name().lower() in ['#ffffff', '#fff']:
+                painter.setPen(QPen(QColor(240, 240, 240)))
+            else:
+                painter.setPen(QPen(QColor(37, 99, 235)))
+
+            fm_notes = QFontMetrics(font_notes)
+            notes_text = "📝 Notes"
+            text_width = fm_notes.horizontalAdvance(notes_text)
+            current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+
+            painter.drawText(int(current_x), int(current_y + fm_notes.ascent()), notes_text)
+            current_y += fm_notes.height() + 2
 
     def node_shape_path(self):
         path = QPainterPath()
@@ -479,12 +522,12 @@ class NodeItem(QGraphicsItem):
             return
 
         attachments_to_draw = getattr(self, 'attachments', [])
-        if attachments_to_draw:
+        if attachments_to_draw or getattr(self, 'notes', ''):
             pos = event.pos()
             font_main = QFont('Segoe UI', 11)
             if self.is_bold: font_main.setBold(True)
             fm_main = QFontMetrics(font_main)
-            
+
             prefix = ""
             if self.status == 'urgent': prefix += "🚨 "
             elif self.status == 'progress': prefix += "⏳ "
@@ -511,7 +554,7 @@ class NodeItem(QGraphicsItem):
                 text_width = fm_att.horizontalAdvance(att_text)
                 current_x = self.rect.left() + (self.rect.width() - text_width) / 2
                 file_rect = QRectF(current_x, current_y, text_width, fm_att.height())
-                
+
                 if file_rect.contains(pos):
                     scene = self.scene()
                     if scene and hasattr(scene, 'views') and scene.views():
@@ -519,9 +562,24 @@ class NodeItem(QGraphicsItem):
                         if hasattr(main_win, 'attachment_controller'):
                             main_win.attachment_controller.open_specific_file(att)
                             event.accept()
-                            return 
-                
+                            return
+
                 current_y += fm_att.height() + 2
+
+            if getattr(self, 'notes', ''):
+                notes_text = "📝 Notes"
+                text_width = fm_att.horizontalAdvance(notes_text)
+                current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+                notes_rect = QRectF(current_x, current_y, text_width, fm_att.height())
+
+                if notes_rect.contains(pos):
+                    scene = self.scene()
+                    if scene and hasattr(scene, 'views') and scene.views():
+                        main_win = scene.views()[0].window()
+                        if hasattr(main_win, 'notes_controller'):
+                            main_win.notes_controller.open_notes_dialog(self)
+                            event.accept()
+                            return
 
         super().mousePressEvent(event)
 
@@ -533,8 +591,8 @@ class NodeItem(QGraphicsItem):
 
         attachments_to_draw = getattr(self, 'attachments', [])
         pos = event.pos()
-        
-        if attachments_to_draw:
+
+        if attachments_to_draw or getattr(self, 'notes', ''):
             font_main = QFont('Segoe UI', 11)
             if self.is_bold: font_main.setBold(True)
             fm_main = QFontMetrics(font_main)
@@ -553,11 +611,21 @@ class NodeItem(QGraphicsItem):
                 text_width = fm_att.horizontalAdvance(att_text)
                 current_x = self.rect.left() + (self.rect.width() - text_width) / 2
                 file_rect = QRectF(current_x, current_y, text_width, fm_att.height())
-                
+
                 if file_rect.contains(pos):
                     event.accept()
-                    return 
+                    return
                 current_y += fm_att.height() + 2
+
+            if getattr(self, 'notes', ''):
+                notes_text = "📝 Notes"
+                text_width = fm_att.horizontalAdvance(notes_text)
+                current_x = self.rect.left() + (self.rect.width() - text_width) / 2
+                notes_rect = QRectF(current_x, current_y, text_width, fm_att.height())
+
+                if notes_rect.contains(pos):
+                    event.accept()
+                    return
 
         self.signals.itemDoubleClicked.emit(self)
         super().mouseDoubleClickEvent(event)

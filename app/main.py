@@ -31,6 +31,7 @@ from controllers.routing_controller import RoutingController
 from controllers.grid_controller import GridController
 from controllers.tabs_controller import TabsController
 from controllers.image_controller import ImageController
+from controllers.notes_controller import NotesController
 
 class MindMapApp(QMainWindow):
     def __init__(self):
@@ -59,6 +60,7 @@ class MindMapApp(QMainWindow):
         self.routing_controller = RoutingController(self)
         self.tabs_controller = TabsController(self)
         self.image_controller = ImageController(self)
+        self.notes_controller = NotesController(self)
 
         # UI Principale
         self.tabs = QTabWidget()

@@ -156,6 +156,11 @@ def create_node_toolbar(app_window) -> None:
     btn_img.clicked.connect(app_window.image_controller.attach_image_to_selected)
     nc_layout.addWidget(btn_img)
 
+    btn_notes = QPushButton("📝 Notes", app_window.node_controls)
+    btn_notes.setToolTip("Ouvrir les notes détaillées du nœud")
+    btn_notes.clicked.connect(lambda: app_window.notes_controller.open_notes_dialog())
+    nc_layout.addWidget(btn_notes)
+
     # Petit bouton bonus pour redimensionner la hauteur de l'image du nœud
     app_window.btn_img_h = QPushButton("↕️ H-Img", app_window.node_controls)
     app_window.btn_img_h.setToolTip("Modifier la hauteur de l'image")
