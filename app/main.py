@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
 from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtCore import QSettings, QTimer
@@ -83,11 +84,16 @@ class MindMapApp(QMainWindow):
         
         self.setup_ui()
         self.setup_shortcuts()
-        
+
         # Un léger délai pour laisser l'interface s'afficher
         QTimer.singleShot(100, self.initialize_startup_session)
 
         check_for_updates(self)
+
+        # Sauvegarde automatique périodique des cartes déjà enregistrées sur disque
+        self.autosave_timer = QTimer(self)
+        self.autosave_timer.timeout.connect(self.autosave_all_tabs)
+        self.autosave_timer.start(3 * 60 * 1000)  # toutes les 3 minutes
 
     def initialize_startup_session(self):
         """Décide au démarrage s'il faut charger la workspace ou le dernier projet."""
@@ -131,13 +137,14 @@ class MindMapApp(QMainWindow):
         ws = self.current_workspace()
         if not ws:
             return
-        
+
         if getattr(ws, 'is_applying_state', False):
             return
-        
+
         current_state = self.serializer.get_state()
         self.history_service.save_state(ws, current_state)
         self.tabs_controller.update_title()
+        self.refresh_undo_redo_state()
 
     def show_about_dialog(self):
         show_app_about_dialog(self, APP_VERSION)
@@ -148,6 +155,7 @@ class MindMapApp(QMainWindow):
             previous_state = self.history_service.undo(ws)
             if previous_state:
                 self.serializer.apply_state(previous_state)
+        self.refresh_undo_redo_state()
 
     def redo(self):
         ws = self.current_workspace()
@@ -155,6 +163,41 @@ class MindMapApp(QMainWindow):
             next_state = self.history_service.redo(ws)
             if next_state:
                 self.serializer.apply_state(next_state)
+        self.refresh_undo_redo_state()
+
+    def refresh_undo_redo_state(self):
+        """Active/désactive les actions Annuler/Rétablir selon le contenu de la pile d'historique."""
+        ws = self.current_workspace()
+        can_undo = bool(ws and len(getattr(ws, 'undo_stack', [])) >= 2)
+        can_redo = bool(ws and len(getattr(ws, 'redo_stack', [])) > 0)
+
+        if hasattr(self, 'undo_action') and self.undo_action is not None:
+            self.undo_action.setEnabled(can_undo)
+        if hasattr(self, 'redo_action') and self.redo_action is not None:
+            self.redo_action.setEnabled(can_redo)
+
+    def autosave_all_tabs(self):
+        """Sauvegarde silencieusement sur disque les onglets déjà nommés qui ont des modifications non enregistrées."""
+        if not hasattr(self, 'tabs') or self.tabs is None:
+            return
+
+        for i in range(self.tabs.count()):
+            ws = self.tabs.widget(i)
+            if not ws or not getattr(ws, 'is_dirty', False):
+                continue
+
+            file_path = getattr(ws, 'current_file_path', None)
+            if not file_path:
+                continue  # Onglet jamais enregistré manuellement : on ne force pas de "Enregistrer sous"
+
+            try:
+                state_to_save = self.serializer.get_state(ws)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(state_to_save, f, indent=2, ensure_ascii=False)
+                ws.is_dirty = False
+                self.tabs_controller.update_title(i)
+            except Exception as e:
+                print(f"[Autosave] Échec de la sauvegarde automatique de '{file_path}' : {e}")
         
     
 if __name__ == '__main__':

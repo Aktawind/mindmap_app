@@ -60,6 +60,12 @@ class EditingController(QObject):
     def eventFilter(self, obj, event):
         """Filtre les événements clavier et de focus pour l'éditeur de texte."""
         if obj == getattr(self, 'editor', None):
+            # Réserve Échap/Entrée à l'éditeur pour éviter qu'un raccourci global
+            # (ex : Échap = désélectionner) ne les intercepte avant qu'ils n'atteignent le champ
+            if event.type() == event.Type.ShortcutOverride:
+                if event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    event.accept()
+                    return True
             if event.type() == event.Type.KeyPress:
                 # Entrée valide l'édition (sauf si Shift est enfoncé pour un saut de ligne)
                 if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):

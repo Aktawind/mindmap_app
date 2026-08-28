@@ -84,17 +84,22 @@ class TabsController:
         # 3. Notification des autres contrôleurs dépendants
         if hasattr(self.app, 'on_selection_changed'):
             self.app.on_selection_changed()
-            
+
         if hasattr(self.app, 'workspace_controller'):
             self.app.workspace_controller.update_workspace_ui()
 
-    def update_title(self):
-        """Actualise dynamiquement le titre de l'onglet et de la fenêtre principale (sans .json)."""
-        ws = self.app.current_workspace()
+        if hasattr(self.app, 'refresh_undo_redo_state'):
+            self.app.refresh_undo_redo_state()
+
+    def update_title(self, index=None):
+        """Actualise dynamiquement le titre de l'onglet visé (ou actif par défaut) et de la fenêtre principale (sans .json)."""
+        if index is None:
+            index = self.app.tabs.currentIndex()
+        if index < 0 or index >= self.app.tabs.count():
+            return
+
+        ws = self.app.tabs.widget(index)
         if not ws: return
-        
-        idx = self.app.tabs.currentIndex()
-        if idx < 0: return
 
         if getattr(ws, 'current_file_path', None):
             # Récupère le nom du fichier et retire l'extension .json
@@ -105,9 +110,13 @@ class TabsController:
 
         suffix = " *" if getattr(ws, 'is_dirty', False) else ""
         display_title = base_title + suffix
-        
-        self.app.tabs.setTabText(idx, display_title) 
-        
+
+        self.app.tabs.setTabText(index, display_title)
+
+        # Le titre de la fenêtre ne reflète que l'onglet actuellement actif
+        if index != self.app.tabs.currentIndex():
+            return
+
         current_ws_path = getattr(self.app, 'current_workspace_path', None)
         if current_ws_path:
             workspace_name = os.path.basename(current_ws_path)

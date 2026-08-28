@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox, QWidget
 from graphics.items import NodeItem
 
@@ -187,6 +188,18 @@ class ToolsController:
                 ws.view.centerOn(root_node)
             else:
                 ws.view.centerOn(0, 0)
+
+    def fit_to_view_clicked(self):
+        """Ajuste le zoom et la position de la vue pour englober l'intégralité de la carte."""
+        ws = self.app.current_workspace()
+        if not ws: return
+
+        rect = ws.scene.itemsBoundingRect()
+        if rect.isEmpty(): return
+
+        margin = 60
+        rect = rect.adjusted(-margin, -margin, margin, margin)
+        ws.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
     def on_bg_double_clicked(self, pos):
         """Crée un nœud au double-clic sur le fond de la scène."""

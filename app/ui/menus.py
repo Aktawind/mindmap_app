@@ -47,12 +47,16 @@ def create_menus(app_window):
     undo_action = QAction("↩️ Annuler", app_window)
     undo_action.setShortcut(QKeySequence("Ctrl+Z"))
     undo_action.triggered.connect(app_window.undo)
+    undo_action.setEnabled(False)
     edit_menu.addAction(undo_action)
+    app_window.undo_action = undo_action
 
     redo_action = QAction("↪️ Rétablir", app_window)
     redo_action.setShortcut(QKeySequence("Ctrl+Y"))
     redo_action.triggered.connect(app_window.redo)
+    redo_action.setEnabled(False)
     edit_menu.addAction(redo_action)
+    app_window.redo_action = redo_action
 
     edit_menu.addSeparator()
 

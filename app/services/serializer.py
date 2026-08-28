@@ -8,10 +8,10 @@ class MindMapSerializer:
     def __init__(self, app):
         self.app = app
 
-    def get_state(self):
-        """Sérialise l'état complet du workspace actif dans un dictionnaire Python."""
-        ws = self.app.current_workspace()
-        if not ws or not hasattr(ws, 'scene') or ws.scene is None: 
+    def get_state(self, ws=None):
+        """Sérialise l'état complet du workspace fourni (ou actif par défaut) dans un dictionnaire Python."""
+        ws = ws or self.app.current_workspace()
+        if not ws or not hasattr(ws, 'scene') or ws.scene is None:
             return {}
         
         all_items = ws.scene.items()

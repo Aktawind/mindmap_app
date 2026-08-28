@@ -106,13 +106,24 @@ def create_toolbar(app_window) -> None:
     btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
     workspace_toolbar.addWidget(btn_center)
 
+    # Bouton Ajuster à l'écran (fit-to-view)
+    btn_fit = QPushButton("🔎 Ajuster à l'écran", workspace_toolbar)
+    btn_fit.setToolTip("Ajuster le zoom pour voir l'ensemble de la carte")
+    btn_fit.setStyleSheet("""
+        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #475569; }
+    """)
+    btn_fit.clicked.connect(app_window.tools_controller.fit_to_view_clicked)
+    workspace_toolbar.addWidget(btn_fit)
+
     spacer = QWidget()
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     workspace_toolbar.addWidget(spacer)
-    
+
     workspace_toolbar.addWidget(QLabel(" 🔍  "))
-    search_input = QLineEdit()
-    search_input.setPlaceholderText("Rechercher un nœud...")
+    app_window.search_input = QLineEdit()
+    search_input = app_window.search_input
+    search_input.setPlaceholderText("Rechercher un nœud... (Ctrl+F)")
     search_input.setMaximumWidth(200)
     search_input.setClearButtonEnabled(True)
     search_input.textChanged.connect(app_window.graph_controller.filter_nodes)

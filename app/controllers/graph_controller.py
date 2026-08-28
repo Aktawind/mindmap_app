@@ -239,6 +239,22 @@ class GraphController:
                 edge.setSelected(True)
                 self.app.save_state()
 
+    def select_all(self):
+        """Sélectionne tous les nœuds et arêtes de la scène active (Ctrl+A)."""
+        if hasattr(self.app, 'editing_controller') and getattr(self.app.editing_controller, 'editor', None) is not None:
+            return
+        ws = self.app.current_workspace()
+        if not ws: return
+        for item in ws.scene.items():
+            if isinstance(item, (NodeItem, EdgeItem)):
+                item.setSelected(True)
+
+    def deselect_all(self):
+        """Désélectionne tous les éléments de la scène active (Échap)."""
+        ws = self.app.current_workspace()
+        if not ws: return
+        ws.scene.clearSelection()
+
     def filter_nodes(self, search_text):
         """Filtre visuellement les nœuds de la Mind Map en modifiant leur opacité."""
         ws = self.app.current_workspace()
