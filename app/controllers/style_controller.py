@@ -81,7 +81,8 @@ class StyleController:
             if widget:
                 widget.deleteLater()
 
-        for hex_color in self.load_custom_colors():
+        columns = 6
+        for i, hex_color in enumerate(self.load_custom_colors()):
             border = QColor(hex_color).darker(130).name()
             btn = QPushButton()
             btn.setFixedSize(22, 22)
@@ -90,7 +91,8 @@ class StyleController:
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             btn.clicked.connect(lambda checked, c=hex_color, b=border: self.change_color(c, b))
             btn.customContextMenuRequested.connect(lambda pos, c=hex_color: self.remove_custom_color(c))
-            layout.addWidget(btn)
+            row, col = divmod(i, columns)
+            layout.addWidget(btn, row, col)
 
     def add_custom_color(self):
         ws = self.app.current_workspace()
@@ -185,6 +187,29 @@ class StyleController:
                 if hasattr(node, 'recalculate_size'):
                     node.recalculate_size()
                 node.update()
+            self.app.save_state()
+
+    def on_format_combo_changed(self, index):
+        if getattr(self, '_updating_ui', False):
+            return
+
+        ws = self.app.current_workspace()
+        if not ws: return
+
+        sel = ws.scene.selectedItems()
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+
+        if nodes:
+            format_value = self.app.format_combo.itemData(index)
+            for node in nodes:
+                node.node_format = format_value
+                if hasattr(node, 'recalculate_size'):
+                    node.recalculate_size()
+                node.update()
+                if hasattr(node, 'edges'):
+                    for edge in node.edges:
+                        if hasattr(edge, 'update_position'): edge.update_position()
+                        edge.update()
             self.app.save_state()
 
     def on_status_combo_changed(self, index):
@@ -336,13 +361,20 @@ class StyleController:
             priority = getattr(node, 'priority', 'none')
             is_compact = getattr(node, 'is_compact', False)
             node_date = getattr(node, 'date', None)
+            node_format = getattr(node, 'node_format', 'default')
 
             # 1. Synchronisation de la Forme (Shape)
             if hasattr(self.app, 'shape_combo') and self.app.shape_combo is not None:
                 idx = self.app.shape_combo.findData(shape)
-                if idx != -1: 
+                if idx != -1:
                     self.app.shape_combo.setCurrentIndex(idx)
-                    
+
+            # 1bis. Synchronisation du Format de nœud
+            if hasattr(self.app, 'format_combo') and self.app.format_combo is not None:
+                idx = self.app.format_combo.findData(node_format)
+                if idx != -1:
+                    self.app.format_combo.setCurrentIndex(idx)
+
             # 2. Synchronisation du Statut
             if hasattr(self.app, 'status_combo') and self.app.status_combo is not None:
                 idx = self.app.status_combo.findData(status)

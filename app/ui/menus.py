@@ -29,7 +29,8 @@ def create_menus(app_window):
     
     file_menu.addAction("📄 Nouveau mindmap", lambda: app_window.project_service.new_project())
     file_menu.addAction("📂 Ouvrir un mindmap", app_window.project_service.load_project)
-    
+    file_menu.addAction("📝 Importer depuis Markdown...", app_window.import_controller.import_markdown)
+
     # Sécurisation des actions avec raccourcis (on évite le chaînage destructeur de pointeur)
     save_action = QAction("💾 Enregistrer", app_window)
     save_action.setShortcut(QKeySequence("Ctrl+S"))
@@ -81,6 +82,7 @@ def create_menus(app_window):
     # MENU AFFICHAGE
     # ==========================================
     display_menu = menu_bar.addMenu("Affichage")
+    app_window.display_menu = display_menu
     app_window.action_toggle_shortcuts = display_menu.addAction("Afficher les raccourcis")
     app_window.action_toggle_shortcuts.setCheckable(True)
     app_window.action_toggle_shortcuts.setChecked(True)

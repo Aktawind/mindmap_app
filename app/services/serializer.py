@@ -55,6 +55,8 @@ class MindMapSerializer:
                 "date": getattr(node, 'date', None),
                 "priority": getattr(node, 'priority', "none"),
                 "is_compact": getattr(node, 'is_compact', False),
+                "notes": getattr(node, 'notes', ''),
+                "node_format": getattr(node, 'node_format', 'default'),
                 "children": []
             }
             
@@ -106,7 +108,9 @@ class MindMapSerializer:
                     "image_height": getattr(node, 'image_height', 150),
                     "date": getattr(node, 'date', None),
                     "priority": getattr(node, 'priority', "none"),
-                    "is_compact": getattr(node, 'is_compact', False)
+                    "is_compact": getattr(node, 'is_compact', False),
+                    "notes": getattr(node, 'notes', ''),
+                    "node_format": getattr(node, 'node_format', 'default')
                 })
 
         # Collecte des liens transversaux (Cross Links)
@@ -199,12 +203,13 @@ class MindMapSerializer:
                 file_path=data.get("file_path"), url_link=data.get("url_link"), 
                 is_bold=data.get("is_bold", False),  is_italic=data.get("is_italic", False), 
                 is_strikethrough=data.get("is_strikethrough", False), status=status,
-                image_path=img_path, image_height=img_height,
+                image_path=img_path, image_height=img_height, notes=data.get("notes", ''),
+                node_format=data.get("node_format", "default"),
             )
             node.border_width = data.get("border_width", 1)
 
             node.date = data.get("date", None)
-            priority = data.get("priority")          
+            priority = data.get("priority")
             node.priority = priority if priority == 'null' else "none"
             node.is_compact = data.get("is_compact", False)
 
@@ -268,11 +273,13 @@ class MindMapSerializer:
                 border=orphan.get("border", '#3B82F6'), font_color=orphan.get("font_color", '#ffffff'),
                 file_path=orphan.get("file_path"), url_link=orphan.get("url_link"),
                 is_bold=orphan.get("is_bold", False), is_italic=orphan.get("is_italic", False),
-                is_strikethrough=orphan.get("is_strikethrough", False), 
-                status=orphan.get("status", "none"), 
-                priority=orphan.get("priority", "none"), 
-                is_compact=orphan.get("is_compact", False), 
+                is_strikethrough=orphan.get("is_strikethrough", False),
+                status=orphan.get("status", "none"),
+                priority=orphan.get("priority", "none"),
+                is_compact=orphan.get("is_compact", False),
                 image_path=img_path, image_height=img_height,
+                notes=orphan.get("notes", ''),
+                node_format=orphan.get("node_format", "default"),
             )
             node.border_width = orphan.get("border_width", 1)
 

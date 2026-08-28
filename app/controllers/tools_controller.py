@@ -125,6 +125,7 @@ class ToolsController:
                 "date": getattr(src, 'date', None),
                 "is_compact": getattr(src, 'is_compact', False),
                 "notes": getattr(src, 'notes', ''),
+                "node_format": getattr(src, 'node_format', 'default'),
                 "attachments": copy.deepcopy(getattr(src, 'attachments', [])),
                 "image_path": getattr(src, 'image_path', None),
                 "image_height": getattr(src, 'image_height', 150),
@@ -154,6 +155,7 @@ class ToolsController:
             is_strikethrough=data.get("is_strikethrough", False), status=data["status"],
             priority=data.get("priority", "none"), is_compact=data.get("is_compact", False),
             image_path=data.get("image_path"), image_height=data.get("image_height", 150),
+            node_format=data.get("node_format", "default"),
         )
         if hasattr(new_node, 'notes'): new_node.notes = data["notes"]
         new_node.date = data.get("date")
