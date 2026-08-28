@@ -1,7 +1,10 @@
 import json
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QInputDialog, QMessageBox, QColorDialog, QPushButton
+from PyQt6.QtWidgets import (
+    QMessageBox, QColorDialog, QPushButton,
+    QDialog, QVBoxLayout, QHBoxLayout, QDateEdit, QDialogButtonBox
+)
 from graphics.items import NodeItem, compute_contrast_font_color
 
 class StyleController:
@@ -43,7 +46,14 @@ class StyleController:
         node.font_color = QColor(compute_contrast_font_color(bg_color))
         node.update()
 
-        # 2. Descente récursive vers les enfants via les arêtes naturelles
+        # 2. On recolore les branches (arêtes) sortantes pour qu'elles suivent le nœud
+        if hasattr(node, 'edges'):
+            for edge in node.edges:
+                if getattr(edge, 'source_node', None) == node and hasattr(edge, 'color'):
+                    edge.color = QColor(border_color)
+                    edge.update()
+
+        # 3. Descente récursive vers les enfants via les arêtes naturelles
         if hasattr(node, 'edges'):
             for edge in node.edges:
                 if getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node:
@@ -237,26 +247,50 @@ class StyleController:
                 node.update()
             self.app.save_state()
 
-    # 🟢 AJOUT : Demande et affectation d'une date d'échéance textuelle
+    # 🟢 AJOUT : Demande et affectation d'une date d'échéance via un calendrier
     def prompt_node_date(self):
         ws = self.app.current_workspace()
         if not ws: return
-        
+
         sel = ws.scene.selectedItems()
         nodes = [item for item in sel if isinstance(item, NodeItem)]
         if not nodes: return
-        
+
         current_date = getattr(nodes[0], 'date', '') or ''
-        
-        text, ok = QInputDialog.getText(
-            self.app, 
-            "Date d'échéance", 
-            "Saisissez une échéance (ex: JJ/MM/AAAA) ou laissez vide pour effacer :",
-            text=current_date
-        )
-        
-        if ok:
-            date_value = text.strip() if text.strip() else None
+
+        dialog = QDialog(self.app)
+        dialog.setWindowTitle("Date d'échéance")
+        layout = QVBoxLayout(dialog)
+
+        date_edit = QDateEdit(dialog)
+        date_edit.setCalendarPopup(True)
+        date_edit.setDisplayFormat("dd/MM/yyyy")
+        parsed_date = QDate.fromString(current_date, "dd/MM/yyyy")
+        date_edit.setDate(parsed_date if parsed_date.isValid() else QDate.currentDate())
+        layout.addWidget(date_edit)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        clear_btn = QPushButton("Effacer l'échéance")
+        button_row = QHBoxLayout()
+        button_row.addWidget(clear_btn)
+        button_row.addStretch()
+        layout.addLayout(button_row)
+        layout.addWidget(buttons)
+
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+
+        cleared = {"value": False}
+
+        def on_clear():
+            cleared["value"] = True
+            dialog.accept()
+
+        clear_btn.clicked.connect(on_clear)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            date_value = None if cleared["value"] else date_edit.date().toString("dd/MM/yyyy")
+
             for node in nodes:
                 node.date = date_value
                 if hasattr(node, 'recalculate_size'):

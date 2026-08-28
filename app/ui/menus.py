@@ -42,6 +42,31 @@ def create_menus(app_window):
     # MENU ÉDITION
     # ==========================================
     edit_menu = menu_bar.addMenu("Édition")
+
+    undo_action = QAction("↩️ Annuler", app_window)
+    undo_action.setShortcut(QKeySequence("Ctrl+Z"))
+    undo_action.triggered.connect(app_window.undo)
+    edit_menu.addAction(undo_action)
+
+    redo_action = QAction("↪️ Rétablir", app_window)
+    redo_action.setShortcut(QKeySequence("Ctrl+Y"))
+    redo_action.triggered.connect(app_window.redo)
+    edit_menu.addAction(redo_action)
+
+    edit_menu.addSeparator()
+
+    copy_action = QAction("📋 Copier l'élément", app_window)
+    copy_action.setShortcut(QKeySequence("Ctrl+C"))
+    copy_action.triggered.connect(app_window.tools_controller.copy_selected)
+    edit_menu.addAction(copy_action)
+
+    paste_action = QAction("📥 Coller l'élément", app_window)
+    paste_action.setShortcut(QKeySequence("Ctrl+V"))
+    paste_action.triggered.connect(app_window.tools_controller.paste_node)
+    edit_menu.addAction(paste_action)
+
+    edit_menu.addSeparator()
+
     edit_menu.addAction("🗂️ Gérer les templates", lambda: show_template_manager_dialog(app_window))
 
     # ==========================================
