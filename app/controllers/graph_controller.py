@@ -19,6 +19,93 @@ class GraphController:
             elif hasattr(edge, 'set_curved'):
                 edge.set_curved(is_curved_mode)
 
+    def auto_layout(self):
+        """Réorganise automatiquement l'arborescence connectée à la racine en un agencement
+        hiérarchique propre (niveaux alignés par colonnes, fratries réparties verticalement
+        sans chevauchement). Les nœuds orphelins ou reliés uniquement via "Relier les nœuds"
+        ne font pas partie de l'arbre naturel et ne sont donc pas déplacés."""
+        ws = self.app.current_workspace()
+        if not ws: return
+
+        nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+        root = next((n for n in nodes if n.node_id == 'root'), None)
+        if not root: return
+
+        LEVEL_GAP = 90
+        SIBLING_GAP = 30
+
+        visited_ids = set()
+        tree_children = {}
+
+        def build_tree(node):
+            if node.node_id in visited_ids:
+                return
+            visited_ids.add(node.node_id)
+            children = []
+            for edge in getattr(node, 'edges', []):
+                if getattr(edge, 'source_node', None) == node:
+                    child = getattr(edge, 'dest_node', None)
+                    if child and child.node_id not in visited_ids:
+                        children.append(child)
+            tree_children[node.node_id] = children
+            for child in children:
+                build_tree(child)
+
+        build_tree(root)
+
+        subtree_height = {}
+
+        def compute_height(node):
+            children = tree_children.get(node.node_id, [])
+            if not children:
+                h = node.rect.height()
+            else:
+                h = sum(compute_height(c) for c in children) + SIBLING_GAP * (len(children) - 1)
+                h = max(h, node.rect.height())
+            subtree_height[node.node_id] = h
+            return h
+
+        compute_height(root)
+
+        # Largeur de colonne par profondeur (le nœud le plus large de chaque niveau)
+        level_width = {}
+
+        def compute_level_widths(node, depth):
+            level_width[depth] = max(level_width.get(depth, 0), node.rect.width())
+            for child in tree_children.get(node.node_id, []):
+                compute_level_widths(child, depth + 1)
+
+        compute_level_widths(root, 0)
+
+        level_x = {}
+        cumulative_x = 0.0
+        for depth in sorted(level_width.keys()):
+            level_x[depth] = cumulative_x
+            cumulative_x += level_width[depth] + LEVEL_GAP
+
+        def assign_positions(node, depth, top_y):
+            x = level_x[depth] + node.rect.width() / 2
+            h = subtree_height[node.node_id]
+            y = top_y + h / 2
+            node.setPos(x, y)
+
+            child_top = top_y
+            for child in tree_children.get(node.node_id, []):
+                child_h = subtree_height[child.node_id]
+                assign_positions(child, depth + 1, child_top)
+                child_top += child_h + SIBLING_GAP
+
+        assign_positions(root, 0, -subtree_height[root.node_id] / 2)
+
+        for item in ws.scene.items():
+            if isinstance(item, EdgeItem) and hasattr(item, 'update_position'):
+                item.update_position()
+
+        self.app.save_state()
+
+        if hasattr(self.app, 'workspace_controller'):
+            self.app.workspace_controller.center_on_graph()
+
     def add_child_node(self, parent_node):
         """Ajoute un nœud enfant lié au nœud parent fourni et lance l'édition immédiate."""
         ws = self.app.current_workspace()

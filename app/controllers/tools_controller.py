@@ -5,12 +5,14 @@ import sys
 import time
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox, QWidget
-from graphics.items import NodeItem
+from graphics.items import NodeItem, EdgeItem
 
 class ToolsController:
     def __init__(self, app):
         self.app = app
-        self._clipboard_node = None
+        self._clipboard_node = None  # Rétrocompatibilité (non utilisé, voir _clipboard_nodes/_clipboard_edges)
+        self._clipboard_nodes = []
+        self._clipboard_edges = []
 
     @staticmethod
     def resource_path(relative_path):
@@ -105,77 +107,142 @@ class ToolsController:
             else:
                 QMessageBox.warning(self.app, "Erreur", f"Fichier template introuvable :\n{template_path}")
 
+    @staticmethod
+    def _snapshot_node(node):
+        """Capture toutes les propriétés reconstructibles d'un nœud, pour le presse-papier interne."""
+        return {
+            "label": getattr(node, 'label', ''),
+            "shape": getattr(node, 'shape_type', 'box'),
+            "bg": node.bg_color.name() if hasattr(node, 'bg_color') else '#60A5FA',
+            "border": node.border_color.name() if hasattr(node, 'border_color') else '#3B82F6',
+            "font_color": node.font_color.name() if hasattr(node, 'font_color') else '#ffffff',
+            "is_bold": getattr(node, 'is_bold', False),
+            "is_italic": getattr(node, 'is_italic', False),
+            "is_strikethrough": getattr(node, 'is_strikethrough', False),
+            "status": getattr(node, 'status', 'none'),
+            "priority": getattr(node, 'priority', 'none'),
+            "date": getattr(node, 'date', None),
+            "is_compact": getattr(node, 'is_compact', False),
+            "notes": getattr(node, 'notes', ''),
+            "node_format": getattr(node, 'node_format', 'default'),
+            "attachments": copy.deepcopy(getattr(node, 'attachments', [])),
+            "image_path": getattr(node, 'image_path', None),
+            "image_height": getattr(node, 'image_height', 150),
+        }
+
     def copy_selected(self):
-        """Copie le nœud sélectionné dans le presse-papier interne (partagé entre tous les onglets)."""
+        """Copie tous les nœuds sélectionnés (et les branches qui les relient entre eux) dans le
+        presse-papier interne, partagé entre tous les onglets."""
         ws = self.app.current_workspace()
         if not ws: return
+
         sel = ws.scene.selectedItems()
-        if len(sel) == 1 and isinstance(sel[0], NodeItem):
-            src = sel[0]
-            self._clipboard_node = {
-                "label": getattr(src, 'label', ''),
-                "shape": getattr(src, 'shape_type', 'box'),
-                "bg": src.bg_color.name() if hasattr(src, 'bg_color') else '#60A5FA',
-                "border": src.border_color.name() if hasattr(src, 'border_color') else '#3B82F6',
-                "font_color": src.font_color.name() if hasattr(src, 'font_color') else '#ffffff',
-                "is_bold": getattr(src, 'is_bold', False),
-                "is_italic": getattr(src, 'is_italic', False),
-                "is_strikethrough": getattr(src, 'is_strikethrough', False),
-                "status": getattr(src, 'status', 'none'),
-                "priority": getattr(src, 'priority', 'none'),
-                "date": getattr(src, 'date', None),
-                "is_compact": getattr(src, 'is_compact', False),
-                "notes": getattr(src, 'notes', ''),
-                "node_format": getattr(src, 'node_format', 'default'),
-                "attachments": copy.deepcopy(getattr(src, 'attachments', [])),
-                "image_path": getattr(src, 'image_path', None),
-                "image_height": getattr(src, 'image_height', 150),
-            }
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        if not nodes: return
+
+        selected_ids = {n.node_id for n in nodes}
+
+        self._clipboard_nodes = []
+        for node in nodes:
+            snapshot = self._snapshot_node(node)
+            snapshot["_source_id"] = node.node_id
+            snapshot["_x"] = node.pos().x()
+            snapshot["_y"] = node.pos().y()
+            self._clipboard_nodes.append(snapshot)
+
+        # Capture des branches internes au groupe copié (les deux extrémités doivent être sélectionnées)
+        seen_edges = set()
+        self._clipboard_edges = []
+        for node in nodes:
+            for edge in getattr(node, 'edges', []):
+                source = getattr(edge, 'source_node', None)
+                dest = getattr(edge, 'dest_node', None)
+                if not source or not dest or id(edge) in seen_edges:
+                    continue
+                if source.node_id in selected_ids and dest.node_id in selected_ids:
+                    seen_edges.add(id(edge))
+                    self._clipboard_edges.append({
+                        "from": source.node_id,
+                        "to": dest.node_id,
+                        "label": getattr(edge, 'label', ''),
+                        "color": edge.color.name() if hasattr(edge, 'color') else '#A0AEC0',
+                        "arrow_dir": getattr(edge, 'arrow_dir', 'none'),
+                    })
 
     def paste_node(self):
-        """Colle le nœud stocké à l'emplacement central de la vue courante (fonctionne d'un onglet à l'autre)."""
+        """Colle les nœuds du presse-papier (et leurs branches internes) autour de l'emplacement
+        central de la vue courante, en conservant leurs positions relatives. Fonctionne d'un
+        onglet à l'autre puisque le presse-papier est partagé au niveau de l'application."""
         ws = self.app.current_workspace()
-        if not ws or not self._clipboard_node: return
-
-        data = self._clipboard_node
-
-        # 🚨 FIX ANTI-COLLISION : ID basé sur un horodatage milliseconde pour garantir l'unicité stricte
-        new_id = f"node_paste_{int(time.time() * 1000)}"
+        if not ws or not self._clipboard_nodes: return
 
         center = ws.view.mapToScene(ws.view.viewport().rect().center())
-        x, y = center.x(), center.y()
 
-        if getattr(ws.scene, 'snap_to_grid', False):
-            x = round(x / 20) * 20
-            y = round(y / 20) * 20
+        # Décalage nécessaire pour amener le centre du groupe copié sur le centre de la vue
+        avg_x = sum(n["_x"] for n in self._clipboard_nodes) / len(self._clipboard_nodes)
+        avg_y = sum(n["_y"] for n in self._clipboard_nodes) / len(self._clipboard_nodes)
+        offset_x, offset_y = center.x() - avg_x, center.y() - avg_y
 
-        new_node = NodeItem(
-            new_id, data["label"], x, y,
-            shape=data["shape"], bg=data["bg"], border=data["border"], font_color=data["font_color"],
-            is_bold=data["is_bold"], is_italic=data.get("is_italic", False),
-            is_strikethrough=data.get("is_strikethrough", False), status=data["status"],
-            priority=data.get("priority", "none"), is_compact=data.get("is_compact", False),
-            image_path=data.get("image_path"), image_height=data.get("image_height", 150),
-            node_format=data.get("node_format", "default"),
-        )
-        if hasattr(new_node, 'notes'): new_node.notes = data["notes"]
-        new_node.date = data.get("date")
-        new_node.attachments = copy.deepcopy(data.get("attachments", []))
-        new_node.recalculate_size()
+        id_map = {}
+        new_nodes = []
+        base_timestamp = int(time.time() * 1000)
 
-        # Liaison dynamique vers le gestionnaire d'édition textuelle
-        if hasattr(self.app, 'editing_controller') and self.app.editing_controller:
-            new_node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
-        elif hasattr(self.app, 'start_inline_editing'):
-            new_node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+        for i, data in enumerate(self._clipboard_nodes):
+            new_id = f"node_paste_{base_timestamp}_{i}"
+            id_map[data["_source_id"]] = new_id
 
-        ws.scene.addItem(new_node)
+            x, y = data["_x"] + offset_x, data["_y"] + offset_y
+            if getattr(ws.scene, 'snap_to_grid', False):
+                x = round(x / 20) * 20
+                y = round(y / 20) * 20
+
+            new_node = NodeItem(
+                new_id, data["label"], x, y,
+                shape=data["shape"], bg=data["bg"], border=data["border"], font_color=data["font_color"],
+                is_bold=data["is_bold"], is_italic=data.get("is_italic", False),
+                is_strikethrough=data.get("is_strikethrough", False), status=data["status"],
+                priority=data.get("priority", "none"), is_compact=data.get("is_compact", False),
+                image_path=data.get("image_path"), image_height=data.get("image_height", 150),
+                node_format=data.get("node_format", "default"),
+            )
+            if hasattr(new_node, 'notes'): new_node.notes = data["notes"]
+            new_node.date = data.get("date")
+            new_node.attachments = copy.deepcopy(data.get("attachments", []))
+            new_node.recalculate_size()
+
+            if hasattr(self.app, 'editing_controller') and self.app.editing_controller:
+                new_node.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+            elif hasattr(self.app, 'start_inline_editing'):
+                new_node.signals.itemDoubleClicked.connect(self.app.start_inline_editing)
+
+            ws.scene.addItem(new_node)
+            new_nodes.append(new_node)
+
+        # Recrée les branches internes au groupe collé, en pointant vers les nouveaux identifiants
+        for i, edge_data in enumerate(self._clipboard_edges):
+            source = next((n for n in new_nodes if n.node_id == id_map.get(edge_data["from"])), None)
+            dest = next((n for n in new_nodes if n.node_id == id_map.get(edge_data["to"])), None)
+            if not source or not dest:
+                continue
+
+            edge_id = f"edge_paste_{base_timestamp}_{i}"
+            edge = EdgeItem(edge_id, source, dest, edge_data.get("label", ""),
+                             color=edge_data.get("color", "#A0AEC0"), arrow_dir=edge_data.get("arrow_dir", "none"))
+
+            if hasattr(self.app, 'editing_controller') and self.app.editing_controller:
+                edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
+
+            ws.scene.addItem(edge)
+            if hasattr(edge, 'update_position'): edge.update_position()
+            source.edges.append(edge)
+            dest.edges.append(edge)
 
         if hasattr(self.app, 'save_state'):
             self.app.save_state()
 
         ws.scene.clearSelection()
-        new_node.setSelected(True)
+        for node in new_nodes:
+            node.setSelected(True)
 
     def auto_center_clicked(self):
         """Centre précisément la vue sur le nœud racine principal ('root')."""

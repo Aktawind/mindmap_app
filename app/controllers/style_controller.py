@@ -57,7 +57,14 @@ class StyleController:
         if hasattr(node, 'edges'):
             for edge in node.edges:
                 if getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node:
-                    self.apply_color_downward(edge.dest_node, bg_color, border_color, visited)
+                    child = edge.dest_node
+                    # 🛡️ Le nœud racine ne doit jamais être recoloré par ricochet : un lien
+                    # créé via "Relier les nœuds" peut pointer vers lui dans n'importe quel
+                    # sens (l'ordre de sélection n'est pas garanti), auquel cas il serait
+                    # injustement traité comme un "enfant" du nœud en cours de recoloration.
+                    if getattr(child, 'node_id', None) == 'root':
+                        continue
+                    self.apply_color_downward(child, bg_color, border_color, visited)
 
     def load_custom_colors(self):
         raw = self.app.settings.value("custom_node_colors", "[]")

@@ -116,6 +116,16 @@ def create_toolbar(app_window) -> None:
     btn_fit.clicked.connect(app_window.tools_controller.fit_to_view_clicked)
     workspace_toolbar.addWidget(btn_fit)
 
+    # Bouton Réorganisation auto (réalignement propre et instantané de l'arborescence)
+    btn_auto_layout = QPushButton("🧹 Réorganisation auto", workspace_toolbar)
+    btn_auto_layout.setToolTip("Réaligner proprement l'arborescence à partir du nœud central")
+    btn_auto_layout.setStyleSheet("""
+        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #475569; }
+    """)
+    btn_auto_layout.clicked.connect(app_window.graph_controller.auto_layout)
+    workspace_toolbar.addWidget(btn_auto_layout)
+
     spacer = QWidget()
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     workspace_toolbar.addWidget(spacer)

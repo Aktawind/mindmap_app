@@ -6,7 +6,6 @@ from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtCore import QSettings, QTimer
 from PyQt6 import sip
 
-from services.updater_service import check_for_updates
 from services.updater_service import CURRENT_VERSION as APP_VERSION
 from graphics.scene import MindMapWorkspace
 
@@ -88,7 +87,8 @@ class MindMapApp(QMainWindow):
         # Un léger délai pour laisser l'interface s'afficher
         QTimer.singleShot(100, self.initialize_startup_session)
 
-        check_for_updates(self)
+        # La vérification des mises à jour ne se fait plus automatiquement au lancement :
+        # seulement à la demande, via "Vérifier les mises à jour" dans le menu À propos.
 
         # Sauvegarde automatique périodique des cartes déjà enregistrées sur disque
         self.autosave_timer = QTimer(self)
