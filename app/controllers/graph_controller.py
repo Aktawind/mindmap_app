@@ -31,8 +31,8 @@ class GraphController:
         root = next((n for n in nodes if n.node_id == 'root'), None)
         if not root: return
 
-        LEVEL_GAP = 90
-        SIBLING_GAP = 30
+        LEVEL_GAP = 50
+        SIBLING_GAP = 12
 
         visited_ids = set()
         tree_children = {}

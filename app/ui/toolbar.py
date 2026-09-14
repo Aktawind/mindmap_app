@@ -146,10 +146,52 @@ def create_toolbar(app_window) -> None:
     )
     workspace_toolbar.addWidget(app_window.template_combo)
 
-    workspace_toolbar.addSeparator()
+    # Bouton Auto Center
+    btn_center = QPushButton("Auto Center", workspace_toolbar)
+    btn_center.setToolTip("Centrer la vue sur le nœud principal")
+    btn_center.setStyleSheet("""
+        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #475569; }
+    """)
+    btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
+    workspace_toolbar.addWidget(btn_center)
 
-    # ComboBox du canva de fond (Kanban, matrices, etc.) — ancré à la scène, suit le pan/zoom
-    app_window.canvas_combo = QComboBox(workspace_toolbar)
+    # Bouton Ajuster à l'écran (fit-to-view)
+    btn_fit = QPushButton("🔎 Ajuster à l'écran", workspace_toolbar)
+    btn_fit.setToolTip("Ajuster le zoom pour voir l'ensemble de la carte")
+    btn_fit.setStyleSheet("""
+        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #475569; }
+    """)
+    btn_fit.clicked.connect(app_window.tools_controller.fit_to_view_clicked)
+    workspace_toolbar.addWidget(btn_fit)
+
+    spacer = QWidget()
+    spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    workspace_toolbar.addWidget(spacer)
+
+    workspace_toolbar.addWidget(QLabel(" 🔍  "))
+    app_window.search_input = QLineEdit()
+    search_input = app_window.search_input
+    search_input.setPlaceholderText("Rechercher un nœud... (Ctrl+F)")
+    search_input.setMaximumWidth(200)
+    search_input.setClearButtonEnabled(True)
+    search_input.textChanged.connect(app_window.graph_controller.filter_nodes)
+    workspace_toolbar.addWidget(search_input)
+
+    # ==========================================
+    # DEUXIÈME RANGÉE : Canva de fond + Réorganisation auto
+    # Sur sa propre rangée (addToolBarBreak) pour ne jamais être poussée dans le menu
+    # de débordement "»" de la barre principale, déjà bien chargée.
+    # ==========================================
+    app_window.addToolBarBreak()
+    canvas_toolbar = app_window.addToolBar("canvas")
+    canvas_toolbar.setMovable(False)
+    canvas_toolbar.setStyleSheet(workspace_toolbar.styleSheet())
+
+    canvas_toolbar.addWidget(QLabel(" 🖼️ Canva de fond : "))
+
+    app_window.canvas_combo = QComboBox(canvas_toolbar)
     for key, label in CANVAS_TYPES.items():
         app_window.canvas_combo.addItem(label, key)
     app_window.canvas_combo.setToolTip("Choisir un canva de fond (Kanban, matrices, etc.)")
@@ -175,55 +217,24 @@ def create_toolbar(app_window) -> None:
             app_window.save_state()
 
     app_window.canvas_combo.currentIndexChanged.connect(on_canvas_changed)
-    workspace_toolbar.addWidget(app_window.canvas_combo)
+    canvas_toolbar.addWidget(app_window.canvas_combo)
 
-    btn_canvas_image = QPushButton("🖼️", workspace_toolbar)
+    btn_canvas_image = QPushButton("🖼️ Charger une image...", canvas_toolbar)
     btn_canvas_image.setToolTip("Charger une image personnalisée comme fond de carte")
     btn_canvas_image.clicked.connect(lambda: _load_canvas_image(app_window))
-    workspace_toolbar.addWidget(btn_canvas_image)
+    canvas_toolbar.addWidget(btn_canvas_image)
 
-    # Bouton Auto Center
-    btn_center = QPushButton("Auto Center", workspace_toolbar)
-    btn_center.setToolTip("Centrer la vue sur le nœud principal")
-    btn_center.setStyleSheet("""
-        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
-        QPushButton:hover { background-color: #475569; }
-    """)
-    btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
-    workspace_toolbar.addWidget(btn_center)
-
-    # Bouton Ajuster à l'écran (fit-to-view)
-    btn_fit = QPushButton("🔎 Ajuster à l'écran", workspace_toolbar)
-    btn_fit.setToolTip("Ajuster le zoom pour voir l'ensemble de la carte")
-    btn_fit.setStyleSheet("""
-        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
-        QPushButton:hover { background-color: #475569; }
-    """)
-    btn_fit.clicked.connect(app_window.tools_controller.fit_to_view_clicked)
-    workspace_toolbar.addWidget(btn_fit)
+    canvas_toolbar.addSeparator()
 
     # Bouton Réorganisation auto (réalignement propre et instantané de l'arborescence)
-    btn_auto_layout = QPushButton("🧹 Réorganisation auto", workspace_toolbar)
+    btn_auto_layout = QPushButton("🧹 Réorganisation auto", canvas_toolbar)
     btn_auto_layout.setToolTip("Réaligner proprement l'arborescence à partir du nœud central")
     btn_auto_layout.setStyleSheet("""
         QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
         QPushButton:hover { background-color: #475569; }
     """)
     btn_auto_layout.clicked.connect(app_window.graph_controller.auto_layout)
-    workspace_toolbar.addWidget(btn_auto_layout)
-
-    spacer = QWidget()
-    spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-    workspace_toolbar.addWidget(spacer)
-
-    workspace_toolbar.addWidget(QLabel(" 🔍  "))
-    app_window.search_input = QLineEdit()
-    search_input = app_window.search_input
-    search_input.setPlaceholderText("Rechercher un nœud... (Ctrl+F)")
-    search_input.setMaximumWidth(200)
-    search_input.setClearButtonEnabled(True)
-    search_input.textChanged.connect(app_window.graph_controller.filter_nodes)
-    workspace_toolbar.addWidget(search_input)
+    canvas_toolbar.addWidget(btn_auto_layout)
 
     # Bouton Ajouter un onglet inséré dans le coin supérieur droit du QTabWidget
     app_window.add_tab_button = QPushButton("➕ Ajouter un onglet", app_window.tabs)

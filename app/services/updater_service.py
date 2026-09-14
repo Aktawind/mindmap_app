@@ -1,10 +1,13 @@
 import os
 import sys
 import json
+import ssl
+import socket
 import zipfile
 import tempfile
 import subprocess
 import urllib.request
+import urllib.error
 
 from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
@@ -17,36 +20,65 @@ CURRENT_VERSION = "v1.4.0"  # Version actuelle de l'application, à mettre à jo
 class CheckUpdateThread(QThread):
     """Thread secondaire pour vérifier silencieusement les mises à jour sans bloquer l'UI."""
     update_available = pyqtSignal(str, str)  # tag_name, download_url
-    check_finished = pyqtSignal(bool, str)  # (mise_a_jour_trouvee, message_erreur_ou_vide)
+    check_finished = pyqtSignal(bool, str)  # (mise_a_jour_trouvee, message_erreur_ou_vide_precis)
 
     def run(self):
         try:
             url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-            req = urllib.request.Request(url, headers={'User-Agent': 'MindyApp'})
-            with urllib.request.urlopen(req, timeout=5) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    latest_version = data.get('tag_name', '')
+            req = urllib.request.Request(
+                url, headers={'User-Agent': 'MindyApp', 'Accept': 'application/vnd.github+json'}
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode())
+                latest_version = data.get('tag_name', '')
 
-                    if latest_version and latest_version != CURRENT_VERSION:
-                        assets = data.get('assets', [])
-                        download_url = None
-                        for asset in assets:
-                            if asset['name'].endswith('.exe') or asset['name'].endswith('.zip'):
-                                download_url = asset['browser_download_url']
-                                break
+                if latest_version and latest_version != CURRENT_VERSION:
+                    assets = data.get('assets', [])
+                    download_url = None
+                    for asset in assets:
+                        if asset['name'].endswith('.exe') or asset['name'].endswith('.zip'):
+                            download_url = asset['browser_download_url']
+                            break
 
-                        if download_url:
-                            self.update_available.emit(latest_version, download_url)
-                            self.check_finished.emit(True, "")
-                            return
+                    if download_url:
+                        self.update_available.emit(latest_version, download_url)
+                        self.check_finished.emit(True, "")
+                        return
 
-                    self.check_finished.emit(False, "")
-                else:
-                    self.check_finished.emit(False, f"HTTP {response.status}")
+                self.check_finished.emit(False, "")
+
+        except urllib.error.HTTPError as e:
+            if e.code == 403:
+                msg = ("GitHub a temporairement limité le nombre de vérifications depuis cette "
+                       "connexion (quota de requêtes atteint). Réessayez dans quelques minutes.")
+            elif e.code == 404:
+                msg = "Aucune release trouvée sur le dépôt GitHub du projet."
+            else:
+                msg = f"Le serveur GitHub a répondu avec une erreur (HTTP {e.code})."
+            print(f"Erreur vérification mise à jour (HTTP {e.code}) : {e}")
+            self.check_finished.emit(False, msg)
+
+        except urllib.error.URLError as e:
+            reason = e.reason
+            if isinstance(reason, ssl.SSLCertVerificationError) or 'CERTIFICATE_VERIFY_FAILED' in str(reason):
+                msg = ("Échec de la vérification du certificat de sécurité (SSL). Un antivirus, un "
+                       "pare-feu ou un proxy d'entreprise intercepte peut-être la connexion.")
+            else:
+                msg = (f"Connexion à GitHub impossible : {reason}\n\n"
+                       "Un pare-feu ou un antivirus bloque peut-être les connexions sortantes de "
+                       "Mindy.exe (fréquent tant que l'application n'est pas signée numériquement).")
+            print(f"Erreur vérification mise à jour (URLError) : {e}")
+            self.check_finished.emit(False, msg)
+
+        except socket.timeout:
+            msg = ("La connexion à GitHub a expiré (délai dépassé). Réessayez, ou vérifiez qu'aucun "
+                   "pare-feu ne bloque Mindy.exe.")
+            print("Erreur vérification mise à jour : délai dépassé")
+            self.check_finished.emit(False, msg)
+
         except Exception as e:
-            print(f"Erreur vérification mise à jour : {e}")
-            self.check_finished.emit(False, str(e))
+            print(f"Erreur vérification mise à jour ({type(e).__name__}) : {e}")
+            self.check_finished.emit(False, f"Erreur inattendue ({type(e).__name__}) : {e}")
 
 
 class DownloadThread(QThread):
@@ -92,7 +124,7 @@ def check_for_updates(parent_widget, silent=True):
         if error_msg:
             QMessageBox.warning(
                 parent_widget, "Vérification impossible",
-                "Impossible de vérifier les mises à jour.\nVérifiez votre connexion internet."
+                f"Impossible de vérifier les mises à jour.\n\n{error_msg}"
             )
         else:
             QMessageBox.information(
