@@ -80,6 +80,8 @@ class MindMapSerializer:
         state = {
             "global_line_routing": getattr(ws.scene, 'line_routing_mode', 'curved'),
             "snap_to_grid": getattr(ws.scene, 'snap_to_grid', False),
+            "canvas_type": getattr(ws.scene, 'canvas_type', 'none'),
+            "canvas_image_path": getattr(ws.scene, 'canvas_image_path', None),
             "root": serialize_node(root),
             "orphan_nodes": [],
             "cross_links": []
@@ -161,12 +163,15 @@ class MindMapSerializer:
         # Restauration des configurations globales de la scène
         ws.scene.line_routing_mode = root_data.get("global_line_routing", "curved")
         ws.scene.snap_to_grid = root_data.get("snap_to_grid", False)
-        
+        ws.scene.canvas_type = root_data.get("canvas_type", "none")
+        ws.scene.canvas_image_path = root_data.get("canvas_image_path", None)
+
         # Synchronisation de l'interface graphique globale
         if hasattr(self.app, 'workspace_controller'):
             self.app.workspace_controller.sync_workspace_ui({
                 "snap_to_grid": ws.scene.snap_to_grid,
-                "line_routing_mode": ws.scene.line_routing_mode
+                "line_routing_mode": ws.scene.line_routing_mode,
+                "canvas_type": ws.scene.canvas_type
             })
         
         node_counter = [0]

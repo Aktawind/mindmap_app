@@ -228,6 +228,17 @@ class WorkspaceController:
                 combo.setCurrentIndex(index)
             combo.blockSignals(False)
 
+        if hasattr(self.app, 'canvas_combo') and self.app.canvas_combo and "canvas_type" in ui_state:
+            combo = self.app.canvas_combo
+            canvas_type = ui_state.get("canvas_type", "none")
+            combo.blockSignals(True)
+            index = combo.findData(canvas_type)
+            if index < 0:
+                index = combo.findData("none")
+            if index >= 0:
+                combo.setCurrentIndex(index)
+            combo.blockSignals(False)
+
         if hasattr(self.app, 'on_selection_changed'):
             self.app.on_selection_changed()
 

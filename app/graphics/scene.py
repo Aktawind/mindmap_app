@@ -3,6 +3,7 @@ from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QWidget, QVBoxLayout
 from signals import GraphicsSignals
 from ui.selection_manager import on_selection_changed
+from graphics.canvas_backgrounds import draw_canvas_background
 
 class MindMapScene(QGraphicsScene):
     def __init__(self, parent=None):
@@ -12,6 +13,15 @@ class MindMapScene(QGraphicsScene):
         self.line_routing_mode = 'curved'
         self.snap_to_grid = False
         self.parent_workspace = None
+        # Canva de fond (Kanban, matrices, etc.) : ancré aux coordonnées de la scène, donc
+        # il suit le pan/zoom comme le reste de la carte (voir graphics/canvas_backgrounds.py)
+        self.canvas_type = 'none'
+        self.canvas_image_path = None
+        self._canvas_image_cache = {}
+
+    def drawBackground(self, painter, rect):
+        painter.fillRect(rect, self.backgroundBrush())
+        draw_canvas_background(painter, self.canvas_type, self.canvas_image_path, self._canvas_image_cache)
 
     def mouseDoubleClickEvent(self, event):
         # Utilisation de la vue principale pour mapper l'élément sous le curseur de façon stable

@@ -80,6 +80,15 @@ class TabsController:
                 self.app.btn_snap.blockSignals(True)
                 self.app.btn_snap.setChecked(getattr(ws.scene, 'snap_to_grid', False))
                 self.app.btn_snap.blockSignals(False)
+
+            # 2bis. Synchronisation sécurisée du canva de fond (Kanban, matrices, etc.)
+            if hasattr(self.app, 'canvas_combo') and self.app.canvas_combo is not None:
+                combo = self.app.canvas_combo
+                canvas_type = getattr(ws.scene, 'canvas_type', 'none')
+                combo.blockSignals(True)
+                idx = combo.findData(canvas_type)
+                combo.setCurrentIndex(idx if idx >= 0 else combo.findData('none'))
+                combo.blockSignals(False)
             
         # 3. Notification des autres contrôleurs dépendants
         if hasattr(self.app, 'on_selection_changed'):

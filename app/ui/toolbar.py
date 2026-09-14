@@ -1,6 +1,56 @@
-from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget, QLineEdit, QSizePolicy
+import os
+import shutil
+from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget, QLineEdit, QSizePolicy, QFileDialog, QMessageBox
 from PyQt6.QtCore import Qt
 from services.template_service import refresh_template_combo
+from graphics.canvas_backgrounds import CANVAS_TYPES
+
+
+def _load_canvas_image(app_window):
+    """Ouvre un sélecteur de fichier, copie l'image choisie localement et l'affecte comme fond du canva actif."""
+    ws = app_window.current_workspace()
+    if not ws:
+        return False
+
+    file_path, _ = QFileDialog.getOpenFileName(
+        app_window, "Choisir une image de fond", "", "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+    )
+    if not file_path:
+        return False
+
+    try:
+        target_dir = os.path.abspath(".mindmap_attachments")
+        os.makedirs(target_dir, exist_ok=True)
+
+        base_name = os.path.basename(file_path)
+        name, ext = os.path.splitext(base_name)
+        counter = 1
+        new_name = base_name
+        while os.path.exists(os.path.join(target_dir, new_name)):
+            new_name = f"{name}_{counter}{ext}"
+            counter += 1
+
+        dest_path = os.path.join(target_dir, new_name)
+        shutil.copy(file_path, dest_path)
+
+        ws.scene.canvas_image_path = dest_path
+        ws.scene.canvas_type = 'custom'
+        ws.scene._canvas_image_cache.pop(dest_path, None)
+        ws.scene.update()
+
+        if hasattr(app_window, 'canvas_combo') and app_window.canvas_combo is not None:
+            idx = app_window.canvas_combo.findData('custom')
+            if idx >= 0:
+                app_window.canvas_combo.blockSignals(True)
+                app_window.canvas_combo.setCurrentIndex(idx)
+                app_window.canvas_combo.blockSignals(False)
+
+        if hasattr(app_window, 'save_state'):
+            app_window.save_state()
+        return True
+    except Exception as e:
+        QMessageBox.critical(app_window, "Erreur", f"Impossible de charger l'image :\n{e}")
+        return False
 
 def create_toolbar(app_window) -> None:
     """
@@ -95,7 +145,43 @@ def create_toolbar(app_window) -> None:
         lambda idx, window=app_window: window.tools_controller.apply_template(idx)
     )
     workspace_toolbar.addWidget(app_window.template_combo)
-    
+
+    workspace_toolbar.addSeparator()
+
+    # ComboBox du canva de fond (Kanban, matrices, etc.) — ancré à la scène, suit le pan/zoom
+    app_window.canvas_combo = QComboBox(workspace_toolbar)
+    for key, label in CANVAS_TYPES.items():
+        app_window.canvas_combo.addItem(label, key)
+    app_window.canvas_combo.setToolTip("Choisir un canva de fond (Kanban, matrices, etc.)")
+
+    def on_canvas_changed(index):
+        ws = app_window.current_workspace()
+        if not ws:
+            return
+        canvas_key = app_window.canvas_combo.itemData(index)
+
+        if canvas_key == 'custom':
+            loaded = _load_canvas_image(app_window)
+            if not loaded and not getattr(ws.scene, 'canvas_image_path', None):
+                # L'utilisateur a annulé et il n'y avait pas déjà d'image : on revient à "Aucun canva"
+                app_window.canvas_combo.blockSignals(True)
+                app_window.canvas_combo.setCurrentIndex(app_window.canvas_combo.findData('none'))
+                app_window.canvas_combo.blockSignals(False)
+            return
+
+        ws.scene.canvas_type = canvas_key
+        ws.scene.update()
+        if hasattr(app_window, 'save_state'):
+            app_window.save_state()
+
+    app_window.canvas_combo.currentIndexChanged.connect(on_canvas_changed)
+    workspace_toolbar.addWidget(app_window.canvas_combo)
+
+    btn_canvas_image = QPushButton("🖼️", workspace_toolbar)
+    btn_canvas_image.setToolTip("Charger une image personnalisée comme fond de carte")
+    btn_canvas_image.clicked.connect(lambda: _load_canvas_image(app_window))
+    workspace_toolbar.addWidget(btn_canvas_image)
+
     # Bouton Auto Center
     btn_center = QPushButton("Auto Center", workspace_toolbar)
     btn_center.setToolTip("Centrer la vue sur le nœud principal")
