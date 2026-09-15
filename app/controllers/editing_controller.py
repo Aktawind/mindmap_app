@@ -40,7 +40,9 @@ class EditingController(QObject):
             except Exception:
                 view_pos = ws.view.mapFromScene(item.pos()) if hasattr(item, 'pos') else ws.view.mapFromScene(ws.scene.sceneRect().center())
                 
-            self.editor.setGeometry(view_pos.x() - 75, view_pos.y() - 15, 150, 40)
+            # Un peu plus haut que le strict nécessaire pour une ligne, afin de pouvoir
+            # confortablement saisir un libellé de branche sur plusieurs lignes (Maj+Entrée)
+            self.editor.setGeometry(view_pos.x() - 90, view_pos.y() - 25, 180, 60)
         else:
             # Sécurité : Type d'élément non pris en charge pour l'édition
             self.editor.deleteLater()

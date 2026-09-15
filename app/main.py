@@ -98,11 +98,22 @@ class MindMapApp(QMainWindow):
     def initialize_startup_session(self):
         """Décide au démarrage s'il faut charger la workspace ou le dernier projet."""
         last_workspace = self.settings.value("last_collection_path", "")
-        
+
         if last_workspace and os.path.exists(last_workspace):
             self.workspace_controller.load_workspace(last_workspace, is_startup=True)
         else:
             self.project_service.load_last_project_on_startup()
+
+        # 🛡️ Sécurité : force une resynchronisation finale de la toolbar (canva, routage,
+        # aimant) sur l'état réellement chargé, au cas où l'ordre des signaux internes
+        # pendant le chargement au démarrage aurait laissé un widget désynchronisé.
+        ws = self.current_workspace()
+        if ws is not None and hasattr(self, 'workspace_controller'):
+            self.workspace_controller.sync_workspace_ui({
+                "snap_to_grid": getattr(ws.scene, 'snap_to_grid', False),
+                "line_routing_mode": getattr(ws.scene, 'line_routing_mode', 'curved'),
+                "canvas_type": getattr(ws.scene, 'canvas_type', 'none'),
+            })
 
     def current_workspace(self) -> MindMapWorkspace:
         try:

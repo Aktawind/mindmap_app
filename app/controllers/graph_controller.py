@@ -1,5 +1,6 @@
 import time
 from PyQt6.QtCore import QPointF, QRectF
+from PyQt6.QtGui import QFont, QFontMetrics
 from graphics.items import BRANCH_PALETTES, NodeItem, EdgeItem
 
 class GraphController:
@@ -38,6 +39,9 @@ class GraphController:
 
         visited_ids = {root.node_id}
         tree_children = {}
+        # Arête (avec son libellé éventuel) entre un nœud et chacun de ses enfants naturels,
+        # pour pouvoir élargir l'espacement d'un niveau si une branche y porte du texte.
+        child_edge = {}
 
         def get_children(node):
             children = []
@@ -47,7 +51,21 @@ class GraphController:
                     if child and child.node_id not in visited_ids:
                         visited_ids.add(child.node_id)
                         children.append(child)
+                        child_edge[child.node_id] = edge
             return children
+
+        _label_font = QFont('Segoe UI', 10)
+        _label_fm = QFontMetrics(_label_font)
+
+        def label_extra_gap(child):
+            """Espace supplémentaire à réserver si la branche menant à ce nœud porte un
+            libellé, pour que le texte ne soit pas écrasé entre les deux colonnes de nœuds."""
+            edge = child_edge.get(child.node_id)
+            label = getattr(edge, 'label', '') if edge else ''
+            if not label:
+                return 0
+            widest_line = max((_label_fm.horizontalAdvance(line) for line in label.split('\n')), default=0)
+            return widest_line + 40  # marge du cadre du libellé + respiration de part et d'autre
 
         def build_tree(node):
             children = get_children(node)
@@ -88,21 +106,26 @@ class GraphController:
                 right_children.append(child)
                 right_total += subtree_height[child.node_id] + SIBLING_GAP
 
-        # Largeur de colonne par profondeur relative (1 = branches principales), pour chaque côté
-        def compute_level_widths(node, depth, level_width):
+        # Largeur de colonne par profondeur relative (1 = branches principales), et espacement
+        # minimal requis APRÈS chaque colonne (indexé par la profondeur du nœud source), pour
+        # chaque côté — élargi si une des branches qui en partent porte un libellé.
+        def compute_level_widths(node, depth, level_width, gap_after):
             level_width[depth] = max(level_width.get(depth, 0), node.rect.width())
             for child in tree_children.get(node.node_id, []):
-                compute_level_widths(child, depth + 1, level_width)
+                needed = max(LEVEL_GAP, label_extra_gap(child))
+                gap_after[depth] = max(gap_after.get(depth, LEVEL_GAP), needed)
+                compute_level_widths(child, depth + 1, level_width, gap_after)
 
         def build_level_x(children_group):
             level_width = {}
+            gap_after = {0: max(LEVEL_GAP, max((label_extra_gap(c) for c in children_group), default=0))}
             for child in children_group:
-                compute_level_widths(child, 1, level_width)
+                compute_level_widths(child, 1, level_width, gap_after)
             level_x = {}
-            cumulative = root.rect.width() / 2 + LEVEL_GAP
+            cumulative = root.rect.width() / 2 + gap_after[0]
             for depth in sorted(level_width.keys()):
                 level_x[depth] = cumulative
-                cumulative += level_width[depth] + LEVEL_GAP
+                cumulative += level_width[depth] + gap_after.get(depth, LEVEL_GAP)
             return level_x
 
         right_level_x = build_level_x(right_children)

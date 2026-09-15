@@ -150,8 +150,8 @@ def create_toolbar(app_window) -> None:
     btn_center = QPushButton("Auto Center", workspace_toolbar)
     btn_center.setToolTip("Centrer la vue sur le nœud principal")
     btn_center.setStyleSheet("""
-        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
-        QPushButton:hover { background-color: #475569; }
+        QPushButton { background-color: #3B82F6; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #2563EB; }
     """)
     btn_center.clicked.connect(app_window.tools_controller.auto_center_clicked)
     workspace_toolbar.addWidget(btn_center)
@@ -160,8 +160,8 @@ def create_toolbar(app_window) -> None:
     btn_fit = QPushButton("🔎 Ajuster à l'écran", workspace_toolbar)
     btn_fit.setToolTip("Ajuster le zoom pour voir l'ensemble de la carte")
     btn_fit.setStyleSheet("""
-        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
-        QPushButton:hover { background-color: #475569; }
+        QPushButton { background-color: #0EA5E9; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #0284C7; }
     """)
     btn_fit.clicked.connect(app_window.tools_controller.fit_to_view_clicked)
     workspace_toolbar.addWidget(btn_fit)
@@ -230,8 +230,8 @@ def create_toolbar(app_window) -> None:
     btn_auto_layout = QPushButton("🧹 Réorganisation auto", canvas_toolbar)
     btn_auto_layout.setToolTip("Réaligner proprement l'arborescence à partir du nœud central")
     btn_auto_layout.setStyleSheet("""
-        QPushButton { background-color: grey; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
-        QPushButton:hover { background-color: #475569; }
+        QPushButton { background-color: #8B5CF6; color: white; border-radius: 4px; padding: 5px 10px; font-weight: bold; }
+        QPushButton:hover { background-color: #7C3AED; }
     """)
     btn_auto_layout.clicked.connect(app_window.graph_controller.auto_layout)
     canvas_toolbar.addWidget(btn_auto_layout)

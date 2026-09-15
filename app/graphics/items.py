@@ -787,12 +787,18 @@ class EdgeItem(QGraphicsPathItem):
             center = path.pointAtPercent(0.5)
             font = QFont('Segoe UI', 10)
             fm = QFontMetrics(font)
+            # boundingRect() gère nativement les retours à la ligne ('\n', insérables via
+            # Maj+Entrée pendant l'édition), donc un libellé de branche multiligne est mesuré
+            # et centré correctement sans traitement particulier.
             rect = QRectF(fm.boundingRect(self.label))
             rect.moveTo(center.x() - rect.width()/2, center.y() - rect.height()/2)
 
+            # Marge généreuse autour du texte pour que le cadre ne colle pas aux lettres
+            padded_rect = rect.adjusted(-10, -6, 10, 6)
+
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(248, 249, 250, 220))
-            painter.drawRoundedRect(rect.adjusted(-4, -2, 4, 2), 3, 3)
+            painter.setBrush(QColor(248, 249, 250, 230))
+            painter.drawRoundedRect(padded_rect, 5, 5)
 
             painter.setPen(QPen(QColor('#4A5568')))
             painter.setFont(font)
