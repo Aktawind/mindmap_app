@@ -44,6 +44,9 @@ def create_menus(app_window):
     # ==========================================
     edit_menu = menu_bar.addMenu("Édition")
 
+    edit_menu.addAction("🗂️ Gérer les templates", lambda: show_template_manager_dialog(app_window))
+    edit_menu.addSeparator()
+
     undo_action = QAction("↩️ Annuler", app_window)
     undo_action.setShortcut(QKeySequence("Ctrl+Z"))
     undo_action.triggered.connect(app_window.undo)
@@ -69,10 +72,6 @@ def create_menus(app_window):
     paste_action.setShortcut(QKeySequence("Ctrl+V"))
     paste_action.triggered.connect(app_window.tools_controller.paste_node)
     edit_menu.addAction(paste_action)
-
-    edit_menu.addSeparator()
-
-    edit_menu.addAction("🗂️ Gérer les templates", lambda: show_template_manager_dialog(app_window))
 
     # ==========================================
     # MENU EXPORTER

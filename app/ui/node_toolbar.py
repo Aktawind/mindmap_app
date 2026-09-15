@@ -117,7 +117,7 @@ def create_node_toolbar(app_window) -> None:
     section_text.add_widget(text_row)
 
     # 3b. Forme & Format
-    section_shape = add_section("🔷 Forme & Format", "panel_section_shape")
+    section_shape = add_section("🔷 Forme et Format", "panel_section_shape")
 
     app_window.shape_combo = QComboBox(section_shape)
     app_window.shape_combo.addItem("Rectangle", "box")
@@ -135,7 +135,7 @@ def create_node_toolbar(app_window) -> None:
     section_shape.add_widget(_labeled_row(section_shape, "Format", app_window.format_combo))
 
     # 3c. Statut & Priorité
-    section_status = add_section("🚦 Statut & Priorité", "panel_section_status")
+    section_status = add_section("🚦 Statut et Priorité", "panel_section_status")
 
     app_window.status_combo = QComboBox(section_status)
     app_window.status_combo.addItem("⚪ Aucun statut", "none")
@@ -204,7 +204,7 @@ def create_node_toolbar(app_window) -> None:
     app_window.style_controller.refresh_custom_color_buttons()
 
     # 3e. Pièces jointes & Notes
-    section_attach = add_section("📎 Pièces jointes & Notes", "panel_section_attach", start_expanded=False)
+    section_attach = add_section("📎 Pièces jointes", "panel_section_attach", start_expanded=False)
 
     btn_attach = QPushButton("📎 Fichier", section_attach)
     btn_attach.clicked.connect(app_window.attachment_controller.attach_file)

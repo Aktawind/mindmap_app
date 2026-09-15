@@ -8,16 +8,14 @@ MANIFEST_FILENAME = "manifest.json"
 DEFAULT_DISPLAY_NAMES = {
     "cadrage_idee.json": "🎯 Cadrage d'Idée",
     "resolution_probleme.json": "🔍 Résolution de Problème",
-    "gestion_temps.json": "⏳ Organisation des priorités",
+    "gestion_temps.json": "⏳ Organisation Priorités",
     "brain_dump.json": "🧠 Brain Dump",
     "onboarding_technique.json": "🚀 Onboarding Technique",
-    "hub_passions.json": "🎨 Hub Multi-Passions",
-    "organisation_voyage.json": "✈️ Organisation d'un Voyage",
+    "hub_passions.json": "🎨 Multi-projets",
+    "organisation_voyage.json": "✈️ Organisation Voyage",
     "preparation_reunion.json": "🗣️ Préparation Réunion",
-    "retro_projet.json": "🏁 Rétrospective de Fin de Projet",
+    "retro_projet.json": "🏁 Rétrospective",
     "daily_capsule.json": "☀️ Daily Capsule",
-    "sante_mentale_energie.json": "🔋 Santé Mentale et Énergie",
-    "urgence_colere.json": "🚨 Urgence Colère",
 }
 
 

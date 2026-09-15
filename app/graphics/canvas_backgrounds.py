@@ -11,16 +11,16 @@ from PyQt6.QtGui import QColor, QPen, QBrush, QFont, QPixmap, QPainterPath
 CANVAS_RECT = QRectF(-500, -350, 1000, 700)
 
 CANVAS_TYPES = {
-    "none": "Aucun canva (Mind Map standard)",
-    "kanban": "Tableau Kanban (3 colonnes)",
-    "eisenhower": "Matrice d'Eisenhower (4 quadrants)",
+    "none": "Feuille blanche",
+    "kanban": "Tableau Kanban",
+    "eisenhower": "Matrice d'Eisenhower",
     "swot": "Matrice SWOT",
-    "timeline": "Frise chronologique graduée",
-    "ikigai": "4 grands cercles de Ikigai",
-    "roue": "Graph circulaire Roue de la Vie (8 secteurs)",
+    "timeline": "Frise chronologique",
+    "ikigai": "Cercles de Ikigai",
+    #"roue": "Graph circulaire Roue de la Vie (8 secteurs)",
     "pyramide": "Pyramide",
     "ishikawa": "Diagramme d'Ishikawa",
-    "moodboard": "Moodboard",
+    #"moodboard": "Moodboard",
     "custom": "Image personnalisée...",
 }
 
