@@ -21,9 +21,11 @@ class GraphController:
 
     def auto_layout(self):
         """Réorganise automatiquement l'arborescence connectée à la racine en un agencement
-        hiérarchique propre (niveaux alignés par colonnes, fratries réparties verticalement
-        sans chevauchement). Les nœuds orphelins ou reliés uniquement via "Relier les nœuds"
-        ne font pas partie de l'arbre naturel et ne sont donc pas déplacés."""
+        de type mind map classique : la racine reste au centre, et ses branches principales
+        se répartissent de part et d'autre (gauche/droite, équilibrées par hauteur totale de
+        sous-arbre), chaque branche s'étalant horizontalement vers l'extérieur par niveaux de
+        profondeur. Les nœuds orphelins ou reliés uniquement via "Relier les nœuds" ne font
+        pas partie de l'arbre naturel et ne sont donc pas déplacés."""
         ws = self.app.current_workspace()
         if not ws: return
 
@@ -34,24 +36,28 @@ class GraphController:
         LEVEL_GAP = 50
         SIBLING_GAP = 12
 
-        visited_ids = set()
+        visited_ids = {root.node_id}
         tree_children = {}
 
-        def build_tree(node):
-            if node.node_id in visited_ids:
-                return
-            visited_ids.add(node.node_id)
+        def get_children(node):
             children = []
             for edge in getattr(node, 'edges', []):
                 if getattr(edge, 'source_node', None) == node:
                     child = getattr(edge, 'dest_node', None)
                     if child and child.node_id not in visited_ids:
+                        visited_ids.add(child.node_id)
                         children.append(child)
+            return children
+
+        def build_tree(node):
+            children = get_children(node)
             tree_children[node.node_id] = children
             for child in children:
                 build_tree(child)
 
-        build_tree(root)
+        root_children = get_children(root)
+        for child in root_children:
+            build_tree(child)
 
         subtree_height = {}
 
@@ -65,26 +71,45 @@ class GraphController:
             subtree_height[node.node_id] = h
             return h
 
-        compute_height(root)
+        for child in root_children:
+            compute_height(child)
 
-        # Largeur de colonne par profondeur (le nœud le plus large de chaque niveau)
-        level_width = {}
+        # Répartition équilibrée des branches principales entre gauche et droite, en se basant
+        # sur la hauteur totale de chaque sous-arbre (pas seulement leur nombre), pour éviter
+        # qu'un côté ne devienne beaucoup plus long que l'autre.
+        sorted_children = sorted(root_children, key=lambda n: subtree_height[n.node_id], reverse=True)
+        left_children, right_children = [], []
+        left_total, right_total = 0.0, 0.0
+        for child in sorted_children:
+            if left_total <= right_total:
+                left_children.append(child)
+                left_total += subtree_height[child.node_id] + SIBLING_GAP
+            else:
+                right_children.append(child)
+                right_total += subtree_height[child.node_id] + SIBLING_GAP
 
-        def compute_level_widths(node, depth):
+        # Largeur de colonne par profondeur relative (1 = branches principales), pour chaque côté
+        def compute_level_widths(node, depth, level_width):
             level_width[depth] = max(level_width.get(depth, 0), node.rect.width())
             for child in tree_children.get(node.node_id, []):
-                compute_level_widths(child, depth + 1)
+                compute_level_widths(child, depth + 1, level_width)
 
-        compute_level_widths(root, 0)
+        def build_level_x(children_group):
+            level_width = {}
+            for child in children_group:
+                compute_level_widths(child, 1, level_width)
+            level_x = {}
+            cumulative = root.rect.width() / 2 + LEVEL_GAP
+            for depth in sorted(level_width.keys()):
+                level_x[depth] = cumulative
+                cumulative += level_width[depth] + LEVEL_GAP
+            return level_x
 
-        level_x = {}
-        cumulative_x = 0.0
-        for depth in sorted(level_width.keys()):
-            level_x[depth] = cumulative_x
-            cumulative_x += level_width[depth] + LEVEL_GAP
+        right_level_x = build_level_x(right_children)
+        left_level_x = build_level_x(left_children)
 
-        def assign_positions(node, depth, top_y):
-            x = level_x[depth] + node.rect.width() / 2
+        def assign_positions(node, depth, top_y, level_x, direction):
+            x = direction * (level_x[depth] + node.rect.width() / 2)
             h = subtree_height[node.node_id]
             y = top_y + h / 2
             node.setPos(x, y)
@@ -92,10 +117,21 @@ class GraphController:
             child_top = top_y
             for child in tree_children.get(node.node_id, []):
                 child_h = subtree_height[child.node_id]
-                assign_positions(child, depth + 1, child_top)
+                assign_positions(child, depth + 1, child_top, level_x, direction)
                 child_top += child_h + SIBLING_GAP
 
-        assign_positions(root, 0, -subtree_height[root.node_id] / 2)
+        def layout_side(children_group, level_x, direction):
+            total_height = sum(subtree_height[c.node_id] for c in children_group)
+            total_height += SIBLING_GAP * max(0, len(children_group) - 1)
+            top = -total_height / 2
+            for child in children_group:
+                h = subtree_height[child.node_id]
+                assign_positions(child, 1, top, level_x, direction)
+                top += h + SIBLING_GAP
+
+        root.setPos(0, 0)
+        layout_side(right_children, right_level_x, 1)
+        layout_side(left_children, left_level_x, -1)
 
         for item in ws.scene.items():
             if isinstance(item, EdgeItem) and hasattr(item, 'update_position'):
