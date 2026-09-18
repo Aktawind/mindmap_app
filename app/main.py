@@ -3,7 +3,7 @@ import os
 import json
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtCore import QSettings, QTimer
+from PyQt6.QtCore import QSettings, QTimer, pyqtSignal
 from PyQt6 import sip
 
 from services.updater_service import CURRENT_VERSION as APP_VERSION
@@ -34,6 +34,26 @@ from controllers.tabs_controller import TabsController
 from controllers.image_controller import ImageController
 from controllers.notes_controller import NotesController
 from controllers.import_controller import ImportController
+
+
+class WorkspaceTabWidget(QTabWidget):
+    """QTabWidget qui émet un signal au double-clic dans la zone vide de la ligne d'onglets
+    (à côté des onglets existants, où la QTabBar interne ne couvre pas toute la largeur),
+    pour créer rapidement un nouvel onglet — un geste très courant dans ce type d'outil
+    (navigateurs, IDE...)."""
+    emptyTabAreaDoubleClicked = pyqtSignal()
+
+    def mouseDoubleClickEvent(self, event):
+        pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
+        bar = self.tabBar()
+        # La QTabBar est positionnée en (0, 0) au sein du QTabWidget : ses coordonnées
+        # locales correspondent donc directement à celles reçues ici tant qu'on reste
+        # dans sa hauteur (au-delà, c'est le contenu de l'onglet, pas la barre).
+        if pos.y() <= bar.height() and bar.tabAt(pos) == -1:
+            self.emptyTabAreaDoubleClicked.emit()
+            return
+        super().mouseDoubleClickEvent(event)
+
 
 class MindMapApp(QMainWindow):
     def __init__(self):
@@ -66,12 +86,13 @@ class MindMapApp(QMainWindow):
         self.import_controller = ImportController(self)
 
         # UI Principale
-        self.tabs = QTabWidget()
+        self.tabs = WorkspaceTabWidget()
         self.tabs.setTabsClosable(True)
         self.tabs.setTabBarAutoHide(False) # Optionnel, mais utile
         self.tabs.setMovable(True) # Bonus sympa tant qu'à faire !
         self.tabs.tabCloseRequested.connect(self.tabs_controller.close_tab)
         self.tabs.currentChanged.connect(self.tabs_controller.on_tab_changed)
+        self.tabs.emptyTabAreaDoubleClicked.connect(lambda: self.project_service.new_project())
       
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
