@@ -99,7 +99,7 @@ def create_menus(app_window):
     app_window.action_toggle_shortcuts.toggled.connect(lambda checked: _toggle_shortcuts_overlay(app_window, checked))
 
     display_menu.addSeparator()
-    app_window.action_toggle_dark_mode = display_menu.addAction("🌙 Thème sombre")
+    app_window.action_toggle_dark_mode = display_menu.addAction("Thème sombre")
     app_window.action_toggle_dark_mode.setCheckable(True)
     app_window.action_toggle_dark_mode.setChecked(theme.is_dark_mode(app_window))
     app_window.action_toggle_dark_mode.toggled.connect(lambda checked: _toggle_dark_mode(app_window, checked))
