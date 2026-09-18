@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF
 from PyQt6.QtGui import QColor, QCursor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, QPixmap, QPolygonF, QPainterPathStroker
 from PyQt6.QtWidgets import QGraphicsItem, QGraphicsPathItem
 from signals import GraphicsSignals
+from ui.theme import get_palette_for_scene, is_dark_mode_for_scene, adapt_fill
 
 BRANCH_PALETTES = [
     {'bg': '#E0F7FA', 'border': '#4DD0E1', 'text': '#333333', 'edge': '#4DD0E1'},
@@ -380,6 +381,11 @@ class NodeItem(QGraphicsItem):
             elif priority_val == 'none':
                 # Bordure classique classique, pas de mise en forme particulière
                 pass
+
+        # Assombrit le remplissage en thème sombre (même logique que pour la palette de
+        # couleurs de base : voir ui/theme.py adapt_fill), sans toucher à la couleur stockée
+        # sur le nœud, qui reste la même une fois revenu en thème clair.
+        final_bg = adapt_fill(final_bg, is_dark_mode_for_scene(self.scene()))
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(0, 0, 0, 15))

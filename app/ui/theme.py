@@ -94,13 +94,23 @@ def adapt_fill(color, dark):
     return QColor.fromHslF(h, min(1.0, s * 0.9), max(0.16, l * 0.35), a)
 
 
+def _app_window_for_scene(scene):
+    ws = getattr(scene, 'parent_workspace', None) if scene is not None else None
+    return getattr(ws, 'main_app', None) if ws is not None else None
+
+
 def get_palette_for_scene(scene):
     """Retrouve le thème courant à partir d'une scène (via son workspace/app parent), pour
     que les éléments dessinés à la main (canevas, libellés de branche) restent synchronisés
     avec le thème sans avoir besoin d'être notifiés explicitement à chaque changement."""
-    ws = getattr(scene, 'parent_workspace', None) if scene is not None else None
-    app_window = getattr(ws, 'main_app', None) if ws is not None else None
-    return get_palette(app_window)
+    return get_palette(_app_window_for_scene(scene))
+
+
+def is_dark_mode_for_scene(scene):
+    """Même principe que get_palette_for_scene(), mais renvoie directement le booléen —
+    pratique pour les items (nœuds, canevas...) qui n'ont besoin que d'assombrir leurs
+    propres couleurs via adapt_fill() plutôt que de lire toute la palette."""
+    return is_dark_mode(_app_window_for_scene(scene))
 
 
 def app_stylesheet(p):

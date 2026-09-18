@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QWidget, QVBoxLayout
 from signals import GraphicsSignals
 from ui.selection_manager import on_selection_changed
 from graphics.canvas_backgrounds import draw_canvas_background
-from ui.theme import get_palette_for_scene, is_dark_mode
+from ui.theme import get_palette_for_scene, is_dark_mode_for_scene
 
 class MindMapScene(QGraphicsScene):
     def __init__(self, parent=None):
@@ -23,8 +23,7 @@ class MindMapScene(QGraphicsScene):
     def drawBackground(self, painter, rect):
         palette = get_palette_for_scene(self)
         painter.fillRect(rect, QColor(palette['scene_bg']))
-        ws = getattr(self, 'parent_workspace', None)
-        dark = is_dark_mode(getattr(ws, 'main_app', None))
+        dark = is_dark_mode_for_scene(self)
         draw_canvas_background(
             painter, self.canvas_type, self.canvas_image_path, self._canvas_image_cache,
             dark=dark, scale=self.canvas_scale
