@@ -24,10 +24,7 @@ class CollapsibleSection(QWidget):
         self.toggle_button.setChecked(start_expanded)
         self.toggle_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toggle_button.setArrowType(Qt.ArrowType.DownArrow if start_expanded else Qt.ArrowType.RightArrow)
-        self.toggle_button.setStyleSheet("""
-            QToolButton { border: none; font-weight: bold; padding: 6px 2px; text-align: left; color: #1e293b; }
-            QToolButton:hover { background: #f1f5f9; border-radius: 4px; }
-        """)
+        self.toggle_button.setObjectName("SectionToggle")
         self.toggle_button.clicked.connect(self._on_toggled)
         layout.addWidget(self.toggle_button)
 

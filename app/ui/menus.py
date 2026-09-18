@@ -1,6 +1,7 @@
 from PyQt6.QtGui import QKeySequence, QAction
 from services.updater_service import check_for_updates
 from ui.template_manager_dialog import show_template_manager_dialog
+from ui import theme
 
 
 def _toggle_shortcuts_overlay(app_window, checked):
@@ -8,6 +9,12 @@ def _toggle_shortcuts_overlay(app_window, checked):
     if hasattr(app_window, 'overlay') and app_window.overlay is not None:
         app_window.overlay.setVisible(checked)
     app_window.settings.setValue("show_shortcuts_overlay", checked)
+
+
+def _toggle_dark_mode(app_window, checked):
+    """Bascule le thème clair/sombre et réapplique immédiatement les styles."""
+    theme.set_dark_mode(app_window, checked)
+    theme.apply_theme(app_window)
 
 
 def create_menus(app_window):
@@ -90,6 +97,12 @@ def create_menus(app_window):
     app_window.action_toggle_shortcuts.setCheckable(True)
     app_window.action_toggle_shortcuts.setChecked(True)
     app_window.action_toggle_shortcuts.toggled.connect(lambda checked: _toggle_shortcuts_overlay(app_window, checked))
+
+    display_menu.addSeparator()
+    app_window.action_toggle_dark_mode = display_menu.addAction("🌙 Thème sombre")
+    app_window.action_toggle_dark_mode.setCheckable(True)
+    app_window.action_toggle_dark_mode.setChecked(theme.is_dark_mode(app_window))
+    app_window.action_toggle_dark_mode.toggled.connect(lambda checked: _toggle_dark_mode(app_window, checked))
 
     # ==========================================
     # MENU À PROPOS

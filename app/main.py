@@ -15,6 +15,7 @@ from ui.shortcuts import setup_app_shortcuts
 from ui.about_dialog import show_app_about_dialog
 from ui.node_toolbar import create_node_toolbar
 from ui.selection_manager import on_selection_changed
+from ui import theme
 
 from services.serializer import MindMapSerializer
 from services.history_service import HistoryService
@@ -83,6 +84,7 @@ class MindMapApp(QMainWindow):
         
         self.setup_ui()
         self.setup_shortcuts()
+        theme.apply_theme(self)
 
         # Un léger délai pour laisser l'interface s'afficher
         QTimer.singleShot(100, self.initialize_startup_session)
@@ -113,6 +115,7 @@ class MindMapApp(QMainWindow):
                 "snap_to_grid": getattr(ws.scene, 'snap_to_grid', False),
                 "line_routing_mode": getattr(ws.scene, 'line_routing_mode', 'curved'),
                 "canvas_type": getattr(ws.scene, 'canvas_type', 'none'),
+                "canvas_scale": getattr(ws.scene, 'canvas_scale', 1.0),
             })
 
     def current_workspace(self) -> MindMapWorkspace:

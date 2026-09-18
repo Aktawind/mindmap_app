@@ -796,11 +796,13 @@ class EdgeItem(QGraphicsPathItem):
             # Marge généreuse autour du texte pour que le cadre ne colle pas aux lettres
             padded_rect = rect.adjusted(-10, -6, 10, 6)
 
+            from ui.theme import get_palette_for_scene
+            palette = get_palette_for_scene(self.scene())
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(248, 249, 250, 230))
+            painter.setBrush(QColor(*palette['edge_label_bg']))
             painter.drawRoundedRect(padded_rect, 5, 5)
 
-            painter.setPen(QPen(QColor('#4A5568')))
+            painter.setPen(QPen(QColor(palette['edge_label_text'])))
             painter.setFont(font)
             painter.drawText(rect, int(Qt.AlignmentFlag.AlignCenter), self.label)
 

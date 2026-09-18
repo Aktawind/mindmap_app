@@ -4,11 +4,11 @@ from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QWidget, QVBoxLayout
 from signals import GraphicsSignals
 from ui.selection_manager import on_selection_changed
 from graphics.canvas_backgrounds import draw_canvas_background
+from ui.theme import get_palette_for_scene, is_dark_mode
 
 class MindMapScene(QGraphicsScene):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setBackgroundBrush(QColor('#f8f9fa'))
         self.signals = GraphicsSignals()
         self.line_routing_mode = 'curved'
         self.snap_to_grid = False
@@ -17,11 +17,18 @@ class MindMapScene(QGraphicsScene):
         # il suit le pan/zoom comme le reste de la carte (voir graphics/canvas_backgrounds.py)
         self.canvas_type = 'none'
         self.canvas_image_path = None
+        self.canvas_scale = 1.0
         self._canvas_image_cache = {}
 
     def drawBackground(self, painter, rect):
-        painter.fillRect(rect, self.backgroundBrush())
-        draw_canvas_background(painter, self.canvas_type, self.canvas_image_path, self._canvas_image_cache)
+        palette = get_palette_for_scene(self)
+        painter.fillRect(rect, QColor(palette['scene_bg']))
+        ws = getattr(self, 'parent_workspace', None)
+        dark = is_dark_mode(getattr(ws, 'main_app', None))
+        draw_canvas_background(
+            painter, self.canvas_type, self.canvas_image_path, self._canvas_image_cache,
+            dark=dark, scale=self.canvas_scale
+        )
 
     def mouseDoubleClickEvent(self, event):
         # Utilisation de la vue principale pour mapper l'élément sous le curseur de façon stable

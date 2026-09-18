@@ -239,6 +239,10 @@ class WorkspaceController:
                 combo.setCurrentIndex(index)
             combo.blockSignals(False)
 
+        if hasattr(self.app, 'canvas_scale_label') and self.app.canvas_scale_label and "canvas_scale" in ui_state:
+            scale = ui_state.get("canvas_scale", 1.0)
+            self.app.canvas_scale_label.setText(f"{int(round(scale * 100))}%")
+
         if hasattr(self.app, 'on_selection_changed'):
             self.app.on_selection_changed()
 

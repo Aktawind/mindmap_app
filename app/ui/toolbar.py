@@ -4,6 +4,34 @@ from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget, QLineEdit, 
 from PyQt6.QtCore import Qt
 from services.template_service import refresh_template_combo
 from graphics.canvas_backgrounds import CANVAS_TYPES
+from ui import theme
+
+CANVAS_SCALE_MIN = 0.6
+CANVAS_SCALE_MAX = 3.0
+CANVAS_SCALE_STEP = 0.2
+
+
+def _set_canvas_scale(app_window, delta):
+    ws = app_window.current_workspace()
+    if not ws:
+        return
+    current = getattr(ws.scene, 'canvas_scale', 1.0)
+    new_scale = round(min(CANVAS_SCALE_MAX, max(CANVAS_SCALE_MIN, current + delta)), 2)
+    if new_scale == current:
+        return
+    ws.scene.canvas_scale = new_scale
+    ws.scene.update()
+    _refresh_canvas_scale_label(app_window)
+    if hasattr(app_window, 'save_state'):
+        app_window.save_state()
+
+
+def _refresh_canvas_scale_label(app_window):
+    if not hasattr(app_window, 'canvas_scale_label'):
+        return
+    ws = app_window.current_workspace()
+    scale = getattr(ws.scene, 'canvas_scale', 1.0) if ws else 1.0
+    app_window.canvas_scale_label.setText(f"{int(round(scale * 100))}%")
 
 
 def _load_canvas_image(app_window):
@@ -72,14 +100,8 @@ def create_toolbar(app_window) -> None:
     # Configuration et styles de la barre d'outils
     workspace_toolbar = app_window.addToolBar("workspace")
     workspace_toolbar.setMovable(False)
-    workspace_toolbar.setStyleSheet("""
-        QToolBar { background: #F1F5F9; border-bottom: 1px solid #CBD5E1; padding: 4px; spacing: 8px; }
-        QPushButton { background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 4px 8px; font-size: 12px; color: #1e293b; }
-        QPushButton:hover { background: #E2E8F0; }
-        QLabel { font-size: 11px; color: #475569; font-weight: bold; }
-        QComboBox { border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 6px; background: white; color: #1e293b; font-size: 12px; min-width: 100px; }
-        QComboBox:hover { border-color: #94a3b8; }
-    """)
+    app_window.workspace_toolbar = workspace_toolbar
+    workspace_toolbar.setStyleSheet(theme.toolbar_stylesheet(theme.get_palette(app_window)))
 
     # Label de statut
     if hasattr(app_window, 'lbl_workspace_status'):
@@ -126,10 +148,7 @@ def create_toolbar(app_window) -> None:
     # Bouton Aimant Grille (Toggle)
     app_window.btn_snap = QPushButton(" 🧲 Aimant ", workspace_toolbar)
     app_window.btn_snap.setCheckable(True)
-    app_window.btn_snap.setStyleSheet("""
-        QPushButton { padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; background: #f1f5f9; color: #1e293b; }
-        QPushButton:checked { background: #3B82F6; color: white; border-color: #2563EB; font-weight: bold; }
-    """)
+    app_window.btn_snap.setStyleSheet(theme.toggle_button_stylesheet(theme.get_palette(app_window)))
 
     app_window.btn_snap.clicked.connect(app_window.grid_controller.toggle_snap_to_grid)
     workspace_toolbar.addWidget(app_window.btn_snap)
@@ -172,6 +191,23 @@ def create_toolbar(app_window) -> None:
 
     app_window.canvas_combo.currentIndexChanged.connect(on_canvas_changed)
     workspace_toolbar.addWidget(app_window.canvas_combo)
+
+    # Contrôles de taille du canva (agrandir/réduire par pas, distinct du zoom de la vue)
+    btn_canvas_smaller = QPushButton("➖", workspace_toolbar)
+    btn_canvas_smaller.setToolTip("Réduire la taille du canva de fond")
+    btn_canvas_smaller.clicked.connect(lambda: _set_canvas_scale(app_window, -CANVAS_SCALE_STEP))
+    workspace_toolbar.addWidget(btn_canvas_smaller)
+
+    app_window.canvas_scale_label = QLabel("100%", workspace_toolbar)
+    app_window.canvas_scale_label.setToolTip("Taille actuelle du canva de fond")
+    app_window.canvas_scale_label.setMinimumWidth(36)
+    app_window.canvas_scale_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    workspace_toolbar.addWidget(app_window.canvas_scale_label)
+
+    btn_canvas_bigger = QPushButton("➕", workspace_toolbar)
+    btn_canvas_bigger.setToolTip("Agrandir la taille du canva de fond (plus de place pour les nœuds)")
+    btn_canvas_bigger.clicked.connect(lambda: _set_canvas_scale(app_window, CANVAS_SCALE_STEP))
+    workspace_toolbar.addWidget(btn_canvas_bigger)
 
     workspace_toolbar.addSeparator()
 

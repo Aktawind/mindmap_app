@@ -6,24 +6,19 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 from graphics.items import NODE_FORMATS
 from ui.collapsible_section import CollapsibleSection
-
-PANEL_STYLE = """
-    QWidget#PropertiesPanel { background: white; }
-    QPushButton { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 8px; color: #1e293b; }
-    QPushButton:hover { background: #e2e8f0; }
-    QPushButton:checked { background: #cbd5e1; font-weight: bold; }
-    QComboBox { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px; border-radius: 8px; color: #1e293b; }
-"""
+from ui import theme
 
 
 def _labeled_row(parent, label_text, widget):
     """Empile un petit label au-dessus d'un widget, pour une lecture plus claire dans le panneau vertical."""
+    app_window = parent.window() if hasattr(parent, 'window') else None
+    p = theme.get_palette(app_window)
     row = QWidget(parent)
     row_layout = QVBoxLayout(row)
     row_layout.setContentsMargins(0, 0, 0, 0)
     row_layout.setSpacing(2)
     label = QLabel(label_text, row)
-    label.setStyleSheet("color: #64748B; font-size: 11px;")
+    label.setStyleSheet(f"color: {p['text_muted']}; font-size: 11px;")
     row_layout.addWidget(label)
     row_layout.addWidget(widget)
     return row
@@ -47,6 +42,7 @@ def create_node_toolbar(app_window) -> None:
             )
 
     settings = getattr(app_window, 'settings', None)
+    palette = theme.get_palette(app_window)
 
     # 1. Le panneau latéral (QDockWidget) qui accueille toutes les sections de propriétés
     app_window.style_dock = QDockWidget("Propriétés", app_window)
@@ -56,7 +52,8 @@ def create_node_toolbar(app_window) -> None:
 
     panel = QWidget(app_window.style_dock)
     panel.setObjectName("PropertiesPanel")
-    panel.setStyleSheet(PANEL_STYLE)
+    panel.setStyleSheet(theme.panel_stylesheet(palette))
+    app_window.properties_panel = panel
     panel_layout = QVBoxLayout(panel)
     panel_layout.setContentsMargins(8, 8, 8, 8)
     panel_layout.setSpacing(4)
@@ -65,10 +62,10 @@ def create_node_toolbar(app_window) -> None:
     app_window.connect_controls = QWidget(panel)
     cc_layout = QHBoxLayout(app_window.connect_controls)
     cc_layout.setContentsMargins(0, 0, 0, 8)
-    btn_connect = QPushButton("🔗 Relier les nœuds", app_window.connect_controls)
-    btn_connect.setStyleSheet("background: #EBF8FF; border: 1px solid #90CDF4; color: #2B6CB0; font-weight: bold;")
-    btn_connect.clicked.connect(app_window.graph_controller.connect_selected_nodes)
-    cc_layout.addWidget(btn_connect)
+    app_window.btn_connect_nodes = QPushButton("🔗 Relier les nœuds", app_window.connect_controls)
+    app_window.btn_connect_nodes.setStyleSheet(theme.connect_button_stylesheet(palette))
+    app_window.btn_connect_nodes.clicked.connect(app_window.graph_controller.connect_selected_nodes)
+    cc_layout.addWidget(app_window.btn_connect_nodes)
     panel_layout.addWidget(app_window.connect_controls)
 
     # 3. Section : Contrôles des Nœuds (Node Controls), regroupés en sous-sections repliables
@@ -230,7 +227,7 @@ def create_node_toolbar(app_window) -> None:
     section_attach.add_widget(app_window.btn_img_h)
 
     app_window.btn_detach = QPushButton("❌ Dissocier", section_attach)
-    app_window.btn_detach.setStyleSheet("background: #FED7D7; color: #C53030;")
+    app_window.btn_detach.setStyleSheet(theme.danger_button_stylesheet(palette))
     app_window.btn_detach.clicked.connect(app_window.attachment_controller.detach_links)
     section_attach.add_widget(app_window.btn_detach)
 
@@ -276,7 +273,7 @@ def create_node_toolbar(app_window) -> None:
 
     # 5. Overlay d'aide contextuel
     app_window.overlay = QFrame(app_window)
-    app_window.overlay.setStyleSheet("background: rgba(255,255,255,0.95); border-radius: 8px; border: 1px solid #ddd; color: #2d3748;")
+    app_window.overlay.setStyleSheet(theme.overlay_stylesheet(palette))
     ol_layout = QVBoxLayout(app_window.overlay)
 
     ol_header = QHBoxLayout()
