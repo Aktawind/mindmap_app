@@ -8,6 +8,7 @@ libellés de branche) relisent le thème courant à chaque peinture via
 `get_palette_for_scene()` / `is_dark_mode()`, donc ils suivent automatiquement.
 """
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QColor
 
 LIGHT = {
     "bg": "#F8FAFC",
@@ -80,6 +81,17 @@ def set_dark_mode(app_window, enabled: bool):
 
 def get_palette(app_window):
     return DARK if is_dark_mode(app_window) else LIGHT
+
+
+def adapt_fill(color, dark):
+    """Assombrit une couleur pastel pour le mode sombre en conservant sa teinte, pour que les
+    remplissages (canevas de fond, couleurs de base des nœuds...) restent lisibles sur fond
+    sombre au lieu de rester criards ou trop clairs. Sans effet en thème clair."""
+    c = QColor(color)
+    if not dark:
+        return c
+    h, s, l, a = c.getHslF()
+    return QColor.fromHslF(h, min(1.0, s * 0.9), max(0.16, l * 0.35), a)
 
 
 def get_palette_for_scene(scene):
@@ -193,6 +205,9 @@ def apply_theme(app_window):
 
     if getattr(app_window, 'btn_snap', None) is not None:
         app_window.btn_snap.setStyleSheet(toggle_button_stylesheet(p))
+
+    if callable(getattr(app_window, 'refresh_preset_colors', None)):
+        app_window.refresh_preset_colors()
 
     # Repeint immédiatement toutes les scènes ouvertes (fond + canevas) avec le nouveau thème
     if hasattr(app_window, 'tabs') and app_window.tabs is not None:

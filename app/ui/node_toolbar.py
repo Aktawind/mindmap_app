@@ -8,6 +8,34 @@ from graphics.items import NODE_FORMATS
 from ui.collapsible_section import CollapsibleSection
 from ui import theme
 
+# Couleurs de base proposées pour les nœuds (remplissage, bordure), déclinées en variantes
+# assombries en thème sombre via theme.adapt_fill() pour rester lisibles sur fond sombre.
+PRESET_NODE_COLORS = [
+    ('#60A5FA', '#3B82F6'), ('#E0F7FA', '#4DD0E1'),
+    ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'),
+    ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')
+]
+
+
+def _build_preset_color_buttons(app_window, grid_widget, grid_layout, columns):
+    """(Re)construit les pastilles de couleurs de base des nœuds, en les assombrissant si le
+    thème sombre est actif, pour un rendu correct sur fond sombre. Appelé à la création du
+    panneau puis à chaque bascule de thème (voir theme.apply_theme)."""
+    while grid_layout.count():
+        item = grid_layout.takeAt(0)
+        w = item.widget()
+        if w is not None:
+            w.deleteLater()
+
+    dark = theme.is_dark_mode(app_window)
+    for i, (color, border) in enumerate(PRESET_NODE_COLORS):
+        display_color = theme.adapt_fill(color, dark).name()
+        btn = QPushButton(grid_widget)
+        btn.setFixedSize(22, 22)
+        btn.setStyleSheet(f"background: {display_color}; border: 2px solid {border}; border-radius: 11px;")
+        btn.clicked.connect(lambda _, c=display_color, b=border: app_window.style_controller.change_color(c, b))
+        grid_layout.addWidget(btn, *divmod(i, columns))
+
 
 def _labeled_row(parent, label_text, widget):
     """Empile un petit label au-dessus d'un widget, pour une lecture plus claire dans le panneau vertical."""
@@ -169,17 +197,12 @@ def create_node_toolbar(app_window) -> None:
     preset_grid = QGridLayout(preset_grid_widget)
     preset_grid.setContentsMargins(0, 0, 0, 0)
     preset_grid.setSpacing(4)
-    colors_palette = [
-        ('#60A5FA', '#3B82F6'), ('#E0F7FA', '#4DD0E1'),
-        ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'),
-        ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')
-    ]
-    for i, (color, border) in enumerate(colors_palette):
-        btn = QPushButton(preset_grid_widget)
-        btn.setFixedSize(22, 22)
-        btn.setStyleSheet(f"background: {color}; border: 2px solid {border}; border-radius: 11px;")
-        btn.clicked.connect(lambda _, c=color, b=border: app_window.style_controller.change_color(c, b))
-        preset_grid.addWidget(btn, *divmod(i, COLOR_GRID_COLUMNS))
+    app_window.preset_colors_widget = preset_grid_widget
+    app_window.preset_colors_layout = preset_grid
+    app_window.refresh_preset_colors = lambda: _build_preset_color_buttons(
+        app_window, preset_grid_widget, preset_grid, COLOR_GRID_COLUMNS
+    )
+    app_window.refresh_preset_colors()
     section_colors.add_widget(preset_grid_widget)
 
     # Palette de couleurs personnalisées (ajoutées par l'utilisateur, sauvegardées, supprimables)

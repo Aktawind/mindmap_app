@@ -9,6 +9,7 @@ qui agrandit réellement la zone de dessin (pas un simple dézoom) pour loger pl
 import math
 from PyQt6.QtCore import QRectF, QPointF, Qt
 from PyQt6.QtGui import QColor, QPen, QBrush, QFont, QPixmap, QPainterPath
+from ui.theme import adapt_fill as _adapt_fill
 
 # Zone de scène (en unités de coordonnées de la carte) sur laquelle chaque canva est dessiné,
 # avant application de l'échelle (`canvas_scale`) choisie par l'utilisateur.
@@ -36,15 +37,6 @@ _LINE_COLOR_DARK = QColor("#475569")
 
 def _colors(dark):
     return (_LABEL_COLOR_DARK, _LINE_COLOR_DARK) if dark else (_LABEL_COLOR, _LINE_COLOR)
-
-
-def _adapt_fill(color, dark):
-    """Assombrit une couleur pastel pour le mode sombre en conservant sa teinte, pour que les
-    remplissages restent lisibles sur fond sombre au lieu de rester criards ou trop clairs."""
-    if not dark:
-        return color
-    h, s, l, a = color.getHslF()
-    return QColor.fromHslF(h, min(1.0, s * 0.9), max(0.16, l * 0.35), a)
 
 
 def _font(size=13, bold=False, scale=1.0):
