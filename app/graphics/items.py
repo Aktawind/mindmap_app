@@ -385,7 +385,12 @@ class NodeItem(QGraphicsItem):
         # Assombrit le remplissage en thème sombre (même logique que pour la palette de
         # couleurs de base : voir ui/theme.py adapt_fill), sans toucher à la couleur stockée
         # sur le nœud, qui reste la même une fois revenu en thème clair.
-        final_bg = adapt_fill(final_bg, is_dark_mode_for_scene(self.scene()))
+        dark = is_dark_mode_for_scene(self.scene())
+        final_bg = adapt_fill(final_bg, dark)
+        if dark:
+            # Le texte (blanc par défaut, ou sombre choisi pour contraster avec un fond clair
+            # d'origine) est recalculé pour rester lisible sur le fond assombri ci-dessus.
+            final_text_color = QColor(compute_contrast_font_color(final_bg.name()))
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor(0, 0, 0, 15))
