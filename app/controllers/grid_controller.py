@@ -1,4 +1,4 @@
-from graphics.items import NodeItem
+from graphics.items import NodeItem, snap_pos_to_grid
 
 class GridController:
     def __init__(self, app):
@@ -8,23 +8,21 @@ class GridController:
         """Active ou désactive l'alignement automatique sur une grille de 20px."""
         ws = self.app.current_workspace()
         # SÉCURITÉ : Évite le crash si aucun espace de travail n'est actif
-        if not ws or not hasattr(ws, 'scene') or ws.scene is None: 
+        if not ws or not hasattr(ws, 'scene') or ws.scene is None:
             return
-            
+
         ws.scene.snap_to_grid = checked
-        
+
         if checked:
             changed = False
             for item in ws.scene.items():
                 if isinstance(item, NodeItem):
                     old_pos = item.pos()
-                    # Calcul du calage sur la grille de 20px
-                    x = round(old_pos.x() / 20) * 20
-                    y = round(old_pos.y() / 20) * 20
-                    
+                    new_pos = snap_pos_to_grid(old_pos, item.rect, grid_size=20)
+
                     # On n'applique et ne sauvegarde que si le nœud a effectivement bougé
-                    if old_pos.x() != x or old_pos.y() != y:
-                        item.setPos(x, y)
+                    if old_pos != new_pos:
+                        item.setPos(new_pos)
                         
                         # CORRECTION : On force la mise à jour des lignes connectées au nœud
                         if hasattr(item, 'update_edges'):

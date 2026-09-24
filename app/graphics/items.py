@@ -16,6 +16,24 @@ BRANCH_PALETTES = [
 
 MAX_CHARS_PER_LINE = 40
 
+
+def snap_pos_to_grid(pos, rect, grid_size=20):
+    """Aligne un nœud sur une grille virtuelle en accrochant, sur chaque axe, le bord
+    (gauche/droite ou haut/bas) le plus proche d'une ligne de grille — pas seulement son
+    centre — pour que des nœuds de tailles différentes puissent malgré tout aligner leurs
+    bords entre eux, comme une vraie grille d'alignement plutôt qu'un simple quadrillage."""
+    def snap_axis(center, half):
+        edge_a, edge_b = center - half, center + half
+        snap_a = round(edge_a / grid_size) * grid_size
+        snap_b = round(edge_b / grid_size) * grid_size
+        if abs(snap_a - edge_a) <= abs(snap_b - edge_b):
+            return snap_a + half
+        return snap_b - half
+
+    x = snap_axis(pos.x(), rect.width() / 2)
+    y = snap_axis(pos.y(), rect.height() / 2)
+    return QPointF(x, y)
+
 # Formats de nœud prédéfinis : chacun ajuste la police (famille/taille/italique)
 # et un facteur d'échelle appliqué à la taille finale du nœud.
 NODE_FORMATS = {
@@ -566,13 +584,10 @@ class NodeItem(QGraphicsItem):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             scene = self.scene()
             if scene and getattr(scene, 'snap_to_grid', False):
-                grid_size = 20
-                new_pos = value
-                x = round(new_pos.x() / grid_size) * grid_size
-                y = round(new_pos.y() / grid_size) * grid_size
-                
+                snapped = snap_pos_to_grid(value, self.rect, grid_size=20)
+
                 self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
-                self.setPos(x, y)
+                self.setPos(snapped)
                 self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
             self.update_edges()
