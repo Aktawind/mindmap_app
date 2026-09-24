@@ -448,17 +448,21 @@ class GraphController:
         ws.scene.clearSelection()
 
     def filter_nodes(self, search_text):
-        """Filtre visuellement les nœuds de la Mind Map en modifiant leur opacité."""
+        """Filtre visuellement les nœuds de la Mind Map en modifiant leur opacité, en
+        cherchant aussi bien dans le libellé que dans le contenu des notes détaillées."""
         ws = self.app.current_workspace()
         if not ws:
             return
-        
+
         search_text = search_text.lower().strip()
         from graphics.items import NodeItem
-        
+        from ui.node_notes_dialog import notes_to_plain_text
+
         for item in ws.scene.items():
             if isinstance(item, NodeItem):
-                if not search_text or search_text in item.label.lower():
+                if not search_text:
                     item.setOpacity(1.0)
-                else:
-                    item.setOpacity(0.2)
+                    continue
+                label_match = search_text in item.label.lower()
+                notes_match = not label_match and search_text in notes_to_plain_text(getattr(item, 'notes', '')).lower()
+                item.setOpacity(1.0 if (label_match or notes_match) else 0.2)

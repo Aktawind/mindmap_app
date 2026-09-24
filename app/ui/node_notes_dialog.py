@@ -27,6 +27,20 @@ def _looks_like_html(text):
     return stripped.startswith('<!doctype html') or stripped.startswith('<html')
 
 
+def notes_to_plain_text(notes):
+    """Convertit le contenu d'une note (HTML enrichi ou texte brut hérité) en texte simple,
+    pour la recherche — réutilise le même moteur de rendu que l'éditeur (QTextDocument)
+    plutôt qu'un dépouillement de balises maison, pour rester fidèle à ce qui s'affiche."""
+    if not notes:
+        return ''
+    if _looks_like_html(notes):
+        from PyQt6.QtGui import QTextDocument
+        doc = QTextDocument()
+        doc.setHtml(notes)
+        return doc.toPlainText()
+    return notes
+
+
 class NodeNotesDialog(QDialog):
     """Fenêtre de prise de notes détaillées associée à un nœud, avec mise en forme basique
     (police, taille, gras/italique/souligné, listes, couleur de texte) — un petit éditeur
