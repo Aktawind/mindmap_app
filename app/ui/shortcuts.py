@@ -16,6 +16,15 @@ def setup_app_shortcuts(app_window):
     app_window.shortcut_tab = QShortcut(QKeySequence(Qt.Key.Key_Tab), app_window)
     app_window.shortcut_tab.activated.connect(app_window.editing_controller.on_tab_pressed)
 
+    # Entrée = nœud frère (au même niveau), comme dans la plupart des logiciels de mindmap.
+    # Sans danger pendant l'édition inline d'un libellé : l'éditeur de texte réserve déjà
+    # Entrée/Échap pour lui-même via ShortcutOverride (voir EditingController.eventFilter).
+    app_window.shortcut_enter = QShortcut(QKeySequence(Qt.Key.Key_Return), app_window)
+    app_window.shortcut_enter.activated.connect(app_window.editing_controller.on_enter_pressed)
+
+    app_window.shortcut_enter_numpad = QShortcut(QKeySequence(Qt.Key.Key_Enter), app_window)
+    app_window.shortcut_enter_numpad.activated.connect(app_window.editing_controller.on_enter_pressed)
+
     app_window.shortcut_del = QShortcut(QKeySequence(Qt.Key.Key_Delete), app_window)
     app_window.shortcut_del.activated.connect(app_window.graph_controller.delete_selected)
 

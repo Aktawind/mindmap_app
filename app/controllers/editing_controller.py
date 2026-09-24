@@ -157,7 +157,20 @@ class EditingController(QObject):
             elif hasattr(self.app, 'graph_controller'):
                 self.app.graph_controller.add_child_node(sel[0])
 
-    def edit_selected_edge(self): 
+    def on_enter_pressed(self):
+        """Gère l'appui sur Entrée pour insérer un nœud frère au nœud sélectionné, s'il n'y a
+        pas d'édition en cours (Entrée y valide déjà l'édition du texte, voir eventFilter)."""
+        if self.editor is not None:
+            return
+        ws = self.app.current_workspace()
+        if not ws:
+            return
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            if hasattr(self.app, 'graph_controller'):
+                self.app.graph_controller.add_sibling_node(sel[0])
+
+    def edit_selected_edge(self):
         """Déclenche l'édition sur le lien (EdgeItem) sélectionné."""
         ws = self.app.current_workspace()
         if not ws: 

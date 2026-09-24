@@ -60,6 +60,36 @@ class GraphController:
             dst_hidden = getattr(e.dest_node, 'node_id', None) in hidden_ids
             e.setVisible(not (src_hidden or dst_hidden))
 
+    def _find_hierarchy_parent(self, node):
+        """Retrouve le parent hiérarchique d'un nœud en descendant l'arbre depuis la racine
+        (ignore les liens transversaux "Relier les nœuds", qui ne comptent jamais comme parent)."""
+        ws = self.app.current_workspace()
+        if not ws or not node:
+            return None
+        nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+        root = next((n for n in nodes if n.node_id == 'root'), None)
+        if not root or node is root:
+            return None
+
+        def walk(current):
+            for child in current.hierarchy_children():
+                if child is node:
+                    return current
+                found = walk(child)
+                if found is not None:
+                    return found
+            return None
+        return walk(root)
+
+    def add_sibling_node(self, node):
+        """Ajoute un nœud frère au même niveau que le nœud donné (même parent hiérarchique),
+        via add_child_node sur ce parent. Sur la racine (qui n'a pas de parent), se comporte
+        comme l'ajout d'un enfant — cohérent avec le comportement usuel des autres outils."""
+        if not node:
+            return
+        parent = self._find_hierarchy_parent(node)
+        self.add_child_node(parent if parent is not None else node)
+
     def auto_layout(self):
         """Réorganise automatiquement l'arborescence connectée à la racine en un agencement
         de type mind map classique : la racine reste au centre, et ses branches principales
