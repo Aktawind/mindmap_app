@@ -62,9 +62,10 @@ class NodeItem(QGraphicsItem):
     def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff',
                  file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False,
                  image_path=None, image_height=150, status='none', priority='none', is_compact=False, notes='',
-                 node_format=DEFAULT_NODE_FORMAT, **kwargs):
+                 node_format=DEFAULT_NODE_FORMAT, is_collapsed=False, **kwargs):
         super().__init__()
         self.node_id = node_id
+        self.is_collapsed = is_collapsed
         self.label = label
         self.shape_type = shape
         self.bg_color = QColor(bg)
@@ -121,6 +122,20 @@ class NodeItem(QGraphicsItem):
         self.edges = []
         self.recalculate_size()
         self.setAcceptHoverEvents(True)
+
+    def hierarchy_children(self):
+        """Enfants hiérarchiques directs (arêtes dont ce nœud est la source) — ceux affectés
+        par le pliage, à l'exclusion des liens transversaux "Relier les nœuds"."""
+        return [e.dest_node for e in self.edges if getattr(e, 'source_node', None) is self and e.dest_node]
+
+    def has_hierarchy_children(self):
+        return len(self.hierarchy_children()) > 0
+
+    def fold_badge_rect(self):
+        """Petit badge rond en bas à droite du nœud, utilisé pour plier/déplier ses enfants."""
+        r = 7
+        cx, cy = self.rect.right() - 2, self.rect.bottom() - 2
+        return QRectF(cx - r, cy - r, r * 2, r * 2)
 
     def add_edge(self, edge):
         if edge not in self.edges:
@@ -496,6 +511,15 @@ class NodeItem(QGraphicsItem):
             painter.drawText(int(current_x), int(current_y + fm_notes.ascent()), notes_text)
             current_y += fm_notes.height() + 2
 
+        if not self.is_compact and self.has_hierarchy_children():
+            badge_rect = self.fold_badge_rect()
+            painter.setPen(QPen(final_border, 1.5))
+            painter.setBrush(QBrush(final_bg))
+            painter.drawEllipse(badge_rect)
+            painter.setPen(QPen(final_text_color, 1.5))
+            sign = "+" if self.is_collapsed else "−"
+            painter.drawText(badge_rect, int(Qt.AlignmentFlag.AlignCenter), sign)
+
     def node_shape_path(self):
         path = QPainterPath()
         if self.shape_type == 'ellipse':
@@ -530,7 +554,7 @@ class NodeItem(QGraphicsItem):
             edge.update_position()
 
     def boundingRect(self):
-        padding = self.border_width + 6
+        padding = self.border_width + 8
         return self.rect.adjusted(-padding, -padding, padding, padding)
 
     def itemChange(self, change, value):
@@ -554,6 +578,15 @@ class NodeItem(QGraphicsItem):
         if self.is_compact:
             super().mousePressEvent(event)
             return
+
+        if self.has_hierarchy_children() and self.fold_badge_rect().contains(event.pos()):
+            scene = self.scene()
+            if scene and hasattr(scene, 'views') and scene.views():
+                main_win = scene.views()[0].window()
+                if hasattr(main_win, 'graph_controller'):
+                    main_win.graph_controller.toggle_node_collapsed(self)
+                    event.accept()
+                    return
 
         attachments_to_draw = getattr(self, 'attachments', [])
         if attachments_to_draw or getattr(self, 'notes', ''):
@@ -605,6 +638,10 @@ class NodeItem(QGraphicsItem):
         if self.is_compact:
             self.signals.itemDoubleClicked.emit(self)
             super().mouseDoubleClickEvent(event)
+            return
+
+        if self.has_hierarchy_children() and self.fold_badge_rect().contains(event.pos()):
+            event.accept()
             return
 
         attachments_to_draw = getattr(self, 'attachments', [])

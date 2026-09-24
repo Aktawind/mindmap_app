@@ -57,6 +57,7 @@ class MindMapSerializer:
                 "is_compact": getattr(node, 'is_compact', False),
                 "notes": getattr(node, 'notes', ''),
                 "node_format": getattr(node, 'node_format', 'default'),
+                "is_collapsed": getattr(node, 'is_collapsed', False),
                 "children": []
             }
             
@@ -213,6 +214,7 @@ class MindMapSerializer:
                 is_strikethrough=data.get("is_strikethrough", False), status=status,
                 image_path=img_path, image_height=img_height, notes=data.get("notes", ''),
                 node_format=data.get("node_format", "default"),
+                is_collapsed=data.get("is_collapsed", False),
             )
             node.border_width = data.get("border_width", 1)
 
@@ -341,6 +343,10 @@ class MindMapSerializer:
                 item.update()
 
         ws.is_applying_state = False
+
+        if hasattr(self.app, 'graph_controller'):
+            self.app.graph_controller.refresh_fold_visibility()
+
         on_selection_changed(self.app)
 
         if hasattr(self.app, 'image_controller'):

@@ -20,6 +20,46 @@ class GraphController:
             elif hasattr(edge, 'set_curved'):
                 edge.set_curved(is_curved_mode)
 
+    def toggle_node_collapsed(self, node):
+        """Plie/déplie les enfants hiérarchiques du nœud donné, et sauvegarde immédiatement
+        pour que l'état plié survive à une fermeture/réouverture de la carte."""
+        node.is_collapsed = not node.is_collapsed
+        self.refresh_fold_visibility()
+        ws = self.app.current_workspace()
+        if ws:
+            ws.is_dirty = True
+        if hasattr(self.app, 'save_state'):
+            self.app.save_state()
+
+    def refresh_fold_visibility(self):
+        """Cache ou affiche les nœuds/arêtes de la carte active selon l'état plié (is_collapsed)
+        de leurs ancêtres hiérarchiques. Ne suit que les arêtes parent -> enfant : un lien
+        transversal ("Relier les nœuds") ne fait jamais partie d'un pliage."""
+        ws = self.app.current_workspace()
+        if not ws:
+            return
+
+        nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+        edges = [i for i in ws.scene.items() if isinstance(i, EdgeItem)]
+        root = next((n for n in nodes if n.node_id == 'root'), None)
+
+        hidden_ids = set()
+        if root:
+            def walk(node, ancestor_collapsed):
+                for child in node.hierarchy_children():
+                    if ancestor_collapsed:
+                        hidden_ids.add(child.node_id)
+                    walk(child, ancestor_collapsed or getattr(child, 'is_collapsed', False))
+            walk(root, getattr(root, 'is_collapsed', False))
+
+        for n in nodes:
+            n.setVisible(n.node_id not in hidden_ids)
+
+        for e in edges:
+            src_hidden = getattr(e.source_node, 'node_id', None) in hidden_ids
+            dst_hidden = getattr(e.dest_node, 'node_id', None) in hidden_ids
+            e.setVisible(not (src_hidden or dst_hidden))
+
     def auto_layout(self):
         """Réorganise automatiquement l'arborescence connectée à la racine en un agencement
         de type mind map classique : la racine reste au centre, et ses branches principales
@@ -169,7 +209,13 @@ class GraphController:
         """Ajoute un nœud enfant lié au nœud parent fourni et lance l'édition immédiate."""
         ws = self.app.current_workspace()
         if not ws or not parent_node: return
-        
+
+        # Un nœud plié qui reçoit un nouvel enfant se déplie : sinon le nouveau nœud
+        # apparaîtrait immédiatement caché, ce qui serait très déroutant.
+        if getattr(parent_node, 'is_collapsed', False):
+            parent_node.is_collapsed = False
+            self.refresh_fold_visibility()
+
         new_id = self._generate_unique_id("node")
         t_x, t_y = self.calculate_smart_position(parent_node)
         
