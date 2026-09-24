@@ -104,9 +104,10 @@ class NodeNotesDialog(QDialog):
 
         self.btn_color = QToolButton(self)
         self.btn_color.setText("🎨")
-        btn_color = QFont("Segoe UI", 10)
-        self.btn_color.setFont(btn_color)
+        btn_color_font = QFont("Segoe UI", 10)
+        self.btn_color.setFont(btn_color_font)
         self.btn_color.setFixedWidth(35)
+        self.btn_color.setFixedHeight(self.btn_bold.sizeHint().height())
         self.btn_color.setToolTip("Couleur du texte")
         self.btn_color.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         color_menu = QMenu(self.btn_color)
@@ -152,6 +153,12 @@ class NodeNotesDialog(QDialog):
 
         self.text_edit.setFocus()
         self._sync_toolbar_state(self.text_edit.currentCharFormat())
+
+    def closeEvent(self, event):
+        # Fermer via la croix de la fenêtre doit sauvegarder comme "Enregistrer" : c'est ce
+        # qu'on attend d'un éditeur de notes, pas une perte silencieuse du travail en cours.
+        self.accept()
+        event.accept()
 
     def _apply_font_family(self, font):
         self.text_edit.setCurrentFont(font)
