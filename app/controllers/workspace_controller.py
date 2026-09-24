@@ -30,10 +30,10 @@ class WorkspaceController:
             return
 
         path, _ = QFileDialog.getSaveFileName(
-            self.app, 
-            "Créer une nouvelle workspace", 
-            "MaSessionDuMatin.mindy", 
-            "workspace Mindy (*.mindy)"
+            self.app,
+            "Créer une nouvelle workspace",
+            "MaSessionDuMatin.mindysession",
+            "Session Mindy (*.mindysession)"
         )
         if not path:
             return
@@ -61,7 +61,7 @@ class WorkspaceController:
             self.app.tabs_controller.update_title()
 
     def auto_save_workspace(self):
-        """ Écrit instantanément les modifications dans le fichier .mindy """
+        """ Écrit instantanément les modifications dans le fichier .mindysession """
         if not self.current_workspace_path:
             return
         
@@ -118,7 +118,11 @@ class WorkspaceController:
 
     def load_workspace(self, path=None, is_startup=False):
         if not path:
-            path, _ = QFileDialog.getOpenFileName(self.app, "Ouvrir un Espace de travail", "", "Espace Mindy (*.mindy)")
+            # Accepte l'extension .mindysession (native) ainsi que l'ancienne extension .mindy,
+            # utilisée par les espaces de travail créés avant l'introduction de .mindysession.
+            path, _ = QFileDialog.getOpenFileName(
+                self.app, "Ouvrir un Espace de travail", "", "Session Mindy (*.mindysession *.mindy)"
+            )
             if not path:
                 return
 

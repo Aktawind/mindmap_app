@@ -36,14 +36,18 @@ class ProjectService:
             self.app.tabs_controller.update_title()
 
     def load_project(self):
-        """Ouvre un explorateur pour charger plusieurs fichiers simultanément."""
-        paths, _ = QFileDialog.getOpenFileNames(self.app, "Ouvrir un ou plusieurs projets", "", "JSON (*.json)")
+        """Ouvre un explorateur pour charger plusieurs fichiers simultanément.
+        Accepte l'extension .mindy (native) ainsi que l'ancienne extension .json,
+        toujours produite par les versions précédentes de Mindy."""
+        paths, _ = QFileDialog.getOpenFileNames(
+            self.app, "Ouvrir un ou plusieurs projets", "", "Mindmap Mindy (*.mindy *.json)"
+        )
         if paths:
             for path in paths:
                 self.load_project_from_path(path)
 
     def load_project_from_path(self, path):
-        """Instancie un onglet à partir d'un chemin de fichier .json valide."""
+        """Instancie un onglet à partir d'un chemin de fichier .mindy (ou .json hérité) valide."""
         if not os.path.exists(path):
             return
 
@@ -109,10 +113,10 @@ class ProjectService:
                 default_name = "ma_mindmap"
 
             path, _ = QFileDialog.getSaveFileName(
-                self.app, 
-                "Enregistrer la carte", 
-                f"{default_name}.json", 
-                "Mind Map Files (*.json)"
+                self.app,
+                "Enregistrer la carte",
+                f"{default_name}.mindy",
+                "Mindmap Mindy (*.mindy)"
             )
             if not path: 
                 return False
