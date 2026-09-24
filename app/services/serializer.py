@@ -1,6 +1,7 @@
 import json
 import os
 from platform import node
+from PyQt6.QtCore import QPointF
 from graphics.items import NodeItem, EdgeItem
 from ui.selection_manager import on_selection_changed
 
@@ -74,6 +75,9 @@ class MindMapSerializer:
                         child_data["edge_label"] = getattr(edge, 'label', '')
                         child_data["edge_arrow_dir"] = getattr(edge, 'arrow_dir', 'none')
                         child_data["edge_color"] = edge.color.name() if hasattr(edge, 'color') else None
+                        bend = getattr(edge, 'bend_offset', None)
+                        child_data["edge_bend_x"] = bend.x() if bend else 0
+                        child_data["edge_bend_y"] = bend.y() if bend else 0
                         data["children"].append(child_data)
             return data
 
@@ -120,12 +124,15 @@ class MindMapSerializer:
         # Collecte des liens transversaux (Cross Links)
         for edge in edges:
             if edge not in natural_edges and getattr(edge, 'source_node', None) and getattr(edge, 'dest_node', None):
+                bend = getattr(edge, 'bend_offset', None)
                 state["cross_links"].append({
                     "from": edge.source_node.node_id,
                     "to": edge.dest_node.node_id,
                     "label": getattr(edge, 'label', ''),
                     "color": edge.color.name() if hasattr(edge, 'color') else '#A0AEC0',
-                    "arrow_dir": getattr(edge, 'arrow_dir', 'none')
+                    "arrow_dir": getattr(edge, 'arrow_dir', 'none'),
+                    "bend_x": bend.x() if bend else 0,
+                    "bend_y": bend.y() if bend else 0
                 })
 
         return state
@@ -248,7 +255,11 @@ class MindMapSerializer:
                 default_edge_color = border if parent_node.node_id != 'root' else '#A0AEC0'
                 edge_color = data.get("edge_color") or default_edge_color
                 edge = EdgeItem(f"edge_{edge_counter[0]}", parent_node, node, data.get("edge_label", ""), color=edge_color, arrow_dir=data.get("edge_arrow_dir", "none"))
-                
+                bend_x, bend_y = data.get("edge_bend_x", 0), data.get("edge_bend_y", 0)
+                if bend_x or bend_y:
+                    edge.bend_offset = QPointF(bend_x, bend_y)
+                    edge.update_position()
+
                 if hasattr(self.app, 'editing_controller'):
                     edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 
@@ -324,7 +335,11 @@ class MindMapSerializer:
             if source and dest:
                 edge_counter[0] += 1
                 edge = EdgeItem(f"edge_{edge_counter[0]}", source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"), arrow_dir=cl.get("arrow_dir", "none"))
-                
+                bend_x, bend_y = cl.get("bend_x", 0), cl.get("bend_y", 0)
+                if bend_x or bend_y:
+                    edge.bend_offset = QPointF(bend_x, bend_y)
+                    edge.update_position()
+
                 if hasattr(self.app, 'editing_controller'):
                     edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 

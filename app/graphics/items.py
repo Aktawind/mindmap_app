@@ -711,6 +711,10 @@ class EdgeItem(QGraphicsPathItem):
         self.label = label
         self.color = QColor(color)
         self.arrow_dir = arrow_dir
+        # Décalage manuel du "ventre" de la courbe (glisser la poignée du milieu quand la
+        # branche est sélectionnée) : uniquement appliqué en mode de routage "curved".
+        self.bend_offset = QPointF(0, 0)
+        self._dragging_bend = False
 
         self.source_node.add_edge(self)
         self.dest_node.add_edge(self)
@@ -720,15 +724,18 @@ class EdgeItem(QGraphicsPathItem):
         self.signals = GraphicsSignals()
         self.update_position()
 
+    def _current_routing_mode(self):
+        scene = self.scene()
+        if hasattr(self, 'is_curved'):
+            return 'curved' if self.is_curved else 'orthogonal'
+        return getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
+
     def update_position(self):
         if not self.source_node or not self.dest_node:
             return
 
         scene = self.scene()
-        if hasattr(self, 'is_curved'):
-            mode = 'curved' if self.is_curved else 'orthogonal'
-        else:
-            mode = getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
+        mode = self._current_routing_mode()
 
         # 🟢 FIX COLLAGE : Utilisation directe de self.rect mappé pour un contact au pixel près
         s_rect = self.source_node.rect
@@ -808,7 +815,14 @@ class EdgeItem(QGraphicsPathItem):
             ctrl_x2, ctrl_y2 = end.x(), end.y()
             if end_side in ('left', 'right'): ctrl_x2 -= dx / 2
             else: ctrl_y2 -= dy / 2
-            
+
+            # Décalage manuel (glisser la poignée du milieu) : appliqué aux deux points de
+            # contrôle pour déplacer le "ventre" de la courbe en gardant ses extrémités fixes.
+            bend = getattr(self, 'bend_offset', None)
+            if bend is not None and not bend.isNull():
+                ctrl_x1 += bend.x(); ctrl_y1 += bend.y()
+                ctrl_x2 += bend.x(); ctrl_y2 += bend.y()
+
             path.cubicTo(ctrl_x1, ctrl_y1, ctrl_x2, ctrl_y2, end.x(), end.y())
         
         self.setPath(path)
@@ -873,6 +887,57 @@ class EdgeItem(QGraphicsPathItem):
             painter.setPen(QPen(QColor(palette['edge_label_text'])))
             painter.setFont(font)
             painter.drawText(rect, int(Qt.AlignmentFlag.AlignCenter), self.label)
+
+        if self.isSelected() and self._current_routing_mode() == 'curved' and path.length() > 0:
+            handle = path.pointAtPercent(0.5)
+            painter.setPen(QPen(QColor('#4A90E2'), 1.5))
+            painter.setBrush(QBrush(QColor('#FFFFFF')))
+            painter.drawEllipse(handle, 5, 5)
+
+    def _bend_handle_rect(self):
+        """Zone cliquable de la poignée de courbure, en coordonnées locales de l'item."""
+        path = self.path()
+        if path.length() == 0:
+            return None
+        center = path.pointAtPercent(0.5)
+        r = 9
+        return QRectF(center.x() - r, center.y() - r, r * 2, r * 2)
+
+    def mousePressEvent(self, event):
+        if self.isSelected() and self._current_routing_mode() == 'curved':
+            handle_rect = self._bend_handle_rect()
+            if handle_rect is not None and handle_rect.contains(event.pos()):
+                self._dragging_bend = True
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._dragging_bend:
+            # Le décalage est relatif au point milieu "non courbé" (celui qui serait obtenu
+            # avec bend_offset nul), pour que le glisser reste stable et prévisible.
+            offset_before = self.bend_offset
+            self.bend_offset = QPointF(0, 0)
+            self.update_position()
+            natural_mid = self.path().pointAtPercent(0.5)
+            self.bend_offset = event.pos() - natural_mid
+            self.update_position()
+            self.update()
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._dragging_bend:
+            self._dragging_bend = False
+            scene = self.scene()
+            ws = getattr(scene, 'parent_workspace', None) if scene else None
+            app_window = getattr(ws, 'main_app', None) if ws else None
+            if app_window and hasattr(app_window, 'save_state'):
+                app_window.save_state()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event):
         self.signals.itemDoubleClicked.emit(self)
