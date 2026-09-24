@@ -63,7 +63,7 @@ class NodeNotesDialog(QDialog):
 
         self.btn_bold = QPushButton("G", self)
         self.btn_bold.setCheckable(True)
-        self.btn_bold.setFixedWidth(28)
+        self.btn_bold.setFixedWidth(35)
         self.btn_bold.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         self.btn_bold.setToolTip("Gras")
         self.btn_bold.setStyleSheet(toggle_style)
@@ -72,7 +72,7 @@ class NodeNotesDialog(QDialog):
 
         self.btn_italic = QPushButton("I", self)
         self.btn_italic.setCheckable(True)
-        self.btn_italic.setFixedWidth(28)
+        self.btn_italic.setFixedWidth(35)
         italic_font = QFont("Segoe UI", 10)
         italic_font.setItalic(True)
         self.btn_italic.setFont(italic_font)
@@ -83,7 +83,7 @@ class NodeNotesDialog(QDialog):
 
         self.btn_underline = QPushButton("S", self)
         self.btn_underline.setCheckable(True)
-        self.btn_underline.setFixedWidth(28)
+        self.btn_underline.setFixedWidth(35)
         underline_font = QFont("Segoe UI", 10)
         underline_font.setUnderline(True)
         self.btn_underline.setFont(underline_font)
@@ -92,7 +92,7 @@ class NodeNotesDialog(QDialog):
         self.btn_underline.clicked.connect(self._toggle_underline)
         toolbar.addWidget(self.btn_underline)
 
-        btn_bullets = QPushButton("• Liste", self)
+        btn_bullets = QPushButton("• Puce", self)
         btn_bullets.setToolTip("Liste à puces")
         btn_bullets.clicked.connect(lambda: self._insert_list(QTextListFormat.Style.ListDisc))
         toolbar.addWidget(btn_bullets)
@@ -104,6 +104,9 @@ class NodeNotesDialog(QDialog):
 
         self.btn_color = QToolButton(self)
         self.btn_color.setText("🎨")
+        btn_color = QFont("Segoe UI", 10)
+        self.btn_color.setFont(btn_color)
+        self.btn_color.setFixedWidth(35)
         self.btn_color.setToolTip("Couleur du texte")
         self.btn_color.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         color_menu = QMenu(self.btn_color)
