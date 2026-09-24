@@ -2,6 +2,7 @@ from PyQt6.QtGui import QKeySequence, QAction
 from services.updater_service import check_for_updates
 from ui.template_manager_dialog import show_template_manager_dialog
 from ui import theme
+from ui.minimap import toggle_minimap
 
 
 def _toggle_shortcuts_overlay(app_window, checked):
@@ -103,6 +104,11 @@ def create_menus(app_window):
     app_window.action_toggle_dark_mode.setCheckable(True)
     app_window.action_toggle_dark_mode.setChecked(theme.is_dark_mode(app_window))
     app_window.action_toggle_dark_mode.toggled.connect(lambda checked: _toggle_dark_mode(app_window, checked))
+
+    app_window.action_toggle_minimap = display_menu.addAction("🗺️ Mini-carte de navigation")
+    app_window.action_toggle_minimap.setCheckable(True)
+    app_window.action_toggle_minimap.setChecked(app_window.settings.value("show_minimap", False, type=bool))
+    app_window.action_toggle_minimap.toggled.connect(lambda checked: toggle_minimap(app_window, checked))
 
     # ==========================================
     # MENU À PROPOS
