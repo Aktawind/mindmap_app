@@ -161,6 +161,48 @@ class AttachmentController:
                 })
                 self._update_node_ui(node)
 
+    def attach_mindmap_link(self):
+        """Ajoute au nœud sélectionné un lien cliquable vers un autre fichier mindmap
+        (.mindy/.json), pour naviguer d'une carte à l'autre quand des sujets se recoupent."""
+        ws = self.app.current_workspace()
+        if not ws: return
+
+        sel = ws.scene.selectedItems()
+        if len(sel) == 1 and isinstance(sel[0], NodeItem):
+            node = sel[0]
+            self._ensure_attachments_layout(node)
+
+            path, _ = QFileDialog.getOpenFileName(
+                self.app, "Choisir le mindmap à lier", "", "Mindmap Mindy (*.mindy *.json)"
+            )
+            if not path:
+                return
+
+            display_name = os.path.splitext(os.path.basename(path))[0]
+            node.attachments.append({
+                "name": f"🗺️ {display_name}",
+                "path": os.path.abspath(path),
+                "type": "mindmap_link",
+                "is_local_copy": False
+            })
+            self._update_node_ui(node)
+
+    def _open_mindmap_link(self, path):
+        """Ouvre le mindmap ciblé par un lien : réutilise l'onglet déjà ouvert s'il existe,
+        sinon le charge dans un nouvel onglet."""
+        if not os.path.exists(path):
+            QMessageBox.warning(self.app, "Erreur", f"Le mindmap lié est introuvable :\n{path}")
+            return
+
+        for i in range(self.app.tabs.count()):
+            w = self.app.tabs.widget(i)
+            existing_path = getattr(w, 'current_file_path', None)
+            if existing_path and os.path.abspath(existing_path) == os.path.abspath(path):
+                self.app.tabs.setCurrentWidget(w)
+                return
+
+        self.app.project_service.load_project_from_path(path)
+
     def clean_orphan_attachments(self):
         """Parcourt le dossier des pièces jointes et supprime les fichiers qui ne sont plus associés à aucun nœud."""
         ws = self.app.current_workspace()
@@ -261,6 +303,8 @@ class AttachmentController:
             if not url_str.startswith(("http://", "https://")):
                 url_str = "https://" + url_str
             QDesktopServices.openUrl(QUrl.fromUserInput(url_str))
+        elif attachment.get("type") == "mindmap_link":
+            self._open_mindmap_link(path)
         else:
             # Traitement des fichiers
             if attachment.get("is_local_copy") and not os.path.isabs(path) and ws.current_file_path:

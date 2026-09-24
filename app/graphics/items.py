@@ -183,6 +183,11 @@ class NodeItem(QGraphicsItem):
             if len(clean_name) > MAX_CHARS:
                 name = f"🔗 {clean_name[:MAX_CHARS]}..."
             return name
+        elif att.get("type") == "mindmap_link":
+            clean_name = name.replace("🗺️ ", "")
+            if len(clean_name) > MAX_CHARS:
+                name = f"🗺️ {clean_name[:MAX_CHARS]}..."
+            return name
         else:
             if len(name) > MAX_CHARS:
                 name = f"{name[:MAX_CHARS]}..."

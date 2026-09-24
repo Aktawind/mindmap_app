@@ -234,6 +234,11 @@ def create_node_toolbar(app_window) -> None:
     btn_url.clicked.connect(app_window.attachment_controller.attach_url)
     section_attach.add_widget(btn_url)
 
+    btn_mindmap_link = QPushButton("🗺️ Lien vers un mindmap", section_attach)
+    btn_mindmap_link.setToolTip("Lier ce nœud à un autre fichier mindmap (.mindy)")
+    btn_mindmap_link.clicked.connect(app_window.attachment_controller.attach_mindmap_link)
+    section_attach.add_widget(btn_mindmap_link)
+
     btn_img = QPushButton("🏞️ Image", section_attach)
     btn_img.clicked.connect(app_window.image_controller.attach_image_to_selected)
     section_attach.add_widget(btn_img)
