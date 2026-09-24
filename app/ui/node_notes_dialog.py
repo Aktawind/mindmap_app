@@ -1,13 +1,16 @@
+import os
+import shutil
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton,
-    QFontComboBox, QComboBox, QToolButton, QMenu, QColorDialog
+    QFontComboBox, QComboBox, QToolButton, QMenu, QColorDialog, QFileDialog, QMessageBox
 )
-from PyQt6.QtGui import QFont, QTextListFormat, QColor, QAction
+from PyQt6.QtGui import QFont, QTextListFormat, QColor, QAction, QImage
 from PyQt6.QtCore import Qt
 
 from ui import theme
 
 FONT_SIZES = [9, 10, 11, 12, 14, 16, 18, 20, 24]
+MAX_NOTE_IMAGE_WIDTH = 480
 
 TEXT_COLORS = [
     ("Rouge", "#E53E3E"),
@@ -139,6 +142,11 @@ class NodeNotesDialog(QDialog):
         self.btn_color.setMenu(color_menu)
         toolbar.addWidget(self.btn_color)
 
+        btn_image = QPushButton("🖼️ Image", self)
+        btn_image.setToolTip("Insérer une image dans la note")
+        btn_image.clicked.connect(self._insert_image)
+        toolbar.addWidget(btn_image)
+
         toolbar.addStretch()
         layout.addLayout(toolbar)
 
@@ -199,6 +207,43 @@ class NodeNotesDialog(QDialog):
     def _insert_list(self, style):
         cursor = self.text_edit.textCursor()
         cursor.insertList(style)
+        self.text_edit.setFocus()
+
+    def _insert_image(self):
+        """Copie l'image choisie dans .mindmap_attachments (même dossier que les autres
+        pièces jointes) et l'insère dans la note, redimensionnée si trop large."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choisir une image", "", "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+        )
+        if not path:
+            return
+
+        try:
+            target_dir = os.path.abspath(".mindmap_attachments")
+            os.makedirs(target_dir, exist_ok=True)
+
+            base_name = os.path.basename(path)
+            name, ext = os.path.splitext(base_name)
+            counter = 1
+            new_name = base_name
+            while os.path.exists(os.path.join(target_dir, new_name)):
+                new_name = f"{name}_{counter}{ext}"
+                counter += 1
+
+            dest_path = os.path.join(target_dir, new_name)
+            shutil.copy(path, dest_path)
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Impossible d'importer l'image :\n{e}")
+            return
+
+        image = QImage(dest_path)
+        if image.isNull():
+            QMessageBox.critical(self, "Erreur", "Ce format d'image n'est pas pris en charge.")
+            return
+
+        width_attr = f' width="{MAX_NOTE_IMAGE_WIDTH}"' if image.width() > MAX_NOTE_IMAGE_WIDTH else ''
+        src = dest_path.replace('\\', '/')
+        self.text_edit.textCursor().insertHtml(f'<br/><img src="{src}"{width_attr}/><br/>')
         self.text_edit.setFocus()
 
     def _apply_text_color(self, hex_color):
