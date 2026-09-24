@@ -30,7 +30,11 @@ jobs:
       run: |
         # 🚨 FIX AJUSTEMENT DES CHEMINS (app/main.py et app/templates)
         # Note : Si ton icon.ico est resté à la racine du projet, garde "icon.ico;.", s'il a migré dans app/, change en "app/icon.ico;."
-        pyinstaller --name "Mindy" --noconfirm --onefile --windowed --icon="app/icon.ico" --add-data "app/icon.ico;." --add-data "app/templates;templates" app/main.py
+        # --noupx : la compression UPX de l'exécutable onefile est une cause très documentée
+        # de "Failed to load Python DLL ... LoadLibrary: module introuvable" au lancement
+        # (échec de décompression et/ou scan antivirus plus agressif sur un binaire packé) —
+        # on la désactive pour fiabiliser le lancement automatique après mise à jour.
+        pyinstaller --name "Mindy" --noconfirm --onefile --windowed --noupx --icon="app/icon.ico" --add-data "app/icon.ico;." --add-data "app/templates;templates" app/main.py
       shell: pwsh
 
     - name: Créer l'archive Zip avec le nom du TAG

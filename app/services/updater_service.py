@@ -198,6 +198,13 @@ timeout /t 3 /nobreak > nul
 rem Copie forcée en écrasant TOUT (y compris fichiers cachés / lecture seule)
 xcopy /E /Y /I /K /R /H "{source_dir}\\*" "{install_dir}\\"
 
+rem 🚨 FIX : laisse le temps à Windows/l'antivirus de "digérer" le nouvel exécutable
+rem tout juste écrit (scan à la volée d'un binaire non signé fraîchement copié) avant
+rem de le lancer. Sans cette pause, le lancement immédiat peut échouer avec
+rem "Failed to load Python DLL ... LoadLibrary: le module spécifié est introuvable"
+rem (le bootloader onefile ne parvient pas à extraire/charger sa DLL Python).
+timeout /t 2 /nobreak > nul
+
 rem Relance la nouvelle version
 cd /d "{install_dir}"
 start "" "{exe_name}"
