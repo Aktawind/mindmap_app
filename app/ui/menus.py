@@ -45,7 +45,7 @@ def create_menus(app_window):
     
     file_menu.addAction("📄 Nouveau mindmap", lambda: app_window.project_service.new_project())
     file_menu.addAction("📂 Ouvrir un mindmap", app_window.project_service.load_project)
-    file_menu.addAction("📝 Importer depuis Markdown...", app_window.import_controller.import_markdown)
+    file_menu.addAction("📝 Importer Markdown", app_window.import_controller.import_markdown)
 
     # Sécurisation des actions avec raccourcis (on évite le chaînage destructeur de pointeur)
     save_action = QAction("💾 Enregistrer", app_window)
@@ -89,20 +89,13 @@ def create_menus(app_window):
     paste_action.triggered.connect(app_window.tools_controller.paste_node)
     edit_menu.addAction(paste_action)
 
-    edit_menu.addSeparator()
-    app_window.action_toggle_fold = edit_menu.addAction("🔽 Pliage des branches")
-    app_window.action_toggle_fold.setCheckable(True)
-    app_window.action_toggle_fold.setChecked(app_window.settings.value("fold_enabled", True, type=bool))
-    app_window.action_toggle_fold.setToolTip("Autoriser le pliage/dépliage des branches depuis la carte")
-    app_window.action_toggle_fold.toggled.connect(lambda checked: _toggle_fold(app_window, checked))
-
     # ==========================================
     # MENU EXPORTER
     # ==========================================
     export_menu = menu_bar.addMenu("Exporter")
-    export_menu.addAction("Exporter en Image PNG", app_window.export_controller.export_png)
-    export_menu.addAction("Exporter en PDF Vectoriel", app_window.export_controller.export_pdf)
-    export_menu.addAction("Exporter en Markdown", app_window.export_controller.export_md)
+    export_menu.addAction("Exporter en PNG", app_window.export_controller.export_png)
+    export_menu.addAction("Exporter en PDF", app_window.export_controller.export_pdf)
+    export_menu.addAction("Exporter en Markdown  ", app_window.export_controller.export_md)
 
     # ==========================================
     # MENU AFFICHAGE
@@ -114,20 +107,26 @@ def create_menus(app_window):
     app_window.action_toggle_shortcuts.setChecked(True)
     app_window.action_toggle_shortcuts.toggled.connect(lambda checked: _toggle_shortcuts_overlay(app_window, checked))
 
+    app_window.action_toggle_fold = display_menu.addAction("Afficher le pliage des branches")
+    app_window.action_toggle_fold.setCheckable(True)
+    app_window.action_toggle_fold.setChecked(app_window.settings.value("fold_enabled", True, type=bool))
+    app_window.action_toggle_fold.setToolTip("Autoriser le pliage/dépliage des branches depuis la carte")
+    app_window.action_toggle_fold.toggled.connect(lambda checked: _toggle_fold(app_window, checked))
+
+    app_window.action_toggle_minimap = display_menu.addAction("Afficher la mini-carte")
+    app_window.action_toggle_minimap.setCheckable(True)
+    app_window.action_toggle_minimap.setChecked(app_window.settings.value("show_minimap", False, type=bool))
+    app_window.action_toggle_minimap.toggled.connect(lambda checked: toggle_minimap(app_window, checked))
+
     display_menu.addSeparator()
     app_window.action_toggle_dark_mode = display_menu.addAction("Thème sombre")
     app_window.action_toggle_dark_mode.setCheckable(True)
     app_window.action_toggle_dark_mode.setChecked(theme.is_dark_mode(app_window))
     app_window.action_toggle_dark_mode.toggled.connect(lambda checked: _toggle_dark_mode(app_window, checked))
 
-    app_window.action_toggle_minimap = display_menu.addAction("🗺️ Mini-carte de navigation")
-    app_window.action_toggle_minimap.setCheckable(True)
-    app_window.action_toggle_minimap.setChecked(app_window.settings.value("show_minimap", False, type=bool))
-    app_window.action_toggle_minimap.toggled.connect(lambda checked: toggle_minimap(app_window, checked))
-
     # ==========================================
     # MENU À PROPOS
     # ==========================================
     about_menu = menu_bar.addMenu("À propos")
     about_menu.addAction("À propos de Mindy", app_window.show_about_dialog)
-    about_menu.addAction("🔄 Vérifier les mises à jour", lambda: check_for_updates(app_window, silent=False))
+    about_menu.addAction("Vérifier les mises à jour", lambda: check_for_updates(app_window, silent=False))
