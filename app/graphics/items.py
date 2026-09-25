@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, QRectF, QPointF, QLineF
 from PyQt6.QtGui import QColor, QCursor, QPen, QBrush, QPainterPath, QFont, QFontMetrics, QPixmap, QPolygonF, QPainterPathStroker
 from PyQt6.QtWidgets import QGraphicsItem, QGraphicsPathItem
 from signals import GraphicsSignals
-from ui.theme import get_palette_for_scene, is_dark_mode_for_scene, adapt_fill
+from ui.theme import get_palette_for_scene, is_dark_mode_for_scene, adapt_fill, adapt_stroke
 
 BRANCH_PALETTES = [
     {'bg': '#E0F7FA', 'border': '#4DD0E1', 'text': '#333333', 'edge': '#4DD0E1'},
@@ -16,27 +16,28 @@ BRANCH_PALETTES = [
 
 MAX_CHARS_PER_LINE = 40
 
+# Incrément de la grille virtuelle (Aimant). La taille de chaque nœud (recalculate_size) est
+# toujours arrondie à un multiple de ce même incrément : en n'accrochant que le coin
+# haut-gauche sur la grille, TOUS les bords (gauche, droit, haut, bas) se retrouvent alignés
+# automatiquement, sans avoir à choisir "au plus proche" entre deux bords à chaque micro-
+# déplacement — c'est cette ancienne logique de choix qui provoquait le tremblement du nœud
+# pendant le glisser (le bord choisi pouvait basculer d'une étape à l'autre).
+GRID_SIZE = 20
 
-def snap_pos_to_grid(pos, rect, grid_size=20):
-    """Aligne un nœud sur une grille virtuelle en accrochant, sur chaque axe, le bord
-    (gauche/droite ou haut/bas) le plus proche d'une ligne de grille — pas seulement son
-    centre — pour que des nœuds de tailles différentes puissent malgré tout aligner
-    n'importe lequel de leurs bords entre eux. `pos` doit être une position "brute" propre
-    (non déjà contaminée par un arrondi précédent) : voir NodeItem.itemChange(), qui maintient
-    un accumulateur de position brute pendant un glisser pour que ce calcul reste stable
-    d'un micro-déplacement de souris à l'autre plutôt que de dériver vers un bord différent
-    de celui visé."""
-    def snap_axis(center, half):
-        edge_a, edge_b = center - half, center + half
-        snap_a = round(edge_a / grid_size) * grid_size
-        snap_b = round(edge_b / grid_size) * grid_size
-        if abs(snap_a - edge_a) <= abs(snap_b - edge_b):
-            return snap_a + half
-        return snap_b - half
 
-    x = snap_axis(pos.x(), rect.width() / 2)
-    y = snap_axis(pos.y(), rect.height() / 2)
-    return QPointF(x, y)
+def round_up_to_grid(value, grid_size=GRID_SIZE):
+    return int(math.ceil(value / grid_size) * grid_size)
+
+
+def snap_pos_to_grid(pos, rect, grid_size=GRID_SIZE):
+    """Aligne le coin haut-gauche d'un nœud sur la grille virtuelle. Comme la taille de tout
+    nœud est elle-même un multiple de `grid_size` (voir recalculate_size), ses quatre bords
+    se retrouvent alignés sur la grille par construction, sans ambiguïté ni calcul "au plus
+    proche" instable pendant un glisser."""
+    half_w, half_h = rect.width() / 2, rect.height() / 2
+    left = round((pos.x() - half_w) / grid_size) * grid_size
+    top = round((pos.y() - half_h) / grid_size) * grid_size
+    return QPointF(left + half_w, top + half_h)
 
 
 def fold_enabled_for_scene(scene):
@@ -151,7 +152,6 @@ class NodeItem(QGraphicsItem):
         self.rect = QRectF(0, 0, 100, 40)
         self.signals = GraphicsSignals()
         self.edges = []
-        self._drag_raw_pos = None
         self.recalculate_size()
         self.setAcceptHoverEvents(True)
 
@@ -344,9 +344,9 @@ class NodeItem(QGraphicsItem):
             
             if img_w > 0 and img_h > 0:
                 padding = 20
-                width = img_w + padding
-                height = img_h + padding
-                
+                width = round_up_to_grid(img_w + padding)
+                height = round_up_to_grid(img_h + padding)
+
                 self.rect = QRectF(-width / 2, -height / 2, width, height)
                 self.prepareGeometryChange()
                 if hasattr(self, 'update_edges'):
@@ -410,6 +410,9 @@ class NodeItem(QGraphicsItem):
         width = int(width * size_scale)
         height = int(height * size_scale)
 
+        width = round_up_to_grid(width)
+        height = round_up_to_grid(height)
+
         self.rect = QRectF(-width/2, -height/2, width, height)
         self.prepareGeometryChange()
         self.update_edges()
@@ -453,6 +456,7 @@ class NodeItem(QGraphicsItem):
         # sur le nœud, qui reste la même une fois revenu en thème clair.
         dark = is_dark_mode_for_scene(self.scene())
         final_bg = adapt_fill(final_bg, dark)
+        final_border = adapt_stroke(final_border, dark)
         if dark:
             # Le texte (blanc par défaut, ou sombre choisi pour contraster avec un fond clair
             # d'origine) est recalculé pour rester lisible sur le fond assombri ci-dessus.
@@ -609,35 +613,20 @@ class NodeItem(QGraphicsItem):
         return self.rect.adjusted(-padding, -padding, padding, padding)
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             scene = self.scene()
             if scene and getattr(scene, 'snap_to_grid', False):
-                # Accumule la position "brute" (non arrondie) sur toute la durée d'un glisser,
-                # au lieu de laisser Qt calculer chaque micro-déplacement suivant à partir de
-                # la position déjà accrochée à la grille : sans ça, l'arrondi d'une étape
-                # contamine le point de départ de la suivante et le résultat final peut dériver
-                # vers un bord différent de celui réellement visé par la souris.
-                old_pos = self.pos()
-                delta = value - old_pos
-                raw = getattr(self, '_drag_raw_pos', None)
-                if raw is None:
-                    raw = old_pos
-                raw = raw + delta
-                self._drag_raw_pos = raw
-                return snap_pos_to_grid(raw, self.rect, grid_size=20)
-            self._drag_raw_pos = None
-            return value
+                snapped = snap_pos_to_grid(value, self.rect, grid_size=GRID_SIZE)
 
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+                self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
+                self.setPos(snapped)
+                self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+
             self.update_edges()
             self.signals.positionChanged.emit()
         return super().itemChange(change, value)
     
     def mousePressEvent(self, event):
-        # Nouveau glisser : repart d'un accumulateur propre (voir itemChange), pour ne pas
-        # hériter d'un reliquat d'un précédent glisser interrompu.
-        self._drag_raw_pos = None
-
         if self.is_compact:
             super().mousePressEvent(event)
             return
@@ -696,10 +685,6 @@ class NodeItem(QGraphicsItem):
                             return
 
         super().mousePressEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        self._drag_raw_pos = None
-        super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event):
         if self.is_compact:
@@ -888,7 +873,8 @@ class EdgeItem(QGraphicsPathItem):
         painter.drawPolygon(QPolygonF([tip, p1, p2]))
 
     def paint(self, painter, option, widget=None):
-        pen = QPen(self.color, 3)
+        line_color = adapt_stroke(self.color, is_dark_mode_for_scene(self.scene()))
+        pen = QPen(line_color, 3)
         if self.isSelected():
             pen.setColor(QColor('#4A90E2'))
             pen.setWidth(4)
