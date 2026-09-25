@@ -84,14 +84,29 @@ def get_palette(app_window):
 
 
 def adapt_fill(color, dark):
-    """Assombrit une couleur pastel pour le mode sombre en conservant sa teinte, pour que les
-    remplissages (canevas de fond, couleurs de base des nœuds...) restent lisibles sur fond
-    sombre au lieu de rester criards ou trop clairs. Sans effet en thème clair."""
+    """Assombrit et désature une couleur pastel pour le mode sombre en conservant sa teinte,
+    pour que les remplissages (canevas de fond, couleurs de base des nœuds...) restent lisibles
+    sur fond sombre sans devenir criards. Une simple baisse de luminosité en gardant la
+    saturation d'origine (comme un premier essai le faisait) donne des couleurs "néon" très
+    agressives à l'œil sur fond sombre ; les thèmes sombres habituels (Material Design, GitHub
+    Dark...) désaturent nettement en plus d'ajuster la luminosité vers un ton moyen, pas un
+    quasi-noir saturé. Sans effet en thème clair."""
     c = QColor(color)
     if not dark:
         return c
     h, s, l, a = c.getHslF()
-    return QColor.fromHslF(h, min(1.0, s * 0.9), max(0.16, l * 0.35), a)
+    return QColor.fromHslF(h, min(1.0, s * 0.45), min(0.5, max(0.24, l * 0.55)), a)
+
+
+def adapt_stroke(color, dark):
+    """Ajuste une couleur de trait (arête, bordure fine) pour le mode sombre : légèrement
+    désaturée, mais éclaircie plutôt qu'assombrie — contrairement à un remplissage, un trait
+    fin doit rester net et bien visible sur fond sombre, pas se fondre dedans."""
+    c = QColor(color)
+    if not dark:
+        return c
+    h, s, l, a = c.getHslF()
+    return QColor.fromHslF(h, min(1.0, s * 0.7), min(0.78, max(0.55, l)), a)
 
 
 def _app_window_for_scene(scene):
