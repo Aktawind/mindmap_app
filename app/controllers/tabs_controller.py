@@ -90,9 +90,8 @@ class TabsController:
                 combo.setCurrentIndex(idx if idx >= 0 else combo.findData('none'))
                 combo.blockSignals(False)
 
-            if hasattr(self.app, 'canvas_scale_label') and self.app.canvas_scale_label is not None:
-                scale = getattr(ws.scene, 'canvas_scale', 1.0)
-                self.app.canvas_scale_label.setText(f"{int(round(scale * 100))}%")
+            from ui.toolbar import refresh_canvas_scale_controls
+            refresh_canvas_scale_controls(self.app)
 
         # 3. Notification des autres contrôleurs dépendants
         if hasattr(self.app, 'on_selection_changed'):

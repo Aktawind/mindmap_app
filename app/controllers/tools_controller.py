@@ -3,7 +3,7 @@ import json
 import os
 import sys
 import time
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QRectF
 from PyQt6.QtWidgets import QMessageBox, QWidget
 from graphics.items import NodeItem, EdgeItem
 
@@ -257,11 +257,24 @@ class ToolsController:
                 ws.view.centerOn(0, 0)
 
     def fit_to_view_clicked(self):
-        """Ajuste le zoom et la position de la vue pour englober l'intégralité de la carte."""
+        """Ajuste le zoom et la position de la vue pour englober l'intégralité de la carte,
+        y compris le canva de fond s'il y en a un — sinon "Ajuster" recadre trop serré et
+        laisse une partie du canva (surtout agrandi) hors champ."""
         ws = self.app.current_workspace()
         if not ws: return
 
         rect = ws.scene.itemsBoundingRect()
+
+        canvas_type = getattr(ws.scene, 'canvas_type', 'none')
+        if canvas_type and canvas_type != 'none':
+            from graphics.canvas_backgrounds import CANVAS_RECT
+            scale = getattr(ws.scene, 'canvas_scale', 1.0)
+            canvas_rect = QRectF(
+                CANVAS_RECT.x() * scale, CANVAS_RECT.y() * scale,
+                CANVAS_RECT.width() * scale, CANVAS_RECT.height() * scale
+            )
+            rect = canvas_rect if rect.isEmpty() else rect.united(canvas_rect)
+
         if rect.isEmpty(): return
 
         margin = 60
