@@ -95,7 +95,7 @@ def adapt_fill(color, dark):
     if not dark:
         return c
     h, s, l, a = c.getHslF()
-    return QColor.fromHslF(h, min(1.0, s * 0.45), min(0.5, max(0.24, l * 0.55)), a)
+    return QColor.fromHslF(h, min(1.0, s * 0.45), min(0.2, max(0.08, l * 0.20)), a)
 
 
 def adapt_stroke(color, dark):

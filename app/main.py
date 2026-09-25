@@ -204,8 +204,8 @@ class MindMapApp(QMainWindow):
         self.workspace_badge.setText("📁 Aucun espace de travail")
         self.workspace_badge.setAutoRaise(True)
         workspace_menu = QMenu(self.workspace_badge)
-        workspace_menu.addAction("📄 Nouvel espace de travail", self.workspace_controller.new_workspace)
-        workspace_menu.addAction("📂 Ouvrir un espace de travail", self.workspace_controller.load_workspace)
+        workspace_menu.addAction("📄 Nouvel espace de travail    ", self.workspace_controller.new_workspace)
+        workspace_menu.addAction("📂 Ouvrir un espace de travail    ", self.workspace_controller.load_workspace)
         self.workspace_badge.setMenu(workspace_menu)
         self.tabs.setCornerWidget(self.workspace_badge, Qt.Corner.TopLeftCorner)
 

@@ -183,6 +183,7 @@ def create_node_toolbar(app_window) -> None:
         ("progress", "⏳", "En cours"), ("done", "✅", "Terminé"),
     ]:
         btn = QPushButton(emoji, status_row)
+        btn.setFont(QFont("Segoe UI Emoji", 12))
         btn.setCheckable(True)
         btn.setFixedSize(36, 30)
         btn.setToolTip(tooltip)
@@ -272,7 +273,7 @@ def create_node_toolbar(app_window) -> None:
     btn_url.clicked.connect(app_window.attachment_controller.attach_url)
     section_attach.add_widget(btn_url)
 
-    btn_mindmap_link = QPushButton("🗺️ Lien vers un mindmap", section_attach)
+    btn_mindmap_link = QPushButton("🗺️ Lien mindmap", section_attach)
     btn_mindmap_link.setToolTip("Lier ce nœud à un autre fichier mindmap (.mindy)")
     btn_mindmap_link.clicked.connect(app_window.attachment_controller.attach_mindmap_link)
     section_attach.add_widget(btn_mindmap_link)

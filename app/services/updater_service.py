@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 # Configuration du dépôt GitHub
 GITHUB_REPO = "Aktawind/mindmap_app"
-CURRENT_VERSION = "v1.7.0"  # Version actuelle de l'application, à mettre à jour lors des releases
+CURRENT_VERSION = "v1.8.0"  # Version actuelle de l'application, à mettre à jour lors des releases
 
 
 class CheckUpdateThread(QThread):
