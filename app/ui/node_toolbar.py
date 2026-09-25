@@ -293,11 +293,9 @@ def create_node_toolbar(app_window) -> None:
 
     app_window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, app_window.style_dock)
     app_window.style_dock.hide()
-
-    if hasattr(app_window, 'display_menu') and app_window.display_menu is not None:
-        toggle_dock_action = app_window.style_dock.toggleViewAction()
-        toggle_dock_action.setText("Afficher le panneau de propriétés")
-        app_window.display_menu.addAction(toggle_dock_action)
+    # Pas d'entrée de menu pour afficher/masquer ce panneau : il s'affiche déjà tout seul
+    # dès qu'un nœud ou une branche est sélectionné (voir ui/selection_manager.py), un
+    # bouton manuel ferait double emploi et se désynchroniserait de cet état automatique.
 
     # 5. Overlay d'aide contextuel
     app_window.overlay = QFrame(app_window)

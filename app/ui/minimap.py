@@ -54,10 +54,13 @@ class MiniMapWidget(QWidget):
             self.update()
 
     def reposition(self):
+        """En bas à GAUCHE : le panneau de propriétés se docke à droite, une mini-carte à
+        droite se retrouverait donc régulièrement par-dessus lui (elle est un widget flottant
+        au-dessus de la zone centrale, pas géré par le système de dock)."""
         parent = self.app_window
         if parent is None:
             return
-        x = parent.width() - self.width() - MARGIN_FROM_EDGE
+        x = MARGIN_FROM_EDGE
         y = parent.height() - self.height() - MARGIN_FROM_EDGE
         self.move(max(0, x), max(0, y))
 
