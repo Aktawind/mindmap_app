@@ -1,9 +1,9 @@
 import sys
 import os
 import json
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget
+from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QToolButton
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtCore import QSettings, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QSettings, QTimer, pyqtSignal
 from PyQt6 import sip
 
 from services.updater_service import CURRENT_VERSION as APP_VERSION
@@ -43,6 +43,41 @@ class WorkspaceTabWidget(QTabWidget):
     pour créer rapidement un nouvel onglet — un geste très courant dans ce type d'outil
     (navigateurs, IDE...)."""
     emptyTabAreaDoubleClicked = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Petit bouton "+" collé juste après le dernier onglet (comme un navigateur/IDE),
+        # plutôt qu'un gros bouton "Ajouter un onglet" isolé dans le coin de la fenêtre.
+        self.add_tab_button = QToolButton(self)
+        self.add_tab_button.setText("+")
+        self.add_tab_button.setToolTip("Ajouter un onglet")
+        self.add_tab_button.setAutoRaise(True)
+        self.add_tab_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_tab_button.setFixedSize(24, 24)
+
+    def _reposition_add_button(self):
+        bar = self.tabBar()
+        count = bar.count()
+        if count > 0:
+            last_rect = bar.tabRect(count - 1)
+            x = last_rect.right() + 4
+            y = last_rect.top() + (last_rect.height() - self.add_tab_button.height()) // 2
+        else:
+            x, y = 4, 4
+        self.add_tab_button.move(x, max(0, y))
+        self.add_tab_button.raise_()
+
+    def tabInserted(self, index):
+        super().tabInserted(index)
+        self._reposition_add_button()
+
+    def tabRemoved(self, index):
+        super().tabRemoved(index)
+        self._reposition_add_button()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_add_button()
 
     def mouseDoubleClickEvent(self, event):
         pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
@@ -94,6 +129,8 @@ class MindMapApp(QMainWindow):
         self.tabs.tabCloseRequested.connect(self.tabs_controller.close_tab)
         self.tabs.currentChanged.connect(self.tabs_controller.on_tab_changed)
         self.tabs.emptyTabAreaDoubleClicked.connect(lambda: self.project_service.new_project())
+        self.tabs.add_tab_button.clicked.connect(lambda: self.project_service.new_project())
+        self.add_tab_button = self.tabs.add_tab_button  # référence conservée pour compat éventuelle
       
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):

@@ -264,7 +264,6 @@ def create_toolbar(app_window) -> None:
     #canvas_toolbar.setMovable(False)
     #canvas_toolbar.setStyleSheet(workspace_toolbar.styleSheet())
 
-    # Bouton Ajouter un onglet inséré dans le coin supérieur droit du QTabWidget
-    app_window.add_tab_button = QPushButton("➕ Ajouter un onglet", app_window.tabs)
-    app_window.add_tab_button.clicked.connect(app_window.project_service.new_project)
-    app_window.tabs.setCornerWidget(app_window.add_tab_button, Qt.Corner.TopRightCorner)
+    # Le bouton "+" pour ajouter un onglet est géré par WorkspaceTabWidget lui-même
+    # (main.py) : un petit bouton collé juste après le dernier onglet, pas un gros bouton
+    # de coin isolé.
