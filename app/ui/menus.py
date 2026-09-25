@@ -48,7 +48,7 @@ def create_menus(app_window):
     file_menu.addAction("📝 Importer Markdown", app_window.import_controller.import_markdown)
 
     # Sécurisation des actions avec raccourcis (on évite le chaînage destructeur de pointeur)
-    save_action = QAction("💾 Enregistrer", app_window)
+    save_action = QAction("💾 Enregistrer                            ", app_window)
     save_action.setShortcut(QKeySequence("Ctrl+S"))
     save_action.triggered.connect(app_window.project_service.save_project)
     file_menu.addAction(save_action)
@@ -79,12 +79,12 @@ def create_menus(app_window):
 
     edit_menu.addSeparator()
 
-    copy_action = QAction("📋 Copier l'élément", app_window)
+    copy_action = QAction("📋 Copier l'élément        ", app_window)
     copy_action.setShortcut(QKeySequence("Ctrl+C"))
     copy_action.triggered.connect(app_window.tools_controller.copy_selected)
     edit_menu.addAction(copy_action)
 
-    paste_action = QAction("📥 Coller l'élément", app_window)
+    paste_action = QAction("📥 Coller l'élément        ", app_window)
     paste_action.setShortcut(QKeySequence("Ctrl+V"))
     paste_action.triggered.connect(app_window.tools_controller.paste_node)
     edit_menu.addAction(paste_action)
@@ -95,7 +95,7 @@ def create_menus(app_window):
     export_menu = menu_bar.addMenu("Exporter")
     export_menu.addAction("Exporter en PNG", app_window.export_controller.export_png)
     export_menu.addAction("Exporter en PDF", app_window.export_controller.export_pdf)
-    export_menu.addAction("Exporter en Markdown  ", app_window.export_controller.export_md)
+    export_menu.addAction("Exporter en Markdown     ", app_window.export_controller.export_md)
 
     # ==========================================
     # MENU AFFICHAGE
@@ -128,5 +128,5 @@ def create_menus(app_window):
     # MENU À PROPOS
     # ==========================================
     about_menu = menu_bar.addMenu("À propos")
-    about_menu.addAction("À propos de Mindy", app_window.show_about_dialog)
-    about_menu.addAction("Vérifier les mises à jour", lambda: check_for_updates(app_window, silent=False))
+    about_menu.addAction("ℹ️ À propos de Mindy", app_window.show_about_dialog)
+    about_menu.addAction("Vérifier les mises à jour    ", lambda: check_for_updates(app_window, silent=False))
