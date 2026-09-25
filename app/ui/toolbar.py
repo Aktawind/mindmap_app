@@ -260,14 +260,8 @@ def create_toolbar(app_window) -> None:
     spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     workspace_toolbar.addWidget(spacer)
 
-    workspace_toolbar.addWidget(QLabel(" 🔍  "))
-    app_window.search_input = QLineEdit()
-    search_input = app_window.search_input
-    search_input.setPlaceholderText("Rechercher un nœud... (Ctrl+F)")
-    search_input.setMaximumWidth(200)
-    search_input.setClearButtonEnabled(True)
-    search_input.textChanged.connect(app_window.graph_controller.filter_nodes)
-    workspace_toolbar.addWidget(search_input)
+    # La recherche est accessible via Ctrl+F (barre flottante, voir ui/search_dialog.py),
+    # plus une entrée dans le menu Édition — pas un champ fixe dans la barre d'outils.
 
     # ==========================================
     # DEUXIÈME RANGÉE : Canva de fond + Réorganisation auto

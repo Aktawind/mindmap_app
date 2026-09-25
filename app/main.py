@@ -16,6 +16,7 @@ from ui.about_dialog import show_app_about_dialog
 from ui.node_toolbar import create_node_toolbar
 from ui.selection_manager import on_selection_changed
 from ui.minimap import create_minimap
+from ui.search_dialog import create_search_bar
 from ui import theme
 
 from services.serializer import MindMapSerializer
@@ -192,6 +193,7 @@ class MindMapApp(QMainWindow):
         create_toolbar(self)
         create_node_toolbar(self)  # C'est ici que self.style_dock et self.overlay doivent être créés
         create_minimap(self)
+        create_search_bar(self)
 
     def setup_shortcuts(self):
         setup_app_shortcuts(self)
@@ -203,6 +205,9 @@ class MindMapApp(QMainWindow):
         if hasattr(self, 'minimap') and self.minimap is not None:
             self.minimap.reposition()
             self.minimap.raise_()
+        if hasattr(self, 'search_bar') and self.search_bar is not None and self.search_bar.isVisible():
+            self.search_bar.reposition()
+            self.search_bar.raise_()
 
     def closeEvent(self, event):
         if hasattr(self, 'tools_controller'):

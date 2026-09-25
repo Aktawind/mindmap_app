@@ -63,6 +63,11 @@ def create_menus(app_window):
     edit_menu.addAction("🗂️ Gérer les templates", lambda: show_template_manager_dialog(app_window))
     edit_menu.addSeparator()
 
+    # Pas de setShortcut ici : Ctrl+F/Ctrl+R sont déjà des QShortcut globaux (ui/shortcuts.py) ;
+    # en dupliquer un sur l'action créerait un raccourci ambigu qui ne se déclencherait plus.
+    edit_menu.addAction("🔍 Rechercher / remplacer...   (Ctrl+F)", lambda: app_window.search_bar.open_bar())
+    edit_menu.addSeparator()
+
     undo_action = QAction("↩️ Annuler", app_window)
     undo_action.setShortcut(QKeySequence("Ctrl+Z"))
     undo_action.triggered.connect(app_window.undo)

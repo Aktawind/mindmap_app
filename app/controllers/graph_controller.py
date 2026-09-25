@@ -511,3 +511,42 @@ class GraphController:
                 label_match = search_text in item.label.lower()
                 notes_match = not label_match and search_text in notes_to_plain_text(getattr(item, 'notes', '')).lower()
                 item.setOpacity(1.0 if (label_match or notes_match) else 0.2)
+
+    def replace_in_all_nodes(self, search_text, replace_text):
+        """Remplace toutes les occurrences de search_text par replace_text dans le libellé et
+        les notes de chaque nœud de la carte active. Renvoie le nombre d'occurrences remplacées."""
+        ws = self.app.current_workspace()
+        if not ws or not search_text:
+            return 0
+
+        from graphics.items import NodeItem
+        total = 0
+        changed_nodes = []
+
+        for node in [i for i in ws.scene.items() if isinstance(i, NodeItem)]:
+            label_count = node.label.count(search_text)
+            if label_count:
+                node.label = node.label.replace(search_text, replace_text)
+                node.recalculate_size()
+                changed_nodes.append(node)
+                total += label_count
+
+            notes = getattr(node, 'notes', '') or ''
+            notes_count = notes.count(search_text)
+            if notes_count:
+                node.notes = notes.replace(search_text, replace_text)
+                total += notes_count
+
+        if changed_nodes:
+            for node in changed_nodes:
+                for edge in getattr(node, 'edges', []):
+                    if hasattr(edge, 'update_position'):
+                        edge.update_position()
+            ws.scene.update()
+
+        if total:
+            ws.is_dirty = True
+            if hasattr(self.app, 'save_state'):
+                self.app.save_state()
+
+        return total

@@ -2,13 +2,11 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtCore import Qt
 
 
-def _focus_search_field(app_window):
-    """Donne le focus au champ de recherche existant et sélectionne son contenu."""
-    search_input = getattr(app_window, 'search_input', None)
-    if search_input is None:
+def _open_search_bar(app_window, focus_replace=False):
+    search_bar = getattr(app_window, 'search_bar', None)
+    if search_bar is None:
         return
-    search_input.setFocus()
-    search_input.selectAll()
+    search_bar.open_bar(focus_replace=focus_replace)
 
 
 def setup_app_shortcuts(app_window):
@@ -38,4 +36,7 @@ def setup_app_shortcuts(app_window):
     app_window.shortcut_deselect.activated.connect(app_window.graph_controller.deselect_all)
 
     app_window.shortcut_search = QShortcut(QKeySequence("Ctrl+F"), app_window)
-    app_window.shortcut_search.activated.connect(lambda: _focus_search_field(app_window))
+    app_window.shortcut_search.activated.connect(lambda: _open_search_bar(app_window))
+
+    app_window.shortcut_replace = QShortcut(QKeySequence("Ctrl+R"), app_window)
+    app_window.shortcut_replace.activated.connect(lambda: _open_search_bar(app_window, focus_replace=True))
