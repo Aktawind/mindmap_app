@@ -152,6 +152,12 @@ class NodeNotesDialog(QDialog):
 
         self.text_edit = QTextEdit(self)
         self.text_edit.setAcceptRichText(True)
+        # Fond de la zone de notes aligné sur celui du canevas de la carte (et non le gris-bleu
+        # générique des champs de saisie), pour une continuité visuelle avec le mindmap.
+        self.text_edit.setStyleSheet(
+            f"QTextEdit {{ background: {palette['scene_bg']}; color: {palette['text']}; "
+            f"border: 1px solid {palette['border']}; }}"
+        )
         self.text_edit.setPlaceholderText("Écrivez ici vos notes détaillées pour ce nœud...")
         if _looks_like_html(initial_text):
             self.text_edit.setHtml(initial_text)

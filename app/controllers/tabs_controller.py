@@ -104,7 +104,7 @@ class TabsController:
             self.app.refresh_undo_redo_state()
 
     def update_title(self, index=None):
-        """Actualise dynamiquement le titre de l'onglet visé (ou actif par défaut) et de la fenêtre principale (sans .json)."""
+        """Actualise dynamiquement le titre de l'onglet visé (ou actif par défaut) et de la fenêtre principale (sans extension de fichier)."""
         if index is None:
             index = self.app.tabs.currentIndex()
         if index < 0 or index >= self.app.tabs.count():
@@ -114,9 +114,11 @@ class TabsController:
         if not ws: return
 
         if getattr(ws, 'current_file_path', None):
-            # Récupère le nom du fichier et retire l'extension .json
+            # Récupère le nom du fichier et retire son extension (.json ou .mindy)
             file_name = os.path.basename(ws.current_file_path)
-            base_title = os.path.splitext(file_name)[0] if file_name.endswith('.json') else file_name
+            base_title = file_name[:-len('.json')] if file_name.endswith('.json') else (
+                file_name[:-len('.mindy')] if file_name.endswith('.mindy') else file_name
+            )
         else:
             base_title = "[Nouveau Projet]"
 

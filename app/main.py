@@ -113,14 +113,21 @@ class WorkspaceTabWidget(QTabWidget):
         self.add_tab_button.setFixedSize(24, 24)
 
     def _reposition_add_button(self):
+        # bar.tabRect() est exprimé dans les coordonnées locales de la QTabBar, qui ne
+        # commence plus à (0, 0) dans le QTabWidget depuis l'ajout du badge d'espace de
+        # travail en coin haut-gauche (setCornerWidget) : il faut donc reprojeter via
+        # bar.mapTo(self, ...) plutôt que d'utiliser les coordonnées locales telles quelles,
+        # sans quoi le bouton "+" se retrouve décalé vers la gauche du dernier onglet.
         bar = self.tabBar()
         count = bar.count()
         if count > 0:
             last_rect = bar.tabRect(count - 1)
-            x = last_rect.right() + 4
-            y = last_rect.top() + (last_rect.height() - self.add_tab_button.height()) // 2
+            anchor = bar.mapTo(self, last_rect.topRight())
+            x = anchor.x() + 4
+            y = anchor.y() + (last_rect.height() - self.add_tab_button.height()) // 2
         else:
-            x, y = 4, 4
+            anchor = bar.mapTo(self, bar.rect().topLeft())
+            x, y = anchor.x() + 4, anchor.y() + 4
         self.add_tab_button.move(x, max(0, y))
         self.add_tab_button.raise_()
 
