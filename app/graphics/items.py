@@ -18,21 +18,27 @@ MAX_CHARS_PER_LINE = 40
 
 
 def snap_pos_to_grid(pos, rect, grid_size=20):
-    """Aligne un nœud sur une grille virtuelle en accrochant, sur chaque axe, le bord
-    (gauche/droite ou haut/bas) le plus proche d'une ligne de grille — pas seulement son
-    centre — pour que des nœuds de tailles différentes puissent malgré tout aligner leurs
-    bords entre eux, comme une vraie grille d'alignement plutôt qu'un simple quadrillage."""
-    def snap_axis(center, half):
-        edge_a, edge_b = center - half, center + half
-        snap_a = round(edge_a / grid_size) * grid_size
-        snap_b = round(edge_b / grid_size) * grid_size
-        if abs(snap_a - edge_a) <= abs(snap_b - edge_b):
-            return snap_a + half
-        return snap_b - half
+    """Aligne un nœud sur une grille virtuelle en accrochant son bord GAUCHE et son bord HAUT
+    (pas son centre) sur la grille, pour que des nœuds de tailles différentes puissent malgré
+    tout partager un bord commun. Un choix "bord le plus proche" (gauche OU droite selon la
+    distance) a été essayé mais s'est révélé instable pendant un glisser réel : chaque
+    micro-déplacement de la souris déclenche un nouveau calcul depuis la position déjà
+    accrochée, et cet enchaînement peut faire dériver le résultat vers un bord différent de
+    celui visé. Accrocher toujours le même bord (gauche/haut) est prévisible : deux nœuds de
+    même taille alignent alors aussi leurs bords droit/bas, sans ambiguïté."""
+    half_w, half_h = rect.width() / 2, rect.height() / 2
+    left = round((pos.x() - half_w) / grid_size) * grid_size
+    top = round((pos.y() - half_h) / grid_size) * grid_size
+    return QPointF(left + half_w, top + half_h)
 
-    x = snap_axis(pos.x(), rect.width() / 2)
-    y = snap_axis(pos.y(), rect.height() / 2)
-    return QPointF(x, y)
+
+def fold_enabled_for_scene(scene):
+    """Lit le réglage global d'activation du pliage des branches (menu Édition)."""
+    ws = getattr(scene, 'parent_workspace', None) if scene is not None else None
+    app_window = getattr(ws, 'main_app', None) if ws is not None else None
+    if app_window is None or not hasattr(app_window, 'settings'):
+        return True
+    return app_window.settings.value("fold_enabled", True, type=bool)
 
 # Formats de nœud prédéfinis : chacun ajuste la police (famille/taille/italique)
 # et un facteur d'échelle appliqué à la taille finale du nœud.
@@ -149,6 +155,15 @@ class NodeItem(QGraphicsItem):
     def has_hierarchy_children(self):
         return len(self.hierarchy_children()) > 0
 
+    def fold_badge_active(self):
+        """Le badge de pliage n'est ni affiché ni cliquable sur la racine (on ne peut pas
+        plier le nœud central), en mode compact, ni si le pliage est désactivé globalement
+        (menu Édition > Pliage des branches)."""
+        return (self.node_id != 'root'
+                and not self.is_compact
+                and self.has_hierarchy_children()
+                and fold_enabled_for_scene(self.scene()))
+
     def fold_badge_rect(self):
         """Petit badge rond en bas à droite du nœud, utilisé pour plier/déplier ses enfants."""
         r = 7
@@ -214,6 +229,11 @@ class NodeItem(QGraphicsItem):
     def hoverMoveEvent(self, event):
         if self.is_compact:
             self.setCursor(Qt.CursorShape.ArrowCursor)
+            super().hoverMoveEvent(event)
+            return
+
+        if self.fold_badge_active() and self.fold_badge_rect().contains(event.pos()):
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
             super().hoverMoveEvent(event)
             return
 
@@ -534,7 +554,7 @@ class NodeItem(QGraphicsItem):
             painter.drawText(int(current_x), int(current_y + fm_notes.ascent()), notes_text)
             current_y += fm_notes.height() + 2
 
-        if not self.is_compact and self.has_hierarchy_children():
+        if self.fold_badge_active():
             badge_rect = self.fold_badge_rect()
             painter.setPen(QPen(final_border, 1.5))
             painter.setBrush(QBrush(final_bg))
@@ -599,7 +619,7 @@ class NodeItem(QGraphicsItem):
             super().mousePressEvent(event)
             return
 
-        if self.has_hierarchy_children() and self.fold_badge_rect().contains(event.pos()):
+        if self.fold_badge_active() and self.fold_badge_rect().contains(event.pos()):
             scene = self.scene()
             if scene and hasattr(scene, 'views') and scene.views():
                 main_win = scene.views()[0].window()
@@ -660,7 +680,7 @@ class NodeItem(QGraphicsItem):
             super().mouseDoubleClickEvent(event)
             return
 
-        if self.has_hierarchy_children() and self.fold_badge_rect().contains(event.pos()):
+        if self.fold_badge_active() and self.fold_badge_rect().contains(event.pos()):
             event.accept()
             return
 

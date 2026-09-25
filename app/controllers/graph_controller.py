@@ -31,26 +31,41 @@ class GraphController:
         if hasattr(self.app, 'save_state'):
             self.app.save_state()
 
-    def refresh_fold_visibility(self):
-        """Cache ou affiche les nœuds/arêtes de la carte active selon l'état plié (is_collapsed)
-        de leurs ancêtres hiérarchiques. Ne suit que les arêtes parent -> enfant : un lien
-        transversal ("Relier les nœuds") ne fait jamais partie d'un pliage."""
-        ws = self.app.current_workspace()
+    def refresh_fold_visibility_all_tabs(self):
+        """Réapplique le pliage sur tous les onglets ouverts, pas seulement l'actif — utile
+        quand le réglage global (menu Édition > Pliage des branches) change, pour que les
+        onglets en arrière-plan ne restent pas figés dans un état de visibilité obsolète."""
+        if not hasattr(self.app, 'tabs') or self.app.tabs is None:
+            return
+        for i in range(self.app.tabs.count()):
+            ws = self.app.tabs.widget(i)
+            if ws is not None:
+                self.refresh_fold_visibility(ws)
+
+    def refresh_fold_visibility(self, ws=None):
+        """Cache ou affiche les nœuds/arêtes de la carte donnée (ou active par défaut) selon
+        l'état plié (is_collapsed) de leurs ancêtres hiérarchiques. Ne suit que les arêtes
+        parent -> enfant : un lien transversal ("Relier les nœuds") ne fait jamais partie
+        d'un pliage. Le nœud racine ne peut jamais être plié (son propre is_collapsed est
+        ignoré), et si le pliage est désactivé globalement (menu Édition), tout redevient
+        visible sans rien perdre des états sauvegardés."""
+        ws = ws or self.app.current_workspace()
         if not ws:
             return
 
         nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
         edges = [i for i in ws.scene.items() if isinstance(i, EdgeItem)]
         root = next((n for n in nodes if n.node_id == 'root'), None)
+        fold_enabled = self.app.settings.value("fold_enabled", True, type=bool) if hasattr(self.app, 'settings') else True
 
         hidden_ids = set()
-        if root:
+        if root and fold_enabled:
             def walk(node, ancestor_collapsed):
                 for child in node.hierarchy_children():
                     if ancestor_collapsed:
                         hidden_ids.add(child.node_id)
                     walk(child, ancestor_collapsed or getattr(child, 'is_collapsed', False))
-            walk(root, getattr(root, 'is_collapsed', False))
+            walk(root, False)  # le pliage propre de la racine ne compte jamais
 
         for n in nodes:
             n.setVisible(n.node_id not in hidden_ids)

@@ -18,6 +18,14 @@ def _toggle_dark_mode(app_window, checked):
     theme.apply_theme(app_window)
 
 
+def _toggle_fold(app_window, checked):
+    """Active/désactive globalement le pliage des branches et réapplique immédiatement la
+    visibilité sur tous les onglets ouverts (sans perdre les états is_collapsed mémorisés)."""
+    app_window.settings.setValue("fold_enabled", checked)
+    if hasattr(app_window, 'graph_controller'):
+        app_window.graph_controller.refresh_fold_visibility_all_tabs()
+
+
 def create_menus(app_window):
     """Construit et ajoute les menus à la barre de menus de la fenêtre principale."""
     menu_bar = app_window.menuBar()
@@ -80,6 +88,13 @@ def create_menus(app_window):
     paste_action.setShortcut(QKeySequence("Ctrl+V"))
     paste_action.triggered.connect(app_window.tools_controller.paste_node)
     edit_menu.addAction(paste_action)
+
+    edit_menu.addSeparator()
+    app_window.action_toggle_fold = edit_menu.addAction("🔽 Pliage des branches")
+    app_window.action_toggle_fold.setCheckable(True)
+    app_window.action_toggle_fold.setChecked(app_window.settings.value("fold_enabled", True, type=bool))
+    app_window.action_toggle_fold.setToolTip("Autoriser le pliage/dépliage des branches depuis la carte")
+    app_window.action_toggle_fold.toggled.connect(lambda checked: _toggle_fold(app_window, checked))
 
     # ==========================================
     # MENU EXPORTER
