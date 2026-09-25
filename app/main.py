@@ -1,8 +1,8 @@
 import sys
 import os
 import json
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QToolButton
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QTabBar, QToolButton, QMenu
+from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
 from PyQt6.QtCore import Qt, QSettings, QTimer, pyqtSignal
 from PyQt6 import sip
 
@@ -38,6 +38,60 @@ from controllers.notes_controller import NotesController
 from controllers.import_controller import ImportController
 
 
+class WorkspaceTabBar(QTabBar):
+    """QTabBar qui dessine un petit trait de couleur en haut de chaque onglet faisant partie
+    de l'espace de travail actif (au lieu d'une pastille dans l'onglet), et propose un menu
+    contextuel (clic droit) pour ajouter/retirer l'onglet visé de l'espace de travail."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        app_window = self.window()
+        wc = getattr(app_window, 'workspace_controller', None)
+        tabs = getattr(app_window, 'tabs', None)
+        if wc is None or tabs is None or not wc.workspace_files:
+            return
+
+        from ui import theme
+        p = theme.get_palette(app_window)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(p['accent'])
+        for i in range(self.count()):
+            ws = tabs.widget(i)
+            file_path = getattr(ws, 'current_file_path', None) if ws else None
+            if file_path and file_path in wc.workspace_files:
+                rect = self.tabRect(i)
+                painter.fillRect(rect.x() + 3, rect.y() + 1, rect.width() - 6, 3, color)
+        painter.end()
+
+    def _show_context_menu(self, pos):
+        index = self.tabAt(pos)
+        if index < 0:
+            return
+        app_window = self.window()
+        wc = getattr(app_window, 'workspace_controller', None)
+        tabs = getattr(app_window, 'tabs', None)
+        if wc is None or tabs is None:
+            return
+
+        tabs.setCurrentIndex(index)
+        ws = tabs.widget(index)
+        file_path = getattr(ws, 'current_file_path', None) if ws else None
+        in_workspace = bool(file_path and file_path in wc.workspace_files)
+
+        menu = QMenu(self)
+        if in_workspace:
+            menu.addAction("❌ Retirer de l'espace de travail", wc.remove_current_tab_from_workspace)
+        else:
+            menu.addAction("➕ Ajouter à l'espace de travail", wc.add_current_tab_to_workspace)
+        menu.exec(self.mapToGlobal(pos))
+
+
 class WorkspaceTabWidget(QTabWidget):
     """QTabWidget qui émet un signal au double-clic dans la zone vide de la ligne d'onglets
     (à côté des onglets existants, où la QTabBar interne ne couvre pas toute la largeur),
@@ -47,6 +101,8 @@ class WorkspaceTabWidget(QTabWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setTabBar(WorkspaceTabBar(self))
+
         # Petit bouton "+" collé juste après le dernier onglet (comme un navigateur/IDE),
         # plutôt qu'un gros bouton "Ajouter un onglet" isolé dans le coin de la fenêtre.
         self.add_tab_button = QToolButton(self)
@@ -132,13 +188,23 @@ class MindMapApp(QMainWindow):
         self.tabs.emptyTabAreaDoubleClicked.connect(lambda: self.project_service.new_project())
         self.tabs.add_tab_button.clicked.connect(lambda: self.project_service.new_project())
         self.add_tab_button = self.tabs.add_tab_button  # référence conservée pour compat éventuelle
-      
+
+        # Badge/menu de l'espace de travail actif, au tout début de la barre d'onglets — la
+        # liste des cartes elle-même n'affiche plus qu'un simple trait de couleur (WorkspaceTabBar)
+        # sur les onglets qui en font partie, sans texte d'en-tête ni pastille par onglet.
+        self.workspace_badge = QToolButton(self.tabs)
+        self.workspace_badge.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.workspace_badge.setText("📁 Aucun espace de travail")
+        self.workspace_badge.setAutoRaise(True)
+        workspace_menu = QMenu(self.workspace_badge)
+        workspace_menu.addAction("📄 Nouvel espace de travail", self.workspace_controller.new_workspace)
+        workspace_menu.addAction("📂 Ouvrir un espace de travail", self.workspace_controller.load_workspace)
+        self.workspace_badge.setMenu(workspace_menu)
+        self.tabs.setCornerWidget(self.workspace_badge, Qt.Corner.TopLeftCorner)
+
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
-
-        from PyQt6.QtWidgets import QLabel
-        self.lbl_workspace_status = QLabel("📂 Espace de travail : Aucun")
 
         self.resize(1600, 900)
         

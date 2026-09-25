@@ -1,7 +1,5 @@
 import json
 import os
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QMessageBox, QFileDialog
 from ui.selection_manager import on_selection_changed
 
@@ -77,44 +75,34 @@ class WorkspaceController:
             QMessageBox.critical(self.app, "Erreur Sauvegarde", f"Impossible de mettre à jour la workspace :\n{str(e)}")
 
     def update_workspace_ui(self):
-        """ Met à jour le texte de la barre d'outils pour afficher la workspace active """
-        if not hasattr(self.app, 'lbl_workspace_status') or self.app.lbl_workspace_status is None:
+        """ Met à jour le badge de l'espace de travail actif (coin haut-gauche des onglets) """
+        if not hasattr(self.app, 'workspace_badge') or self.app.workspace_badge is None:
             return
 
         if self.current_workspace_path:
             name = os.path.basename(self.current_workspace_path)
             count = len(self.workspace_files)
-            self.app.lbl_workspace_status.setText(f"📁 Workspace :  {name} ({count} carte{'s' if count > 1 else ''})")
+            self.app.workspace_badge.setText(f"📁 {name} ({count} carte{'s' if count > 1 else ''})")
         else:
-            self.app.lbl_workspace_status.setText("📁 Workspace : Aucun")
+            self.app.workspace_badge.setText("📁 Aucun espace de travail")
         self.refresh_workspace_tab_indicators()
 
-    def _workspace_tab_icon(self):
-        """Petit pastille bleue utilisée pour marquer les onglets faisant partie de l'espace de travail actif."""
-        if not hasattr(self, '_cached_tab_icon'):
-            pixmap = QPixmap(10, 10)
-            pixmap.fill(Qt.GlobalColor.transparent)
-            painter = QPainter(pixmap)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor('#3B82F6'))
-            painter.drawEllipse(0, 0, 10, 10)
-            painter.end()
-            self._cached_tab_icon = QIcon(pixmap)
-        return self._cached_tab_icon
-
     def refresh_workspace_tab_indicators(self):
-        """Marque visuellement les onglets qui font partie de l'espace de travail actif."""
+        """Rafraîchit l'indication visuelle des onglets faisant partie de l'espace de travail
+        actif : un simple trait de couleur dessiné par WorkspaceTabBar (voir main.py), plus
+        une info-bulle — pas de texte d'en-tête ni de pastille par onglet."""
         if not hasattr(self.app, 'tabs') or self.app.tabs is None:
             return
 
-        icon = self._workspace_tab_icon()
         for i in range(self.app.tabs.count()):
             ws = self.app.tabs.widget(i)
             file_path = getattr(ws, 'current_file_path', None) if ws else None
             in_workspace = bool(file_path and file_path in self.workspace_files)
-            self.app.tabs.setTabIcon(i, icon if in_workspace else QIcon())
             self.app.tabs.setTabToolTip(i, "Fait partie de l'espace de travail actif" if in_workspace else "")
+
+        tab_bar = self.app.tabs.tabBar()
+        if tab_bar is not None:
+            tab_bar.update()
 
     def load_workspace(self, path=None, is_startup=False):
         if not path:

@@ -113,31 +113,13 @@ def create_toolbar(app_window) -> None:
     app_window.workspace_toolbar = workspace_toolbar
     workspace_toolbar.setStyleSheet(theme.toolbar_stylesheet(theme.get_palette(app_window)))
 
-    # Label de statut
-    if hasattr(app_window, 'lbl_workspace_status'):
-        workspace_toolbar.addWidget(app_window.lbl_workspace_status)
-    workspace_toolbar.addSeparator()
-
-    # Actions d'onglets au sein de l'espace de travail
-    btn_add_to_coll = QPushButton("➕", workspace_toolbar)
-    btn_add_to_coll.setToolTip("Inclure l'onglet actuel dans l'espace de travail")
-    
-    btn_remove_from_coll = QPushButton("❌", workspace_toolbar)
-    btn_remove_from_coll.setToolTip("Retirer l'onglet actuel de l'espace de travail")
-    
-    workspace_toolbar.addWidget(btn_add_to_coll)
-    workspace_toolbar.addWidget(btn_remove_from_coll)
-    
-    btn_add_to_coll.clicked.connect(app_window.workspace_controller.add_current_tab_to_workspace)
-    btn_remove_from_coll.clicked.connect(app_window.workspace_controller.remove_current_tab_from_workspace)
-    
-    workspace_toolbar.addSeparator()
-
-    # Bouton Sauvegarder
+    # Bouton Sauvegarder — tout à gauche de la barre (l'ajout/retrait de l'espace de
+    # travail se fait désormais via le clic droit sur un onglet, voir WorkspaceTabBar)
     btn_save = QPushButton("💾", workspace_toolbar)
     btn_save.setToolTip("Sauvegarder")
-    btn_save.clicked.connect(app_window.project_service.save_project) 
+    btn_save.clicked.connect(app_window.project_service.save_project)
     workspace_toolbar.addWidget(btn_save)
+    workspace_toolbar.addSeparator()
 
     # Remplacement de l'ancien bouton unique "Liens courbes" par le sélecteur à 4 choix de routage
     app_window.routing_mode_combo = QComboBox(workspace_toolbar)
