@@ -87,15 +87,15 @@ def adapt_fill(color, dark):
     """Assombrit et désature une couleur pastel pour le mode sombre en conservant sa teinte,
     pour que les remplissages (canevas de fond, couleurs de base des nœuds...) restent lisibles
     sur fond sombre sans devenir criards. Une simple baisse de luminosité en gardant la
-    saturation d'origine (comme un premier essai le faisait) donne des couleurs "néon" très
-    agressives à l'œil sur fond sombre ; les thèmes sombres habituels (Material Design, GitHub
-    Dark...) désaturent nettement en plus d'ajuster la luminosité vers un ton moyen, pas un
-    quasi-noir saturé. Sans effet en thème clair."""
+    saturation d'origine donne des couleurs "néon" agressives ; à l'inverse, trop désaturer ET
+    trop éclaircir donne un rendu grisâtre/délavé. Vise un compromis : un fond nettement
+    sombre (comme les thèmes sombres habituels) mais qui garde un peu de sa teinte d'origine,
+    combiné à adapt_stroke() pour un contour plus clair et net autour. Sans effet en thème clair."""
     c = QColor(color)
     if not dark:
         return c
     h, s, l, a = c.getHslF()
-    return QColor.fromHslF(h, min(1.0, s * 0.45), min(0.5, max(0.24, l * 0.55)), a)
+    return QColor.fromHslF(h, min(1.0, s * 0.55), min(0.32, max(0.16, l * 0.38)), a)
 
 
 def adapt_stroke(color, dark):
