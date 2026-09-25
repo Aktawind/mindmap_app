@@ -29,7 +29,13 @@ def _set_canvas_scale(app_window, delta):
 def refresh_canvas_scale_controls(app_window):
     """Met à jour le pourcentage affiché ET n'affiche les boutons +/- de taille de canva que
     si un canva de fond est effectivement sélectionné (ils n'ont pas de sens sur "Feuille
-    blanche"). À appeler chaque fois que le canva actif ou l'onglet change."""
+    blanche"). À appeler chaque fois que le canva actif ou l'onglet change.
+
+    Important : ces widgets ont été ajoutés à la toolbar via addWidget(), qui les enveloppe
+    chacun dans une QAction interne. Qt resynchronise périodiquement la visibilité du widget
+    sur celle de sa QAction (par ex. lors d'un relayout du toolbar déclenché par un simple
+    changement d'onglet) — piloter uniquement widget.setVisible() se fait donc écraser plus
+    tard. On ne pilote donc QUE la QAction ; Qt répercute lui-même l'état sur le widget."""
     ws = app_window.current_workspace()
     scale = getattr(ws.scene, 'canvas_scale', 1.0) if ws else 1.0
     canvas_type = getattr(ws.scene, 'canvas_type', 'none') if ws else 'none'
@@ -37,11 +43,11 @@ def refresh_canvas_scale_controls(app_window):
 
     if getattr(app_window, 'canvas_scale_label', None) is not None:
         app_window.canvas_scale_label.setText(f"{int(round(scale * 100))}%")
-        app_window.canvas_scale_label.setVisible(has_canvas)
-    if getattr(app_window, 'btn_canvas_smaller', None) is not None:
-        app_window.btn_canvas_smaller.setVisible(has_canvas)
-    if getattr(app_window, 'btn_canvas_bigger', None) is not None:
-        app_window.btn_canvas_bigger.setVisible(has_canvas)
+
+    for action_attr in ('canvas_scale_label_action', 'btn_canvas_smaller_action', 'btn_canvas_bigger_action'):
+        action = getattr(app_window, action_attr, None)
+        if action is not None:
+            action.setVisible(has_canvas)
 
 
 def _load_canvas_image(app_window):
@@ -187,22 +193,27 @@ def create_toolbar(app_window) -> None:
     workspace_toolbar.addWidget(app_window.canvas_combo)
 
     # Contrôles de taille du canva (agrandir/réduire par pas, distinct du zoom de la vue) :
-    # masqués tant qu'aucun canva de fond n'est sélectionné (voir refresh_canvas_scale_controls)
+    # masqués tant qu'aucun canva de fond n'est sélectionné (voir refresh_canvas_scale_controls).
+    # Important : QToolBar.addWidget() enveloppe chaque widget dans une QAction interne, et
+    # Qt resynchronise périodiquement la visibilité du widget sur celle de cette QAction (par
+    # ex. lors d'un relayout du toolbar déclenché par un changement d'onglet). Si on masque
+    # uniquement le widget via setVisible(), il peut donc réapparaître tout seul. On garde
+    # donc une référence à la QAction pour piloter sa visibilité en plus de celle du widget.
     app_window.btn_canvas_smaller = QPushButton("➖", workspace_toolbar)
     app_window.btn_canvas_smaller.setToolTip("Réduire la taille du canva de fond")
     app_window.btn_canvas_smaller.clicked.connect(lambda: _set_canvas_scale(app_window, -CANVAS_SCALE_STEP))
-    workspace_toolbar.addWidget(app_window.btn_canvas_smaller)
+    app_window.btn_canvas_smaller_action = workspace_toolbar.addWidget(app_window.btn_canvas_smaller)
 
     app_window.canvas_scale_label = QLabel("100%", workspace_toolbar)
     app_window.canvas_scale_label.setToolTip("Taille actuelle du canva de fond")
     app_window.canvas_scale_label.setMinimumWidth(36)
     app_window.canvas_scale_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    workspace_toolbar.addWidget(app_window.canvas_scale_label)
+    app_window.canvas_scale_label_action = workspace_toolbar.addWidget(app_window.canvas_scale_label)
 
     app_window.btn_canvas_bigger = QPushButton("➕", workspace_toolbar)
     app_window.btn_canvas_bigger.setToolTip("Agrandir la taille du canva de fond (plus de place pour les nœuds)")
     app_window.btn_canvas_bigger.clicked.connect(lambda: _set_canvas_scale(app_window, CANVAS_SCALE_STEP))
-    workspace_toolbar.addWidget(app_window.btn_canvas_bigger)
+    app_window.btn_canvas_bigger_action = workspace_toolbar.addWidget(app_window.btn_canvas_bigger)
 
     refresh_canvas_scale_controls(app_window)
 

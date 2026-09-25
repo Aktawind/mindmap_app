@@ -10,10 +10,13 @@ from ui import theme
 
 # Couleurs de base proposées pour les nœuds (remplissage, bordure), déclinées en variantes
 # assombries en thème sombre via theme.adapt_fill() pour rester lisibles sur fond sombre.
+# Toutes au même niveau de saturation/luminosité (palette Tailwind, teinte-400 / teinte-500)
+# que le bleu par défaut des nouveaux nœuds : ni criardes, ni délavées, pour bien rendre
+# aussi bien en thème clair (couleur telle quelle) qu'en thème sombre (via adapt_fill/stroke).
 PRESET_NODE_COLORS = [
-    ('#60A5FA', '#3B82F6'), ('#E0F7FA', '#4DD0E1'),
-    ('#FFF3E0', '#FFB74D'), ('#E8F5E9', '#81C784'),
-    ('#F3E5F5', '#CE93D8'), ('#FFEBEE', '#EF9A9A')
+    ('#60A5FA', '#3B82F6'), ('#22D3EE', '#06B6D4'),
+    ('#FB923C', '#F97316'), ('#4ADE80', '#22C55E'),
+    ('#C084FC', '#A855F7'), ('#FB7185', '#F43F5E')
 ]
 
 
