@@ -2,6 +2,7 @@ from PyQt6.QtCore import Qt, QObject
 from PyQt6.QtWidgets import QTextEdit
 from graphics.items import NodeItem, EdgeItem
 from ui.selection_manager import on_selection_changed
+from ui import theme
 
 class EditingController(QObject):
     def __init__(self, app):
@@ -50,8 +51,14 @@ class EditingController(QObject):
             self.edit_item = None
             return
 
-        self.editor.setText(clean_text) 
-        self.editor.setStyleSheet("border: 2px solid #60A5FA; background: white; font-family: Segoe UI; font-size: 11pt;")
+        self.editor.setText(clean_text)
+        # Fond/texte pris sur la palette du thème courant : un fond blanc figé associait un
+        # texte clair (couleur du thème sombre) à un fond clair, rendant la saisie invisible.
+        p = theme.get_palette(self.app)
+        self.editor.setStyleSheet(
+            f"border: 2px solid #60A5FA; background: {p['bg_elevated']}; color: {p['text']}; "
+            f"font-family: Segoe UI; font-size: 11pt;"
+        )
         self.editor.selectAll()
         self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter) 
         self.editor.show()
