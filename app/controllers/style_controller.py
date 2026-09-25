@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QDateEdit, QDialogButtonBox
 )
 from graphics.items import NodeItem, compute_contrast_font_color
+from ui import theme
 
 class StyleController:
     def __init__(self, app):
@@ -89,13 +90,18 @@ class StyleController:
                 widget.deleteLater()
 
         columns = 6
+        dark = theme.is_dark_mode(self.app)
         for i, hex_color in enumerate(self.load_custom_colors()):
             border = QColor(hex_color).darker(130).name()
+            display_color = theme.adapt_fill(hex_color, dark).name()
             btn = QPushButton()
             btn.setFixedSize(22, 22)
             btn.setToolTip("Clic : appliquer  •  Clic droit : supprimer")
-            btn.setStyleSheet(f"background: {hex_color}; border: 2px solid {border}; border-radius: 11px;")
+            btn.setStyleSheet(f"background: {display_color}; border: 2px solid {border}; border-radius: 11px;")
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            # Applique toujours la couleur personnalisée CANONIQUE (celle choisie par
+            # l'utilisateur), jamais l'aperçu déjà assombri affiché sur la pastille — même
+            # logique que pour les couleurs de base, l'adaptation se fait à la peinture.
             btn.clicked.connect(lambda checked, c=hex_color, b=border: self.change_color(c, b))
             btn.customContextMenuRequested.connect(lambda pos, c=hex_color: self.remove_custom_color(c))
             row, col = divmod(i, columns)

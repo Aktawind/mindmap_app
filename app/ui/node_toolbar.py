@@ -33,7 +33,12 @@ def _build_preset_color_buttons(app_window, grid_widget, grid_layout, columns):
         btn = QPushButton(grid_widget)
         btn.setFixedSize(22, 22)
         btn.setStyleSheet(f"background: {display_color}; border: 2px solid {border}; border-radius: 11px;")
-        btn.clicked.connect(lambda _, c=display_color, b=border: app_window.style_controller.change_color(c, b))
+        # Applique toujours la couleur CANONIQUE (celle du thème clair), jamais la variante
+        # déjà assombrie affichée sur la pastille : le nœud doit rester adapté dynamiquement
+        # à chaque peinture (voir NodeItem.paint/adapt_fill), pas figé sur la couleur du thème
+        # actif au moment du clic — sinon reclique en clair ou re-bascule le thème donnerait
+        # un résultat différent de celui obtenu en resélectionnant la palette.
+        btn.clicked.connect(lambda _, c=color, b=border: app_window.style_controller.change_color(c, b))
         grid_layout.addWidget(btn, *divmod(i, columns))
 
 

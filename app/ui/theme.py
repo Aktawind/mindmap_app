@@ -234,6 +234,9 @@ def apply_theme(app_window):
     if callable(getattr(app_window, 'refresh_preset_colors', None)):
         app_window.refresh_preset_colors()
 
+    if getattr(app_window, 'style_controller', None) is not None:
+        app_window.style_controller.refresh_custom_color_buttons()
+
     # Repeint immédiatement toutes les scènes ouvertes (fond + canevas) avec le nouveau thème
     if hasattr(app_window, 'tabs') and app_window.tabs is not None:
         for i in range(app_window.tabs.count()):
