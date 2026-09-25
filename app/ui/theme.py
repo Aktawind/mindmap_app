@@ -231,6 +231,9 @@ def apply_theme(app_window):
     if getattr(app_window, 'btn_snap', None) is not None:
         app_window.btn_snap.setStyleSheet(toggle_button_stylesheet(p))
 
+    for btn in list(getattr(app_window, 'status_buttons', {}).values()) + list(getattr(app_window, 'priority_buttons', {}).values()):
+        btn.setStyleSheet(toggle_button_stylesheet(p))
+
     if callable(getattr(app_window, 'refresh_preset_colors', None)):
         app_window.refresh_preset_colors()
 

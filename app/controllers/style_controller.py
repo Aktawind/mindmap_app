@@ -225,19 +225,16 @@ class StyleController:
                         edge.update()
             self.app.save_state()
 
-    def on_status_combo_changed(self, index):
-        if getattr(self, '_updating_ui', False):
-            return
-            
+    def set_status(self, status_value):
+        """Applique un statut au(x) nœud(s) sélectionné(s) — appelé par les vignettes
+        cliquables du panneau (⚪/🚨/⏳/✅), plus rapide qu'un menu déroulant."""
         ws = self.app.current_workspace()
         if not ws: return
-        
+
         sel = ws.scene.selectedItems()
         nodes = [item for item in sel if isinstance(item, NodeItem)]
 
         if nodes:
-            status_value = self.app.status_combo.itemData(index)
-            
             # Map des emojis pour éviter les nettoyages de chaînes approximatifs
             status_emojis = {"urgent": "🚨 ", "progress": "⏳ ", "done": "✅ ", "none": ""}
             new_emoji = status_emojis.get(status_value, "")
@@ -266,18 +263,16 @@ class StyleController:
                         
             self.app.save_state()
 
-    def on_priority_combo_changed(self, index):
-        if getattr(self, '_updating_ui', False):
-            return
-            
+    def set_priority(self, priority_value):
+        """Applique une priorité au(x) nœud(s) sélectionné(s) — appelé par les vignettes
+        cliquables du panneau (⚪️/🟡/🔴), plus rapide qu'un menu déroulant."""
         ws = self.app.current_workspace()
         if not ws: return
-        
+
         sel = ws.scene.selectedItems()
         nodes = [item for item in sel if isinstance(item, NodeItem)]
-        
+
         if nodes:
-            priority_value = self.app.priority_combo.itemData(index)
             for node in nodes:
                 node.priority = priority_value
                 if hasattr(node, 'recalculate_size'):
@@ -388,17 +383,15 @@ class StyleController:
                 if idx != -1:
                     self.app.format_combo.setCurrentIndex(idx)
 
-            # 2. Synchronisation du Statut
-            if hasattr(self.app, 'status_combo') and self.app.status_combo is not None:
-                idx = self.app.status_combo.findData(status)
-                if idx != -1: 
-                    self.app.status_combo.setCurrentIndex(idx)
+            # 2. Synchronisation du Statut (vignette active)
+            status_btn = getattr(self.app, 'status_buttons', {}).get(status)
+            if status_btn is not None:
+                status_btn.setChecked(True)
 
-            # 3. Synchronisation de la Priorité
-            if hasattr(self.app, 'priority_combo') and self.app.priority_combo is not None:
-                idx = self.app.priority_combo.findData(priority)
-                if idx != -1: 
-                    self.app.priority_combo.setCurrentIndex(idx)
+            # 3. Synchronisation de la Priorité (vignette active)
+            priority_btn = getattr(self.app, 'priority_buttons', {}).get(priority)
+            if priority_btn is not None:
+                priority_btn.setChecked(True)
 
             # 4. Synchronisation du Mode Compact
             if hasattr(self.app, 'btn_compact') and self.app.btn_compact is not None:

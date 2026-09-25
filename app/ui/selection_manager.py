@@ -96,15 +96,13 @@ def on_selection_changed(app) -> None:
             app.format_combo.setCurrentIndex(app.format_combo.findData(getattr(target_node, 'node_format', 'default')))
             app.format_combo.blockSignals(False)
 
-        if hasattr(app, 'status_combo') and app.status_combo:
-            app.status_combo.blockSignals(True)
-            app.status_combo.setCurrentIndex(app.status_combo.findData(getattr(target_node, 'status', 'none')))
-            app.status_combo.blockSignals(False)
+        status_btn = getattr(app, 'status_buttons', {}).get(getattr(target_node, 'status', 'none'))
+        if status_btn is not None:
+            status_btn.setChecked(True)
 
-        if hasattr(app, 'priority_combo') and app.priority_combo:
-            app.priority_combo.blockSignals(True)
-            app.priority_combo.setCurrentIndex(app.priority_combo.findData(getattr(target_node, 'priority', 'none')))
-            app.priority_combo.blockSignals(False)
+        priority_btn = getattr(app, 'priority_buttons', {}).get(getattr(target_node, 'priority', 'none'))
+        if priority_btn is not None:
+            priority_btn.setChecked(True)
 
         if hasattr(app, 'btn_compact') and app.btn_compact:
             app.btn_compact.blockSignals(True)

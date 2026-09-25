@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QLabel,
-    QFrame, QComboBox, QDockWidget, QScrollArea
+    QFrame, QComboBox, QDockWidget, QScrollArea, QButtonGroup
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
@@ -167,21 +167,54 @@ def create_node_toolbar(app_window) -> None:
     # 3c. Statut & Priorité
     section_status = add_section("🚦 Statut et Priorité", "panel_section_status")
 
-    app_window.status_combo = QComboBox(section_status)
-    app_window.status_combo.addItem("⚪ Aucun statut", "none")
-    app_window.status_combo.addItem("🚨 Urgent", "urgent")
-    app_window.status_combo.addItem("⏳ En cours", "progress")
-    app_window.status_combo.addItem("✅ Terminé", "done")
-    app_window.status_combo.currentIndexChanged.connect(app_window.style_controller.on_status_combo_changed)
-    section_status.add_widget(_labeled_row(section_status, "Statut", app_window.status_combo))
+    # Vignettes cliquables au lieu de menus déroulants (comme gras/italique/barré) : plus
+    # rapide, et on voit d'un coup d'œil laquelle est active (sélection exclusive).
+    toggle_style = theme.toggle_button_stylesheet(palette)
 
-    app_window.priority_combo = QComboBox(section_status)
-    app_window.priority_combo.addItem("⚪️ Priorité Normale", "none")
-    app_window.priority_combo.addItem("🟡 Priorité Moyenne", "mid")
-    app_window.priority_combo.addItem("🔴 Priorité Haute", "high")
-    if hasattr(app_window.style_controller, 'on_priority_combo_changed'):
-        app_window.priority_combo.currentIndexChanged.connect(app_window.style_controller.on_priority_combo_changed)
-    section_status.add_widget(_labeled_row(section_status, "Priorité", app_window.priority_combo))
+    status_row = QWidget(section_status)
+    status_row_layout = QHBoxLayout(status_row)
+    status_row_layout.setContentsMargins(0, 0, 0, 0)
+    status_row_layout.setSpacing(4)
+    app_window.status_buttons = {}
+    app_window._status_button_group = QButtonGroup(status_row)
+    app_window._status_button_group.setExclusive(True)
+    for value, emoji, tooltip in [
+        ("none", "⚪", "Aucun statut"), ("urgent", "🚨", "Urgent"),
+        ("progress", "⏳", "En cours"), ("done", "✅", "Terminé"),
+    ]:
+        btn = QPushButton(emoji, status_row)
+        btn.setCheckable(True)
+        btn.setFixedSize(36, 30)
+        btn.setToolTip(tooltip)
+        btn.setStyleSheet(toggle_style)
+        btn.clicked.connect(lambda checked, v=value: app_window.style_controller.set_status(v))
+        app_window._status_button_group.addButton(btn)
+        status_row_layout.addWidget(btn)
+        app_window.status_buttons[value] = btn
+    status_row_layout.addStretch()
+    section_status.add_widget(_labeled_row(section_status, "Statut", status_row))
+
+    priority_row = QWidget(section_status)
+    priority_row_layout = QHBoxLayout(priority_row)
+    priority_row_layout.setContentsMargins(0, 0, 0, 0)
+    priority_row_layout.setSpacing(4)
+    app_window.priority_buttons = {}
+    app_window._priority_button_group = QButtonGroup(priority_row)
+    app_window._priority_button_group.setExclusive(True)
+    for value, emoji, tooltip in [
+        ("none", "⚪️", "Priorité normale"), ("mid", "🟡", "Priorité moyenne"), ("high", "🔴", "Priorité haute"),
+    ]:
+        btn = QPushButton(emoji, priority_row)
+        btn.setCheckable(True)
+        btn.setFixedSize(36, 30)
+        btn.setToolTip(tooltip)
+        btn.setStyleSheet(toggle_style)
+        btn.clicked.connect(lambda checked, v=value: app_window.style_controller.set_priority(v))
+        app_window._priority_button_group.addButton(btn)
+        priority_row_layout.addWidget(btn)
+        app_window.priority_buttons[value] = btn
+    priority_row_layout.addStretch()
+    section_status.add_widget(_labeled_row(section_status, "Priorité", priority_row))
 
     app_window.btn_set_date = QPushButton("📅 Échéance", section_status)
     if hasattr(app_window.style_controller, 'prompt_node_date'):
