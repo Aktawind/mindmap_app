@@ -116,7 +116,7 @@ def check_for_updates(parent_widget, silent=True):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
-            perform_update(parent_widget, download_url)
+            perform_update(parent_widget, download_url, version)
 
     def on_check_finished(update_found, error_msg):
         if update_found or silent:
@@ -139,7 +139,7 @@ def check_for_updates(parent_widget, silent=True):
     parent_widget._update_thread = thread
 
 
-def perform_update(parent_widget, download_url):
+def perform_update(parent_widget, download_url, version=None):
     """Gère l'affichage de la fenêtre, le téléchargement, l'extraction et le relais au script Batch."""
     try:
         current_exe = os.path.abspath(sys.executable)
@@ -202,11 +202,20 @@ rem 🚨 FIX : laisse le temps à Windows/l'antivirus de "digérer" le nouvel ex
 rem tout juste écrit (scan à la volée d'un binaire non signé fraîchement copié) avant
 rem de le lancer. Sans cette pause, le lancement immédiat peut échouer avec
 rem "Failed to load Python DLL ... LoadLibrary: le module spécifié est introuvable"
-rem (le bootloader onefile ne parvient pas à extraire/charger sa DLL Python).
-timeout /t 2 /nobreak > nul
+rem (le bootloader onefile ne parvient pas à extraire/charger sa DLL Python). Portée à
+rem 5s (au lieu de 2s) : le cas remonté persistait, un scan antivirus sur un exécutable
+rem de cette taille peut dépasser 2 secondes selon la machine.
+timeout /t 5 /nobreak > nul
 
-rem Relance la nouvelle version
+rem Relance la nouvelle version, avec de nouvelles tentatives si le lancement échoue de
+rem façon transitoire (l'antivirus peut encore verrouiller brièvement l'exécutable tout
+rem juste copié malgré la pause ci-dessus, ce qui fait planter le bootloader avec l'erreur
+rem "Failed to load Python DLL") : si le process n'apparaît pas dans la liste des tâches
+rem après le lancement, on retente jusqu'à 3 fois au total.
 cd /d "{install_dir}"
+set LAUNCH_TRIES=0
+:launch_retry
+set /a LAUNCH_TRIES+=1
 start "" "{exe_name}"
 
 rem 🚨 FIX : on laisse le temps au bootloader du nouvel exécutable de terminer sa
@@ -215,6 +224,13 @@ rem (le parent en question) ne se termine. Sans cette pause, ce cmd.exe peut
 rem disparaître trop tôt et le nouvel exécutable échoue avec
 rem "Security validation failure: failed to obtain executable path for parent process".
 timeout /t 3 /nobreak > nul
+
+tasklist /FI "IMAGENAME eq {exe_name}" | find /I "{exe_name}" > nul
+if errorlevel 1 (
+    if %LAUNCH_TRIES% LSS 3 (
+        goto launch_retry
+    )
+)
 
 rem Nettoyage
 rd /s /q "{temp_dir}"
@@ -238,6 +254,15 @@ exit
                     creation_flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
                 else:
                     creation_flags = 0
+
+                # Mémorise la version installée pour que la prochaine instance qui démarre
+                # (relancée par le script Batch ci-dessus, ou manuellement par l'utilisateur
+                # si ce relais automatique échoue) affiche un message de confirmation propre
+                # ("Mindy a été mis à jour à la version vX") plutôt que rien, ou plutôt que
+                # seule l'éventuelle erreur transitoire du bootloader ne soit visible.
+                if version and hasattr(parent_widget, 'settings'):
+                    parent_widget.settings.setValue("pending_update_version", version)
+                    parent_widget.settings.sync()
 
                 subprocess.Popen(
                     ["cmd.exe", "/c", bat_path] if os.name == 'nt' else [bat_path],

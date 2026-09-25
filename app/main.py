@@ -232,6 +232,8 @@ class MindMapApp(QMainWindow):
 
     def initialize_startup_session(self):
         """Décide au démarrage s'il faut charger la workspace ou le dernier projet."""
+        self._notify_if_just_updated()
+
         last_workspace = self.settings.value("last_collection_path", "")
 
         if last_workspace and os.path.exists(last_workspace):
@@ -250,6 +252,22 @@ class MindMapApp(QMainWindow):
                 "canvas_type": getattr(ws.scene, 'canvas_type', 'none'),
                 "canvas_scale": getattr(ws.scene, 'canvas_scale', 1.0),
             })
+
+    def _notify_if_just_updated(self):
+        """Affiche un message de confirmation propre si cette instance vient d'être lancée
+        juste après une mise à jour (voir updater_service.perform_update, qui pose ce
+        marqueur avant de relancer l'application) — plutôt que l'utilisateur ne découvre
+        la mise à jour que par la nouvelle version affichée dans le menu À propos, ou pire,
+        par l'éventuelle erreur transitoire du bootloader lors du relais automatique."""
+        pending_version = self.settings.value("pending_update_version", "")
+        if not pending_version:
+            return
+        self.settings.remove("pending_update_version")
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            self, "Mise à jour réussie",
+            f"Mindy a été mis à jour à la version {pending_version}."
+        )
 
     def current_workspace(self) -> MindMapWorkspace:
         try:
