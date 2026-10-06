@@ -58,6 +58,7 @@ class MindMapSerializer:
                 "is_compact": getattr(node, 'is_compact', False),
                 "notes": getattr(node, 'notes', ''),
                 "node_format": getattr(node, 'node_format', 'default'),
+                "text_align": getattr(node, 'text_align', 'center'),
                 "is_collapsed": getattr(node, 'is_collapsed', False),
                 "children": []
             }
@@ -118,7 +119,8 @@ class MindMapSerializer:
                     "priority": getattr(node, 'priority', "none"),
                     "is_compact": getattr(node, 'is_compact', False),
                     "notes": getattr(node, 'notes', ''),
-                    "node_format": getattr(node, 'node_format', 'default')
+                    "node_format": getattr(node, 'node_format', 'default'),
+                    "text_align": getattr(node, 'text_align', 'center'),
                 })
 
         # Collecte des liens transversaux (Cross Links)
@@ -221,6 +223,7 @@ class MindMapSerializer:
                 is_strikethrough=data.get("is_strikethrough", False), status=status,
                 image_path=img_path, image_height=img_height, notes=data.get("notes", ''),
                 node_format=data.get("node_format", "default"),
+                text_align=data.get("text_align", "center"),
                 is_collapsed=data.get("is_collapsed", False),
             )
             node.border_width = data.get("border_width", 1)
@@ -301,6 +304,7 @@ class MindMapSerializer:
                 image_path=img_path, image_height=img_height,
                 notes=orphan.get("notes", ''),
                 node_format=orphan.get("node_format", "default"),
+                text_align=orphan.get("text_align", "center"),
             )
             node.border_width = orphan.get("border_width", 1)
 

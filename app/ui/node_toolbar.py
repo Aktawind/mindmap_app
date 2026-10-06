@@ -146,6 +146,31 @@ def create_node_toolbar(app_window) -> None:
     text_row_layout.addStretch()
     section_text.add_widget(text_row)
 
+    # Justification du texte : vignettes exclusives, comme Statut/Priorité
+    align_row = QWidget(section_text)
+    align_row_layout = QHBoxLayout(align_row)
+    align_row_layout.setContentsMargins(0, 0, 0, 0)
+    align_row_layout.setSpacing(4)
+    app_window.align_buttons = {}
+    app_window._align_button_group = QButtonGroup(align_row)
+    app_window._align_button_group.setExclusive(True)
+    for value, label, tooltip in [
+        ("left", "Gauche", "Aligner le texte à gauche"),
+        ("center", "Centre", "Centrer le texte"),
+        ("right", "Droite", "Aligner le texte à droite"),
+    ]:
+        btn = QPushButton(label, align_row)
+        btn.setCheckable(True)
+        btn.setFixedHeight(26)
+        btn.setToolTip(tooltip)
+        btn.setStyleSheet(theme.toggle_button_stylesheet(palette))
+        btn.clicked.connect(lambda checked, v=value: app_window.style_controller.set_text_align(v))
+        app_window._align_button_group.addButton(btn)
+        align_row_layout.addWidget(btn)
+        app_window.align_buttons[value] = btn
+    align_row_layout.addStretch()
+    section_text.add_widget(_labeled_row(section_text, "Justification", align_row))
+
     # 3b. Forme & Format
     section_shape = add_section("🔷 Forme et Format", "panel_section_shape")
 

@@ -80,7 +80,7 @@ class WorkspaceController:
             return
 
         if self.current_workspace_path:
-            name = os.path.basename(self.current_workspace_path)
+            name = os.path.splitext(os.path.basename(self.current_workspace_path))[0]
             count = len(self.workspace_files)
             self.app.workspace_badge.setText(f"📁 {name} ({count} carte{'s' if count > 1 else ''})")
         else:

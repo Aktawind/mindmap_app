@@ -183,6 +183,18 @@ class StyleController:
                 node.update()
             self.app.save_state()
 
+    def set_text_align(self, align_value):
+        """Applique la justification du texte (gauche/centre/droite) aux nœuds sélectionnés."""
+        ws = self.app.current_workspace()
+        if not ws: return
+        sel = ws.scene.selectedItems()
+        nodes = [item for item in sel if isinstance(item, NodeItem)]
+        if nodes:
+            for node in nodes:
+                node.text_align = align_value
+                node.update()
+            self.app.save_state()
+
     def on_shape_combo_changed(self, index):
         if getattr(self, '_updating_ui', False):
             return
@@ -300,6 +312,7 @@ class StyleController:
         date_edit.setDisplayFormat("dd/MM/yyyy")
         parsed_date = QDate.fromString(current_date, "dd/MM/yyyy")
         date_edit.setDate(parsed_date if parsed_date.isValid() else QDate.currentDate())
+        theme.style_calendar(date_edit.calendarWidget(), self.app)
         layout.addWidget(date_edit)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -370,6 +383,7 @@ class StyleController:
             is_compact = getattr(node, 'is_compact', False)
             node_date = getattr(node, 'date', None)
             node_format = getattr(node, 'node_format', 'default')
+            text_align = getattr(node, 'text_align', 'center')
 
             # 1. Synchronisation de la Forme (Shape)
             if hasattr(self.app, 'shape_combo') and self.app.shape_combo is not None:
@@ -382,6 +396,11 @@ class StyleController:
                 idx = self.app.format_combo.findData(node_format)
                 if idx != -1:
                     self.app.format_combo.setCurrentIndex(idx)
+
+            # 1ter. Synchronisation de la Justification du texte (vignette active)
+            align_btn = getattr(self.app, 'align_buttons', {}).get(text_align)
+            if align_btn is not None:
+                align_btn.setChecked(True)
 
             # 2. Synchronisation du Statut (vignette active)
             status_btn = getattr(self.app, 'status_buttons', {}).get(status)

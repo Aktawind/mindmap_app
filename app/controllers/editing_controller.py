@@ -1,6 +1,6 @@
 from PyQt6.QtCore import Qt, QObject
 from PyQt6.QtWidgets import QTextEdit
-from graphics.items import NodeItem, EdgeItem
+from graphics.items import NodeItem, EdgeItem, TEXT_ALIGNMENTS, DEFAULT_TEXT_ALIGN, get_max_chars_per_line
 from ui.selection_manager import on_selection_changed
 from ui import theme
 
@@ -31,6 +31,11 @@ class EditingController(QObject):
             w = int(item.rect.width())
             h = max(int(item.rect.height()), 40)
             self.editor.setGeometry(view_pos.x() - w//2, view_pos.y() - h//2, w, h)
+            # Pas de barre de défilement : la zone de saisie s'agrandit avec le texte (voir
+            # _fit_node_editor), en partant du centre horizontal et du bord haut du nœud.
+            self._node_editor_anchor = (view_pos.x(), view_pos.y() - h // 2, w, h)
+            self.editor.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.editor.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             
         elif isinstance(item, EdgeItem):
             clean_text = getattr(item, 'label', "")
@@ -60,11 +65,41 @@ class EditingController(QObject):
             f"font-family: Segoe UI; font-size: 11pt;"
         )
         self.editor.selectAll()
-        self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter) 
+        if isinstance(item, NodeItem):
+            self.editor.setAlignment(TEXT_ALIGNMENTS.get(getattr(item, 'text_align', DEFAULT_TEXT_ALIGN),
+                                                         Qt.AlignmentFlag.AlignHCenter))
+            self.editor.ensurePolished()  # police de la feuille de style appliquée avant la mesure
+            self._fit_node_editor()
+            self.editor.textChanged.connect(self._fit_node_editor)
+        else:
+            self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.editor.show()
         self.editor.setFocus()
         
         self.editor.installEventFilter(self)
+
+    def _fit_node_editor(self):
+        """Ajuste la zone de saisie d'un nœud à son contenu : elle s'élargit jusqu'à la
+        largeur du retour à la ligne automatique (Fichier > Options), puis grandit en hauteur
+        au lieu d'afficher une barre de défilement, peu lisible sur un texte long."""
+        editor = self.editor
+        anchor = getattr(self, '_node_editor_anchor', None)
+        if editor is None or anchor is None or not isinstance(self.edit_item, NodeItem):
+            return
+        center_x, top_y, min_w, min_h = anchor
+
+        fm = editor.fontMetrics()
+        doc = editor.document()
+        # Bordure du cadre + marges internes du document, de part et d'autre
+        chrome = 2 * editor.frameWidth() + 2 * int(doc.documentMargin()) + 4
+        max_w = fm.averageCharWidth() * get_max_chars_per_line() + chrome
+        longest_line = max((fm.horizontalAdvance(line) for line in editor.toPlainText().split('\n')), default=0)
+        w = int(max(min_w, min(longest_line + chrome, max_w)))
+
+        doc.setTextWidth(w - 2 * editor.frameWidth())
+        h = int(max(min_h, doc.size().height() + 2 * editor.frameWidth() + 4))
+
+        editor.setGeometry(int(center_x - w // 2), int(top_y), w, h)
 
     def eventFilter(self, obj, event):
         """Filtre les événements clavier et de focus pour l'éditeur de texte."""

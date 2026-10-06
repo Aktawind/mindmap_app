@@ -15,6 +15,35 @@ BRANCH_PALETTES = [
 ]
 
 MAX_CHARS_PER_LINE = 40
+MIN_CHARS_PER_LINE = 10
+MAX_CHARS_PER_LINE_LIMIT = 200
+
+# Valeur effective, réglable par l'utilisateur (Fichier > Options) et commune à toutes les
+# cartes. Gardée en variable de module plutôt que relue dans QSettings à chaque appel :
+# wrap_line() est sollicitée à chaque peinture/survol, et un nœud est souvent dimensionné
+# avant même d'être ajouté à sa scène (pas encore de lien vers la fenêtre principale).
+_max_chars_per_line = MAX_CHARS_PER_LINE
+
+
+def get_max_chars_per_line():
+    return _max_chars_per_line
+
+
+def set_max_chars_per_line(value):
+    global _max_chars_per_line
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = MAX_CHARS_PER_LINE
+    _max_chars_per_line = max(MIN_CHARS_PER_LINE, min(MAX_CHARS_PER_LINE_LIMIT, value))
+
+# Justification du texte principal d'un nœud (propriété "text_align")
+TEXT_ALIGNMENTS = {
+    'left': Qt.AlignmentFlag.AlignLeft,
+    'center': Qt.AlignmentFlag.AlignHCenter,
+    'right': Qt.AlignmentFlag.AlignRight,
+}
+DEFAULT_TEXT_ALIGN = 'center'
 
 # Incrément de la grille virtuelle (Aimant). La taille de chaque nœud (recalculate_size) est
 # toujours arrondie à un multiple de ce même incrément : en n'accrochant que le coin
@@ -67,8 +96,10 @@ def compute_contrast_font_color(bg_hex):
     return '#000000' if luminance > 0.6 else '#ffffff'
 
 
-def wrap_line(line, max_chars=MAX_CHARS_PER_LINE):
+def wrap_line(line, max_chars=None):
     """Découpe une ligne trop longue en plusieurs lignes, en coupant sur les espaces si possible."""
+    if max_chars is None:
+        max_chars = _max_chars_per_line
     if len(line) <= max_chars:
         return [line]
 
@@ -94,7 +125,7 @@ class NodeItem(QGraphicsItem):
     def __init__(self, node_id, label, x, y, shape='box', bg='#60A5FA', border='#3B82F6', font_color='#ffffff',
                  file_path=None, url_link=None, is_bold=False, is_italic=False, is_strikethrough=False,
                  image_path=None, image_height=150, status='none', priority='none', is_compact=False, notes='',
-                 node_format=DEFAULT_NODE_FORMAT, is_collapsed=False, **kwargs):
+                 node_format=DEFAULT_NODE_FORMAT, is_collapsed=False, text_align=DEFAULT_TEXT_ALIGN, **kwargs):
         super().__init__()
         self.node_id = node_id
         self.is_collapsed = is_collapsed
@@ -110,6 +141,7 @@ class NodeItem(QGraphicsItem):
         self.is_compact = is_compact
         self.notes = notes or ''
         self.node_format = node_format if node_format in NODE_FORMATS else DEFAULT_NODE_FORMAT
+        self.text_align = text_align if text_align in TEXT_ALIGNMENTS else DEFAULT_TEXT_ALIGN
 
         self.attachments = []
         
@@ -510,7 +542,17 @@ class NodeItem(QGraphicsItem):
         else:
             main_text_rect = self.rect
 
-        painter.drawText(main_text_rect, int(Qt.AlignmentFlag.AlignCenter), display_label)
+        # Justification : le bloc de texte (large comme sa ligne la plus longue) reste centré
+        # dans le nœud, et ce sont les lignes qui s'alignent entre elles à gauche/droite au
+        # sein de ce bloc — rendu correct quelle que soit la forme (losange, ellipse...).
+        h_align = TEXT_ALIGNMENTS.get(getattr(self, 'text_align', DEFAULT_TEXT_ALIGN), Qt.AlignmentFlag.AlignHCenter)
+        if h_align == Qt.AlignmentFlag.AlignHCenter:
+            text_rect = main_text_rect
+        else:
+            block_w = max(fm_main.horizontalAdvance(line) for line in lines)
+            text_rect = QRectF(main_text_rect.center().x() - block_w / 2, main_text_rect.top(),
+                               block_w, main_text_rect.height())
+        painter.drawText(text_rect, int(h_align | Qt.AlignmentFlag.AlignVCenter), display_label)
 
         if self.is_compact:
             return
@@ -762,6 +804,24 @@ class EdgeItem(QGraphicsPathItem):
             return 'curved' if self.is_curved else 'orthogonal'
         return getattr(scene, 'line_routing_mode', 'curved') if scene else 'curved'
 
+    @staticmethod
+    def _facing_anchor_coords(s_mid, d_mid, s_extent, d_extent):
+        """Coordonnées (y pour une liaison horizontale, x pour une verticale) des points
+        d'accroche du lien sur chacun des deux nœuds.
+
+        Par défaut, on s'accroche au milieu de chaque côté. Mais avec l'aimant, les nœuds
+        sont calés par leur coin haut-gauche et leurs tailles sont des multiples de la
+        grille : deux nœuds "en face" de hauteurs différentes ont souvent leurs milieux
+        décalés d'un demi-pas, ce qui donne un lien légèrement penché au lieu d'un trait
+        droit. Si les deux milieux sont à moins d'un pas de grille l'un de l'autre (et que
+        le point commun tombe bien sur les deux côtés), on accroche les deux extrémités à
+        la même coordonnée pour obtenir un lien parfaitement droit."""
+        if abs(s_mid - d_mid) <= GRID_SIZE:
+            common = (s_mid + d_mid) / 2
+            if abs(common - s_mid) < s_extent / 2 and abs(common - d_mid) < d_extent / 2:
+                return common, common
+        return s_mid, d_mid
+
     def update_position(self):
         if not self.source_node or not self.dest_node:
             return
@@ -775,26 +835,28 @@ class EdgeItem(QGraphicsPathItem):
         
         s_center = self.source_node.mapToScene(s_rect.center())
         d_center = self.dest_node.mapToScene(d_rect.center())
-        
+
         if abs(s_center.x() - d_center.x()) > abs(s_center.y() - d_center.y()):
             # Connexion Horizontale (Milieu Gauche / Droite)
+            s_y, d_y = self._facing_anchor_coords(s_center.y(), d_center.y(), s_rect.height(), d_rect.height())
             if s_center.x() < d_center.x():
-                start = self.source_node.mapToScene(QPointF(s_rect.right(), s_rect.top() + s_rect.height() / 2))
-                end = self.dest_node.mapToScene(QPointF(d_rect.left(), d_rect.top() + d_rect.height() / 2))
+                start = QPointF(self.source_node.mapToScene(QPointF(s_rect.right(), 0)).x(), s_y)
+                end = QPointF(self.dest_node.mapToScene(QPointF(d_rect.left(), 0)).x(), d_y)
                 start_side, end_side = "right", "left"
             else:
-                start = self.source_node.mapToScene(QPointF(s_rect.left(), s_rect.top() + s_rect.height() / 2))
-                end = self.dest_node.mapToScene(QPointF(d_rect.right(), d_rect.top() + d_rect.height() / 2))
+                start = QPointF(self.source_node.mapToScene(QPointF(s_rect.left(), 0)).x(), s_y)
+                end = QPointF(self.dest_node.mapToScene(QPointF(d_rect.right(), 0)).x(), d_y)
                 start_side, end_side = "left", "right"
         else:
             # Connexion Verticale (Milieu Haut / Bas)
+            s_x, d_x = self._facing_anchor_coords(s_center.x(), d_center.x(), s_rect.width(), d_rect.width())
             if s_center.y() < d_center.y():
-                start = self.source_node.mapToScene(QPointF(s_rect.left() + s_rect.width() / 2, s_rect.bottom()))
-                end = self.dest_node.mapToScene(QPointF(d_rect.left() + d_rect.width() / 2, d_rect.top()))
+                start = QPointF(s_x, self.source_node.mapToScene(QPointF(0, s_rect.bottom())).y())
+                end = QPointF(d_x, self.dest_node.mapToScene(QPointF(0, d_rect.top())).y())
                 start_side, end_side = "bottom", "top"
             else:
-                start = self.source_node.mapToScene(QPointF(s_rect.left() + s_rect.width() / 2, s_rect.top()))
-                end = self.dest_node.mapToScene(QPointF(d_rect.left() + d_rect.width() / 2, d_rect.bottom()))
+                start = QPointF(s_x, self.source_node.mapToScene(QPointF(0, s_rect.top())).y())
+                end = QPointF(d_x, self.dest_node.mapToScene(QPointF(0, d_rect.bottom())).y())
                 start_side, end_side = "top", "bottom"
 
         path = QPainterPath()

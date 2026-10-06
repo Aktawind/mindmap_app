@@ -3,6 +3,7 @@ from services.updater_service import check_for_updates
 from ui.template_manager_dialog import show_template_manager_dialog
 from ui import theme
 from ui.minimap import toggle_minimap
+from ui.options_dialog import show_options_dialog
 
 
 def _toggle_shortcuts_overlay(app_window, checked):
@@ -54,6 +55,9 @@ def create_menus(app_window):
     file_menu.addAction(save_action)
     
     file_menu.addAction("💾 Enregistrer sous...", lambda: app_window.project_service.save_project(force_save_as=True))
+
+    file_menu.addSeparator()
+    file_menu.addAction("⚙️ Options...", lambda: show_options_dialog(app_window))
 
     # ==========================================
     # MENU ÉDITION

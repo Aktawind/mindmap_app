@@ -17,6 +17,7 @@ from ui.node_toolbar import create_node_toolbar
 from ui.selection_manager import on_selection_changed
 from ui.minimap import create_minimap
 from ui.search_dialog import create_search_bar
+from ui.options_dialog import load_preferences
 from ui import theme
 
 from services.serializer import MindMapSerializer
@@ -160,6 +161,8 @@ class MindMapApp(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"Mindy {APP_VERSION}")
         self.settings = QSettings("MindyApp", "MindMapEditor")
+        # Avant la création du moindre nœud : leur taille dépend de ces préférences
+        load_preferences(self)
         self._clipboard_node = None
 
         self.current_workspace_path = None

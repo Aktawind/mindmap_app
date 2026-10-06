@@ -149,6 +149,17 @@ def app_stylesheet(p):
         }}
         QListWidget {{ background: {p['bg_elevated']}; color: {p['text']}; border: 1px solid {p['border']}; }}
         QCalendarWidget {{ background: {p['bg_elevated']}; color: {p['text']}; }}
+        QCalendarWidget QWidget#qt_calendar_navigationbar {{ background: {p['bg_toolbar']}; border-bottom: 1px solid {p['border']}; }}
+        QCalendarWidget QToolButton {{ background: transparent; color: {p['text']}; border: none; padding: 4px 8px; font-weight: bold; }}
+        QCalendarWidget QToolButton:hover {{ background: {p['bg_hover']}; border-radius: 4px; }}
+        QCalendarWidget QToolButton::menu-indicator {{ image: none; }}
+        QCalendarWidget QMenu {{ background: {p['bg_elevated']}; color: {p['text']}; }}
+        QCalendarWidget QSpinBox {{ background: {p['bg_input']}; color: {p['text']}; selection-background-color: {p['accent']}; }}
+        QCalendarWidget QAbstractItemView {{
+            background: {p['bg_elevated']}; color: {p['text']}; outline: 0;
+            selection-background-color: {p['accent']}; selection-color: white;
+        }}
+        QCalendarWidget QAbstractItemView:disabled {{ color: {p['text_muted']}; }}
         QScrollBar:vertical, QScrollBar:horizontal {{ background: {p['bg']}; }}
         QTabWidget::pane {{ border: 1px solid {p['border']}; background: {p['bg']}; }}
         QTabBar::tab {{ background: {p['bg_toolbar']}; color: {p['text']}; padding: 6px 12px; border: 1px solid {p['border']}; }}
@@ -204,6 +215,27 @@ def toggle_button_stylesheet(p):
     """
 
 
+def style_calendar(calendar, app_window):
+    """Complète la feuille de style pour un QCalendarWidget : la ligne d'en-tête des jours
+    et les week-ends sont dessinés via des QTextCharFormat (pas via la feuille de style),
+    avec des couleurs système claires par défaut — illisibles en thème sombre."""
+    if calendar is None:
+        return
+    from PyQt6.QtGui import QTextCharFormat, QBrush
+    from PyQt6.QtCore import Qt
+
+    p = get_palette(app_window)
+    header_fmt = QTextCharFormat()
+    header_fmt.setBackground(QBrush(QColor(p['bg_toolbar'])))
+    header_fmt.setForeground(QBrush(QColor(p['text_muted'])))
+    calendar.setHeaderTextFormat(header_fmt)
+
+    weekend_fmt = QTextCharFormat()
+    weekend_fmt.setForeground(QBrush(QColor(p['danger_text'])))
+    for day in (Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday):
+        calendar.setWeekdayTextFormat(day, weekend_fmt)
+
+
 def apply_theme(app_window):
     """Réapplique le thème courant à l'ensemble de l'interface (à appeler à l'initialisation
     et à chaque bascule clair/sombre)."""
@@ -231,7 +263,9 @@ def apply_theme(app_window):
     if getattr(app_window, 'btn_snap', None) is not None:
         app_window.btn_snap.setStyleSheet(toggle_button_stylesheet(p))
 
-    for btn in list(getattr(app_window, 'status_buttons', {}).values()) + list(getattr(app_window, 'priority_buttons', {}).values()):
+    for btn in (list(getattr(app_window, 'status_buttons', {}).values())
+                + list(getattr(app_window, 'priority_buttons', {}).values())
+                + list(getattr(app_window, 'align_buttons', {}).values())):
         btn.setStyleSheet(toggle_button_stylesheet(p))
 
     if callable(getattr(app_window, 'refresh_preset_colors', None)):
