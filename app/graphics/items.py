@@ -189,8 +189,14 @@ class NodeItem(QGraphicsItem):
 
     def hierarchy_children(self):
         """Enfants hiérarchiques directs (arêtes dont ce nœud est la source) — ceux affectés
-        par le pliage, à l'exclusion des liens transversaux "Relier les nœuds"."""
-        return [e.dest_node for e in self.edges if getattr(e, 'source_node', None) is self and e.dest_node]
+        par le pliage, à l'exclusion des liens transversaux "Relier les nœuds", dont le sens
+        ne dépend que de l'ordre de sélection et qui ne créent aucune relation parent/enfant."""
+        children = []
+        for e in self.edges:
+            if (getattr(e, 'source_node', None) is self and e.dest_node is not None
+                    and not getattr(e, 'is_cross_link', False) and e.dest_node not in children):
+                children.append(e.dest_node)
+        return children
 
     def has_hierarchy_children(self):
         return len(self.hierarchy_children()) > 0
@@ -213,10 +219,12 @@ class NodeItem(QGraphicsItem):
     def add_edge(self, edge):
         if edge not in self.edges:
             self.edges.append(edge)
+            self.update()  # le badge de pliage peut apparaître
 
     def remove_edge(self, edge):
         if edge in self.edges:
             self.edges.remove(edge)
+            self.update()  # le badge de pliage peut disparaître
 
     def get_scaled_image_size(self):
         """Calcule la taille de l'image en gardant le ratio basé sur la hauteur configurée."""
@@ -644,7 +652,13 @@ class NodeItem(QGraphicsItem):
         return path
 
     def shape(self):
-        return self.node_shape_path()
+        path = self.node_shape_path()
+        # Le badge de pliage déborde du coin bas-droit (et tombe entièrement hors de la forme
+        # d'un losange ou d'une ellipse) : sans l'inclure ici, Qt ne transmettrait pas le clic
+        # au nœud et le badge semblerait ne rien faire.
+        if self.fold_badge_active():
+            path.addEllipse(self.fold_badge_rect())
+        return path
 
     def update_edges(self):
         for edge in self.edges:
@@ -777,9 +791,13 @@ class NodeItem(QGraphicsItem):
 
 
 class EdgeItem(QGraphicsPathItem):
-    def __init__(self, edge_id, source_node, dest_node, label="", color='#A0AEC0', arrow_dir="none"):
+    def __init__(self, edge_id, source_node, dest_node, label="", color='#A0AEC0', arrow_dir="none",
+                 is_cross_link=False):
         super().__init__()
         self.edge_id = edge_id
+        # Lien transversal ("Relier les nœuds") : ne crée pas de relation parent/enfant,
+        # donc n'intervient ni dans le pliage ni dans la structure de l'arbre.
+        self.is_cross_link = is_cross_link
         self.source_node = source_node
         self.dest_node = dest_node
         self.label = label

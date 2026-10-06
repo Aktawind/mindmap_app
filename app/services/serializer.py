@@ -64,7 +64,8 @@ class MindMapSerializer:
             }
             
             for edge in getattr(node, 'edges', []):
-                if getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node:
+                if (getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node
+                        and not getattr(edge, 'is_cross_link', False)):
                     
                     # SÉCURITÉ SUPPLÉMENTAIRE
                     if edge.dest_node.node_id in serialized_node_ids:
@@ -121,6 +122,7 @@ class MindMapSerializer:
                     "notes": getattr(node, 'notes', ''),
                     "node_format": getattr(node, 'node_format', 'default'),
                     "text_align": getattr(node, 'text_align', 'center'),
+                    "is_collapsed": getattr(node, 'is_collapsed', False),
                 })
 
         # Collecte des liens transversaux (Cross Links)
@@ -134,7 +136,10 @@ class MindMapSerializer:
                     "color": edge.color.name() if hasattr(edge, 'color') else '#A0AEC0',
                     "arrow_dir": getattr(edge, 'arrow_dir', 'none'),
                     "bend_x": bend.x() if bend else 0,
-                    "bend_y": bend.y() if bend else 0
+                    "bend_y": bend.y() if bend else 0,
+                    # Distingue les vrais liens "Relier les nœuds" des liens parent/enfant
+                    # d'un sous-arbre détaché de la racine, rangés eux aussi dans cette liste
+                    "is_cross_link": getattr(edge, 'is_cross_link', False),
                 })
 
         return state
@@ -265,13 +270,8 @@ class MindMapSerializer:
 
                 if hasattr(self.app, 'editing_controller'):
                     edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
-                
+
                 ws.scene.addItem(edge)
-                
-                if not hasattr(parent_node, 'edges'): parent_node.edges = []
-                if not hasattr(node, 'edges'): node.edges = []
-                parent_node.edges.append(edge)
-                node.edges.append(edge)
 
             for child_data in data.get("children", []):
                 deserialize_node(child_data, node)
@@ -305,6 +305,7 @@ class MindMapSerializer:
                 notes=orphan.get("notes", ''),
                 node_format=orphan.get("node_format", "default"),
                 text_align=orphan.get("text_align", "center"),
+                is_collapsed=orphan.get("is_collapsed", False),
             )
             node.border_width = orphan.get("border_width", 1)
 
@@ -333,12 +334,24 @@ class MindMapSerializer:
             created_nodes[node_id] = node
 
         # 3. Restauration des liens transversaux (Cross Links)
+        tree_node_ids = set(created_nodes) - {o.get("id") for o in root_data.get("orphan_nodes", [])}
+        legacy_parented = set()
         for cl in root_data.get("cross_links", []):
             source = created_nodes.get(cl["from"])
             dest = created_nodes.get(cl["to"])
             if source and dest:
+                if "is_cross_link" in cl:
+                    is_cross = cl["is_cross_link"]
+                else:
+                    # Ancien format, sans distinction : un lien vers un nœud hors de l'arbre
+                    # principal qui n'a pas encore de parent est un lien parent/enfant d'un
+                    # sous-arbre détaché ; tout le reste est un vrai lien "Relier les nœuds".
+                    is_cross = dest.node_id in tree_node_ids or dest.node_id in legacy_parented
+                    if not is_cross:
+                        legacy_parented.add(dest.node_id)
                 edge_counter[0] += 1
-                edge = EdgeItem(f"edge_{edge_counter[0]}", source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"), arrow_dir=cl.get("arrow_dir", "none"))
+                edge = EdgeItem(f"edge_{edge_counter[0]}", source, dest, cl.get("label", ""), color=cl.get("color", "#A0AEC0"),
+                                arrow_dir=cl.get("arrow_dir", "none"), is_cross_link=is_cross)
                 bend_x, bend_y = cl.get("bend_x", 0), cl.get("bend_y", 0)
                 if bend_x or bend_y:
                     edge.bend_offset = QPointF(bend_x, bend_y)
@@ -348,11 +361,6 @@ class MindMapSerializer:
                     edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
                 
                 ws.scene.addItem(edge)
-                
-                if not hasattr(source, 'edges'): source.edges = []
-                if not hasattr(dest, 'edges'): dest.edges = []
-                source.edges.append(edge)
-                dest.edges.append(edge)
 
         # Rafraîchissement géométrique forcé de toutes les arêtes
         for item in ws.scene.items():
@@ -364,6 +372,9 @@ class MindMapSerializer:
         ws.is_applying_state = False
 
         if hasattr(self.app, 'graph_controller'):
+            # Rattrape les nœuds reliés à la main avant que "Relier les nœuds" ne crée
+            # automatiquement un lien parent/enfant (même règle qu'à la création du lien)
+            self.app.graph_controller.promote_cross_links(ws)
             self.app.graph_controller.refresh_fold_visibility()
 
         on_selection_changed(self.app)

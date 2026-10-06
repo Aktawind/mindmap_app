@@ -50,14 +50,16 @@ class StyleController:
         # 2. On recolore les branches (arêtes) sortantes pour qu'elles suivent le nœud
         if hasattr(node, 'edges'):
             for edge in node.edges:
-                if getattr(edge, 'source_node', None) == node and hasattr(edge, 'color'):
+                if (getattr(edge, 'source_node', None) == node and hasattr(edge, 'color')
+                        and not getattr(edge, 'is_cross_link', False)):
                     edge.color = QColor(border_color)
                     edge.update()
 
         # 3. Descente récursive vers les enfants via les arêtes naturelles
         if hasattr(node, 'edges'):
             for edge in node.edges:
-                if getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node:
+                if (getattr(edge, 'source_node', None) == node and hasattr(edge, 'dest_node') and edge.dest_node
+                        and not getattr(edge, 'is_cross_link', False)):
                     child = edge.dest_node
                     # 🛡️ Le nœud racine ne doit jamais être recoloré par ricochet : un lien
                     # créé via "Relier les nœuds" peut pointer vers lui dans n'importe quel

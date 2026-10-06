@@ -24,6 +24,7 @@ class GraphController:
         """Plie/déplie les enfants hiérarchiques du nœud donné, et sauvegarde immédiatement
         pour que l'état plié survive à une fermeture/réouverture de la carte."""
         node.is_collapsed = not node.is_collapsed
+        node.update()
         self.refresh_fold_visibility()
         ws = self.app.current_workspace()
         if ws:
@@ -59,13 +60,34 @@ class GraphController:
         fold_enabled = self.app.settings.value("fold_enabled", True, type=bool) if hasattr(self.app, 'settings') else True
 
         hidden_ids = set()
-        if root and fold_enabled:
+        if fold_enabled:
+            visited = set()
+
             def walk(node, ancestor_collapsed):
-                for child in node.hierarchy_children():
-                    if ancestor_collapsed:
-                        hidden_ids.add(child.node_id)
-                    walk(child, ancestor_collapsed or getattr(child, 'is_collapsed', False))
-            walk(root, False)  # le pliage propre de la racine ne compte jamais
+                # Parcours itératif avec garde anti-cycle : une boucle dans le graphe (ex :
+                # anciennes cartes où un lien "Relier" remontait vers la racine) ne doit ni
+                # planter ni bloquer le pliage.
+                stack = [(node, ancestor_collapsed)]
+                while stack:
+                    current, collapsed = stack.pop()
+                    for child in current.hierarchy_children():
+                        if child.node_id in visited:
+                            continue
+                        visited.add(child.node_id)
+                        if collapsed:
+                            hidden_ids.add(child.node_id)
+                        stack.append((child, collapsed or getattr(child, 'is_collapsed', False)))
+
+            if root:
+                visited.add(root.node_id)
+                walk(root, False)  # le pliage propre de la racine ne compte jamais
+            # Sous-arbres détachés de la racine : leur sommet (nœud sans parent hiérarchique)
+            # peut lui aussi être plié.
+            has_parent = {c.node_id for n in nodes for c in n.hierarchy_children()}
+            for n in nodes:
+                if n.node_id not in visited and n.node_id not in has_parent:
+                    visited.add(n.node_id)
+                    walk(n, getattr(n, 'is_collapsed', False))
 
         for n in nodes:
             n.setVisible(n.node_id not in hidden_ids)
@@ -74,6 +96,70 @@ class GraphController:
             src_hidden = getattr(e.source_node, 'node_id', None) in hidden_ids
             dst_hidden = getattr(e.dest_node, 'node_id', None) in hidden_ids
             e.setVisible(not (src_hidden or dst_hidden))
+
+    @staticmethod
+    def _descendant_ids(node):
+        """Identifiants de tous les descendants hiérarchiques d'un nœud (lui-même inclus)."""
+        seen = {node.node_id}
+        stack = [node]
+        while stack:
+            for child in stack.pop().hierarchy_children():
+                if child.node_id not in seen:
+                    seen.add(child.node_id)
+                    stack.append(child)
+        return seen
+
+    def _hierarchy_orientation(self, node_a, node_b, nodes):
+        """Décide si un lien tracé à la main entre deux nœuds doit devenir un lien
+        parent/enfant, et dans quel sens. Renvoie (parent, enfant), ou None s'il doit rester
+        un simple lien transversal.
+
+        Un nœud qui n'a pas encore de parent (nœud seul, ou sommet d'un groupe détaché) et
+        qui n'est pas la racine est rattaché comme enfant de l'autre — quel que soit l'ordre
+        de sélection —, pour que le pliage de l'autre nœud l'emporte avec lui. Si les deux
+        ont déjà un parent, on ne crée pas de second parent : le lien reste transversal.
+        Un rattachement qui créerait une boucle (l'autre nœud est déjà un descendant) est
+        lui aussi refusé."""
+        has_parent = {c.node_id for n in nodes for c in n.hierarchy_children()}
+
+        def can_be_child(child, parent):
+            return (child.node_id != 'root'
+                    and child.node_id not in has_parent
+                    and parent.node_id not in self._descendant_ids(child))
+
+        a_child, b_child = can_be_child(node_a, node_b), can_be_child(node_b, node_a)
+        if a_child and b_child:
+            # Deux groupes détachés : le plus gros accueille l'autre (à égalité, le premier)
+            if len(self._descendant_ids(node_b)) > len(self._descendant_ids(node_a)):
+                return node_b, node_a
+            return node_a, node_b
+        if b_child:
+            return node_a, node_b
+        if a_child:
+            return node_b, node_a
+        return None
+
+    def promote_cross_links(self, ws=None):
+        """Convertit en liens parent/enfant les liens transversaux qui rattachent un nœud
+        sans parent (voir _hierarchy_orientation) — pour les cartes où des nœuds ont été
+        reliés à la main avant que ce rattachement ne soit fait automatiquement."""
+        ws = ws or self.app.current_workspace()
+        if not ws:
+            return
+        nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+        edges = [i for i in ws.scene.items() if isinstance(i, EdgeItem) and getattr(i, 'is_cross_link', False)]
+        for edge in edges:
+            if edge.source_node is None or edge.dest_node is None:
+                continue
+            orientation = self._hierarchy_orientation(edge.source_node, edge.dest_node, nodes)
+            if orientation is None:
+                continue
+            parent, child = orientation
+            edge.source_node, edge.dest_node = parent, child
+            edge.is_cross_link = False
+            edge.update_position()
+            parent.update()
+            child.update()
 
     def _find_hierarchy_parent(self, node):
         """Retrouve le parent hiérarchique d'un nœud en descendant l'arbre depuis la racine
@@ -86,15 +172,17 @@ class GraphController:
         if not root or node is root:
             return None
 
-        def walk(current):
+        visited = {root.node_id}
+        stack = [root]
+        while stack:
+            current = stack.pop()
             for child in current.hierarchy_children():
                 if child is node:
                     return current
-                found = walk(child)
-                if found is not None:
-                    return found
-            return None
-        return walk(root)
+                if child.node_id not in visited:
+                    visited.add(child.node_id)
+                    stack.append(child)
+        return None
 
     def add_sibling_node(self, node):
         """Ajoute un nœud frère au même niveau que le nœud donné (même parent hiérarchique),
@@ -131,7 +219,7 @@ class GraphController:
         def get_children(node):
             children = []
             for edge in getattr(node, 'edges', []):
-                if getattr(edge, 'source_node', None) == node:
+                if getattr(edge, 'source_node', None) == node and not getattr(edge, 'is_cross_link', False):
                     child = getattr(edge, 'dest_node', None)
                     if child and child.node_id not in visited_ids:
                         visited_ids.add(child.node_id)
@@ -275,7 +363,7 @@ class GraphController:
         text_col = parent_node.font_color.name() if hasattr(parent_node, 'font_color') else '#000000'
         edge_col = '#A0AEC0'
         
-        child_edges = [e for e in parent_node.edges if e.source_node == parent_node]
+        child_edges = [e for e in parent_node.edges if e.source_node == parent_node and not getattr(e, 'is_cross_link', False)]
         
         # Attribution d'une palette de couleur distincte par branche si on part du nœud central
         if getattr(parent_node, 'node_id', None) == 'root':
@@ -284,7 +372,7 @@ class GraphController:
                 bg, border, text_col, edge_col = pal['bg'], pal['border'], pal['text'], pal['edge']
         else:
             # Sinon, hérite de la couleur du lien parent
-            p_edge = next((e for e in parent_node.edges if e.dest_node == parent_node), None)
+            p_edge = next((e for e in parent_node.edges if e.dest_node == parent_node and not getattr(e, 'is_cross_link', False)), None)
             if p_edge and hasattr(p_edge, 'color'): 
                 edge_col = p_edge.color.name()
 
@@ -310,10 +398,7 @@ class GraphController:
         if hasattr(edge, 'update_position'):
             edge.update_position()
         
-        # Enregistrement de l'arborescence interne dans les NodeItems
-        if hasattr(parent_node, 'edges'): parent_node.edges.append(edge)
-        if hasattr(new_node, 'edges'): new_node.edges.append(edge)
-        
+        # (EdgeItem s'enregistre lui-même auprès de ses deux nœuds, voir NodeItem.add_edge)
         self.app.save_state()
         
         ws.scene.clearSelection()
@@ -415,10 +500,11 @@ class GraphController:
                     self.app.attachment_controller.remove_file_from_attachments(item.file_path)
                 
                 for edge in list(getattr(item, 'edges', [])):
-                    if hasattr(edge, 'source_node') and edge in getattr(edge.source_node, 'edges', []): 
-                        edge.source_node.edges.remove(edge)
-                    if hasattr(edge, 'dest_node') and edge in getattr(edge.dest_node, 'edges', []): 
-                        edge.dest_node.edges.remove(edge)
+                    # remove_edge() redessine aussi l'autre extrémité (badge de pliage)
+                    if getattr(edge, 'source_node', None) is not None:
+                        edge.source_node.remove_edge(edge)
+                    if getattr(edge, 'dest_node', None) is not None:
+                        edge.dest_node.remove_edge(edge)
                     if edge.scene() == ws.scene: 
                         ws.scene.removeItem(edge)
                         
@@ -427,15 +513,18 @@ class GraphController:
                 changed = True
                 
             elif isinstance(item, EdgeItem):
-                if hasattr(item, 'source_node') and item in getattr(item.source_node, 'edges', []): 
-                    item.source_node.edges.remove(item)
-                if hasattr(item, 'dest_node') and item in getattr(item.dest_node, 'edges', []): 
-                    item.dest_node.edges.remove(item)
+                if getattr(item, 'source_node', None) is not None:
+                    item.source_node.remove_edge(item)
+                if getattr(item, 'dest_node', None) is not None:
+                    item.dest_node.remove_edge(item)
                 if item.scene() == ws.scene: 
                     ws.scene.removeItem(item)
                 changed = True
                     
         if changed:
+            # Les descendants d'un nœud plié supprimé deviennent un sous-arbre détaché : on
+            # recalcule la visibilité pour ne pas les laisser cachés sans moyen de les déplier.
+            self.refresh_fold_visibility()
             self.app.save_state()
 
     def connect_selected_nodes(self):
@@ -455,9 +544,18 @@ class GraphController:
             )
             
             if not already_linked:
-                link_color = getattr(node1, 'border_color', None)
+                nodes = [i for i in ws.scene.items() if isinstance(i, NodeItem)]
+                orientation = self._hierarchy_orientation(node1, node2, nodes)
+                if orientation is not None:
+                    # Rattachement parent/enfant : pris en compte par le pliage
+                    source, dest = orientation
+                    if getattr(source, 'is_collapsed', False):
+                        source.is_collapsed = False  # sinon le nœud rattaché disparaîtrait aussitôt
+                else:
+                    source, dest = node1, node2
+                link_color = getattr(source, 'border_color', None)
                 edge_id = self._generate_unique_id("edge")
-                edge = EdgeItem(edge_id, node1, node2, "", color=link_color)
+                edge = EdgeItem(edge_id, source, dest, "", color=link_color, is_cross_link=orientation is None)
                 
                 self._apply_current_routing_mode(edge)
                 
@@ -468,10 +566,9 @@ class GraphController:
 
                 if hasattr(edge, 'update_position'):
                     edge.update_position()
-                
-                if hasattr(node1, 'edges'): node1.edges.append(edge)
-                if hasattr(node2, 'edges'): node2.edges.append(edge)
-                
+                source.update()
+                self.refresh_fold_visibility()
+
                 ws.scene.clearSelection()
                 edge.setSelected(True)
                 self.app.save_state()

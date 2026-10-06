@@ -149,7 +149,7 @@ class ExportController:
             
             # Récupération sécurisée des nœuds enfants reliés
             if hasattr(node, 'edges'):
-                children = [e.dest_node for e in node.edges if e.source_node == node and hasattr(e, 'dest_node')]
+                children = node.hierarchy_children()  # hors liens transversaux "Relier les nœuds"
                 for child in children: 
                     build_tree(child, depth + 1)
                 

@@ -168,6 +168,7 @@ class ToolsController:
                         "label": getattr(edge, 'label', ''),
                         "color": edge.color.name() if hasattr(edge, 'color') else '#A0AEC0',
                         "arrow_dir": getattr(edge, 'arrow_dir', 'none'),
+                        "is_cross_link": getattr(edge, 'is_cross_link', False),
                     })
 
     def paste_node(self):
@@ -229,15 +230,14 @@ class ToolsController:
 
             edge_id = f"edge_paste_{base_timestamp}_{i}"
             edge = EdgeItem(edge_id, source, dest, edge_data.get("label", ""),
-                             color=edge_data.get("color", "#A0AEC0"), arrow_dir=edge_data.get("arrow_dir", "none"))
+                             color=edge_data.get("color", "#A0AEC0"), arrow_dir=edge_data.get("arrow_dir", "none"),
+                             is_cross_link=edge_data.get("is_cross_link", False))
 
             if hasattr(self.app, 'editing_controller') and self.app.editing_controller:
                 edge.signals.itemDoubleClicked.connect(self.app.editing_controller.start_inline_editing)
 
             ws.scene.addItem(edge)
             if hasattr(edge, 'update_position'): edge.update_position()
-            source.edges.append(edge)
-            dest.edges.append(edge)
 
         if hasattr(self.app, 'save_state'):
             self.app.save_state()

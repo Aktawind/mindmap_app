@@ -88,7 +88,9 @@ class MindMapControlView(QGraphicsView):
                 self._is_panning = True
                 self._pan_start_x = viewport_pos.x()
                 self._pan_start_y = viewport_pos.y()
-                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+                # Le curseur affiché est celui du viewport (widget enfant de la vue), pas
+                # celui de la vue elle-même : c'est donc sur lui qu'on le change.
+                self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
                 event.accept()
                 return
 
@@ -108,9 +110,24 @@ class MindMapControlView(QGraphicsView):
 
         super().mousePressEvent(event)
 
+    def _end_panning(self):
+        """Termine le déplacement de la vue au clic droit et rend le curseur normal (celui
+        des éléments survolés, ou la flèche par défaut)."""
+        self._is_panning = False
+        self.viewport().unsetCursor()
+
+    def focusOutEvent(self, event):
+        if self._is_panning:
+            self._end_panning()
+        super().focusOutEvent(event)
+
     def mouseMoveEvent(self, event):
         viewport_pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
         
+        if self._is_panning and not (event.buttons() & Qt.MouseButton.RightButton):
+            # Relâchement du clic droit jamais reçu (menu contextuel système, changement de
+            # fenêtre...) : on termine le déplacement ici plutôt que de garder la main fermée.
+            self._end_panning()
         if self._is_panning:
             dx = viewport_pos.x() - self._pan_start_x
             dy = viewport_pos.y() - self._pan_start_y
@@ -126,8 +143,7 @@ class MindMapControlView(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.RightButton and self._is_panning:
-            self._is_panning = False
-            self.setCursor(Qt.CursorShape.ArrowCursor)
+            self._end_panning()
             event.accept()
             return
 
