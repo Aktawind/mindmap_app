@@ -12,6 +12,19 @@ def show_app_about_dialog(app_window, version_str):
     créer des cartes mentales fluides et les transformer en véritables tableaux
     de travail, grâce à ses canevas de fond, puis les exporter dans des formats variés.</p>
 
+    <p><b>Nouveautés de la version 1.9.0 :</b></p>
+    <ul>
+        <li>Menu Fichier &gt; Options : nombre de caractères avant retour à la ligne automatique</li>
+        <li>Justification du texte des nœuds (gauche, centre, droite)</li>
+        <li>Sélecteur d'emojis intégré (bouton 😀 ou Ctrl+E pendant la saisie)</li>
+        <li>Zone de saisie qui s'agrandit avec le texte, sans barre de défilement</li>
+        <li>Liens parfaitement droits entre deux nœuds face à face</li>
+        <li>« Relier les nœuds » rattache un nœud isolé comme enfant, pris en compte par le pliage</li>
+        <li>Pliage/dépliage des branches fiabilisé</li>
+        <li>Taille et position des fenêtres (principale et notes) mémorisées</li>
+        <li>Calendrier des échéances adapté au thème sombre</li>
+    </ul>
+
     <p><b>Cartes et organisation :</b></p>
     <ul>
         <li>Réorganisation automatique de l'arborescence</li>

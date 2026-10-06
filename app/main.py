@@ -270,10 +270,22 @@ class MindMapApp(QMainWindow):
             return
         self.settings.remove("pending_update_version")
         from PyQt6.QtWidgets import QMessageBox
-        QMessageBox.information(
-            self, "Mise à jour réussie",
-            f"Mindy a été mis à jour à la version {pending_version}."
-        )
+        if pending_version == APP_VERSION:
+            QMessageBox.information(
+                self, "Mise à jour réussie",
+                f"✅ Mindy a bien été mis à jour en version {APP_VERSION}.\n\n"
+                "Les nouveautés sont détaillées dans le menu À propos."
+            )
+        else:
+            # La version qui démarre n'est pas celle attendue : la copie des nouveaux
+            # fichiers a échoué (exécutable resté verrouillé...), on le dit clairement
+            # plutôt que d'annoncer à tort une mise à jour réussie.
+            QMessageBox.warning(
+                self, "Mise à jour non appliquée",
+                f"La mise à jour vers la version {pending_version} n'a pas pu être appliquée "
+                f"(version actuelle : {APP_VERSION}).\n\n"
+                "Relancez-la depuis À propos > Vérifier les mises à jour."
+            )
 
     def current_workspace(self) -> MindMapWorkspace:
         try:

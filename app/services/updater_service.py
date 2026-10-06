@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 # Configuration du dépôt GitHub
 GITHUB_REPO = "Aktawind/mindmap_app"
-CURRENT_VERSION = "v1.8.0"  # Version actuelle de l'application, à mettre à jour lors des releases
+CURRENT_VERSION = "v1.9.0"  # Version actuelle de l'application, à mettre à jour lors des releases
 
 
 class CheckUpdateThread(QThread):
@@ -139,6 +139,23 @@ def check_for_updates(parent_widget, silent=True):
     parent_widget._update_thread = thread
 
 
+def _clean_environment_for_relaunch(extra_vars=None):
+    """Environnement à transmettre au script de relais (et donc à la nouvelle version).
+
+    L'exécutable "onefile" de PyInstaller place dans l'environnement de son processus des
+    variables internes (_PYI_APPLICATION_HOME_DIR, _PYI_PARENT_PROCESS_LEVEL, _MEIPASS2...).
+    Héritées par la nouvelle version, elles lui font croire qu'elle est un sous-processus de
+    l'ancienne : elle cherche alors sa DLL Python dans le dossier temporaire de l'ancienne
+    (supprimé entre-temps) -> "Failed to load Python DLL", ou échoue à valider son
+    processus parent -> "Security validation failure". On les retire, et on demande
+    explicitement au bootloader de repartir d'un environnement propre."""
+    env = {k: v for k, v in os.environ.items()
+           if not k.upper().startswith('_PYI_') and not k.upper().startswith('_MEIPASS')}
+    env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+    env.update(extra_vars or {})
+    return env
+
+
 def perform_update(parent_widget, download_url, version=None):
     """Gère l'affichage de la fenêtre, le téléchargement, l'extraction et le relais au script Batch."""
     try:
@@ -188,55 +205,58 @@ def perform_update(parent_widget, download_url, version=None):
                 if not source_dir:
                     raise FileNotFoundError(f"Impossible de trouver {exe_name} dans l'archive téléchargée.")
 
-                # 2. Script Batch renforcé pour écraser les fichiers système/lecture seule
+                # 2. Script Batch de relais. Points importants :
+                # - Il tourne SANS console (DETACHED_PROCESS, plus bas) : la commande
+                #   "timeout" y échoue immédiatement ("redirection d'entrée non prise en
+                #   charge") au lieu d'attendre. Toutes les pauses passent donc par
+                #   "ping -n N 127.0.0.1", qui attend ~N-1 secondes sans console.
+                # - On attend que l'ancienne version soit réellement fermée, puis on retente
+                #   la copie tant que l'exécutable est encore verrouillé (antivirus...),
+                #   au lieu de parier sur des délais fixes.
+                # - Aucun chemin n'est écrit dans le script : sans console, cmd.exe ne peut
+                #   pas passer en UTF-8 (chcp échoue) et lirait mal tout chemin accentué
+                #   (ex : nom d'utilisateur Windows). Les chemins lui sont transmis par des
+                #   variables d'environnement (Unicode), et le script reste en pur ASCII.
                 bat_path = os.path.join(temp_dir, "update.bat")
-                bat_script = f"""@echo off
-rem S'assure que le processus d'origine est bien arrêté
-taskkill /F /IM "{exe_name}" > nul 2>&1
-timeout /t 3 /nobreak > nul
+                bat_script = r"""@echo off
 
-rem Copie forcée en écrasant TOUT (y compris fichiers cachés / lecture seule)
-xcopy /E /Y /I /K /R /H "{source_dir}\\*" "{install_dir}\\"
-
-rem 🚨 FIX : laisse le temps à Windows/l'antivirus de "digérer" le nouvel exécutable
-rem tout juste écrit (scan à la volée d'un binaire non signé fraîchement copié) avant
-rem de le lancer. Sans cette pause, le lancement immédiat peut échouer avec
-rem "Failed to load Python DLL ... LoadLibrary: le module spécifié est introuvable"
-rem (le bootloader onefile ne parvient pas à extraire/charger sa DLL Python). Portée à
-rem 5s (au lieu de 2s) : le cas remonté persistait, un scan antivirus sur un exécutable
-rem de cette taille peut dépasser 2 secondes selon la machine.
-timeout /t 5 /nobreak > nul
-
-rem Relance la nouvelle version, avec de nouvelles tentatives si le lancement échoue de
-rem façon transitoire (l'antivirus peut encore verrouiller brièvement l'exécutable tout
-rem juste copié malgré la pause ci-dessus, ce qui fait planter le bootloader avec l'erreur
-rem "Failed to load Python DLL") : si le process n'apparaît pas dans la liste des tâches
-rem après le lancement, on retente jusqu'à 3 fois au total.
-cd /d "{install_dir}"
-set LAUNCH_TRIES=0
-:launch_retry
-set /a LAUNCH_TRIES+=1
-start "" "{exe_name}"
-
-rem 🚨 FIX : on laisse le temps au bootloader du nouvel exécutable de terminer sa
-rem validation de sécurité (qui vérifie son processus parent) AVANT que ce script
-rem (le parent en question) ne se termine. Sans cette pause, ce cmd.exe peut
-rem disparaître trop tôt et le nouvel exécutable échoue avec
-rem "Security validation failure: failed to obtain executable path for parent process".
-timeout /t 3 /nobreak > nul
-
-tasklist /FI "IMAGENAME eq {exe_name}" | find /I "{exe_name}" > nul
-if errorlevel 1 (
-    if %LAUNCH_TRIES% LSS 3 (
-        goto launch_retry
-    )
+rem Attend la fermeture de l'ancienne version (15 s max), puis force si besoin
+set WAIT_TRIES=0
+:wait_exit
+tasklist /FI "IMAGENAME eq %MINDY_EXE%" | find /I "%MINDY_EXE%" > nul
+if errorlevel 1 goto copy_files
+set /a WAIT_TRIES+=1
+if %WAIT_TRIES% GEQ 15 (
+    taskkill /F /IM "%MINDY_EXE%" > nul 2>&1
+    ping -n 3 127.0.0.1 > nul
+    goto copy_files
 )
+ping -n 2 127.0.0.1 > nul
+goto wait_exit
 
-rem Nettoyage
-rd /s /q "{temp_dir}"
+rem Copie de la nouvelle version, retentee tant que l'exe est verrouille (10 essais)
+:copy_files
+set COPY_TRIES=0
+:copy_retry
+set /a COPY_TRIES+=1
+xcopy /E /Y /I /K /R /H /Q "%MINDY_SOURCE%\*" "%MINDY_INSTALL%\" < nul > nul 2>&1
+if not errorlevel 1 goto launch
+if %COPY_TRIES% GEQ 10 goto launch
+ping -n 3 127.0.0.1 > nul
+goto copy_retry
+
+rem Laisse l'antivirus analyser le nouvel executable avant de le lancer
+:launch
+ping -n 4 127.0.0.1 > nul
+cd /d "%MINDY_INSTALL%"
+start "" "%MINDY_EXE%"
+
+rem Nettoyage (apres un delai, pour ne pas supprimer le script en cours de lecture)
+ping -n 6 127.0.0.1 > nul
+rd /s /q "%MINDY_TEMP%" > nul 2>&1
 exit
 """
-                with open(bat_path, "w", encoding="utf-8") as f:
+                with open(bat_path, "w", encoding="ascii") as f:
                     f.write(bat_script)
 
                 # Lancement du script Batch, complètement détaché du processus actuel :
@@ -268,6 +288,12 @@ exit
                     ["cmd.exe", "/c", bat_path] if os.name == 'nt' else [bat_path],
                     creationflags=creation_flags,
                     close_fds=True,
+                    env=_clean_environment_for_relaunch({
+                        "MINDY_EXE": exe_name,
+                        "MINDY_SOURCE": source_dir,
+                        "MINDY_INSTALL": install_dir,
+                        "MINDY_TEMP": temp_dir,
+                    }),
                 )
 
                 # --- CHANGEMENT CLÉ ICI ---
