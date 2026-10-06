@@ -216,8 +216,11 @@ class MindMapApp(QMainWindow):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
-        self.resize(1600, 900)
-        
+        # Taille/position (et état agrandi) mémorisées à la dernière fermeture, sinon défaut
+        saved_geometry = self.settings.value("main_window_geometry")
+        if saved_geometry is None or not self.restoreGeometry(saved_geometry):
+            self.resize(1600, 900)
+
         self.setup_ui()
         self.setup_shortcuts()
         theme.apply_theme(self)
@@ -308,6 +311,8 @@ class MindMapApp(QMainWindow):
             self.tools_controller.handle_close_event(event)
         else:
             event.accept()
+        if event.isAccepted():
+            self.settings.setValue("main_window_geometry", self.saveGeometry())
 
     def save_state(self):
         ws = self.current_workspace()

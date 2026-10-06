@@ -52,7 +52,12 @@ class NodeNotesDialog(QDialog):
     def __init__(self, parent, node_label, initial_text):
         super().__init__(parent)
         self.setWindowTitle(f"Notes — {node_label}")
-        self.resize(600, 480)
+        # Taille/position mémorisées à la dernière fermeture d'une fenêtre de notes (commune
+        # à tous les nœuds), sinon taille par défaut
+        self._settings = getattr(parent, 'settings', None)
+        saved_geometry = self._settings.value("notes_dialog_geometry") if self._settings is not None else None
+        if saved_geometry is None or not self.restoreGeometry(saved_geometry):
+            self.resize(600, 480)
 
         palette = theme.get_palette(parent)
 
@@ -187,6 +192,12 @@ class NodeNotesDialog(QDialog):
         # qu'on attend d'un éditeur de notes, pas une perte silencieuse du travail en cours.
         self.accept()
         event.accept()
+
+    def done(self, result):
+        # Point de passage commun à Enregistrer, Annuler, Échap et la croix de fermeture
+        if self._settings is not None:
+            self._settings.setValue("notes_dialog_geometry", self.saveGeometry())
+        super().done(result)
 
     def _apply_font_family(self, font):
         self.text_edit.setCurrentFont(font)
