@@ -143,6 +143,13 @@ def create_node_toolbar(app_window) -> None:
     btn_strike.setStyleSheet("QPushButton { padding: 0px; margin: 0px; }")
     btn_strike.clicked.connect(app_window.style_controller.toggle_strikethrough)
     text_row_layout.addWidget(btn_strike)
+    btn_emoji = QPushButton("😀", text_row)
+    btn_emoji.setFont(QFont("Segoe UI Emoji", 11))
+    btn_emoji.setFixedSize(36, 26)
+    btn_emoji.setStyleSheet("QPushButton { padding: 0px; margin: 0px; }")
+    btn_emoji.setToolTip("Ajouter un emoji au début du texte (Ctrl+E pendant la saisie)")
+    btn_emoji.clicked.connect(app_window.style_controller.insert_emoji)
+    text_row_layout.addWidget(btn_emoji)
     text_row_layout.addStretch()
     section_text.add_widget(text_row)
 
@@ -385,6 +392,7 @@ def create_node_toolbar(app_window) -> None:
         "- Double-clic vide : Nouveau nœud<br>"
         "- Double-clic : Éditer le texte<br>"
         "- Maj + Entrée : Retour à la ligne<br>"
+        "- Ctrl + E (en saisie) : Emoji<br>"
         "- Sélect + Tab : Ajouter un fils<br>"
         "- Sélect + Entrée : Ajouter un frère<br>"
         "- Ctrl+C / Ctrl+V : Copier/Coller<br>"
@@ -395,7 +403,7 @@ def create_node_toolbar(app_window) -> None:
     )
     lbl.setFont(QFont("Segoe UI", 9))
     ol_layout.addWidget(lbl)
-    app_window.overlay.resize(260, 190)  # 📐 Ajusté pour laisser de la place au bouton de fermeture
+    app_window.overlay.resize(260, 205)  # 📐 Ajusté pour laisser de la place au bouton de fermeture
     app_window.overlay.move(20, 100)
 
     show_overlay = app_window.settings.value("show_shortcuts_overlay", True, type=bool)

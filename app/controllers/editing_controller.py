@@ -101,15 +101,39 @@ class EditingController(QObject):
 
         editor.setGeometry(int(center_x - w // 2), int(top_y), w, h)
 
+    def _insert_emoji_in_editor(self):
+        """Ctrl+E pendant la saisie : insère l'emoji choisi à la position du curseur."""
+        editor = self.editor
+        if editor is None:
+            return
+        from ui.emoji_picker import pick_emoji
+        self._emoji_picker_open = True
+        try:
+            emoji = pick_emoji(self.app)
+        finally:
+            self._emoji_picker_open = False
+        if self.editor is not editor:
+            return  # l'édition a été fermée entre-temps
+        if emoji:
+            editor.insertPlainText(emoji)
+        editor.activateWindow()
+        editor.setFocus()
+
     def eventFilter(self, obj, event):
         """Filtre les événements clavier et de focus pour l'éditeur de texte."""
         if obj == getattr(self, 'editor', None):
             # Réserve Échap/Entrée à l'éditeur pour éviter qu'un raccourci global
             # (ex : Échap = désélectionner) ne les intercepte avant qu'ils n'atteignent le champ
+            is_emoji_shortcut = (event.type() in (event.Type.ShortcutOverride, event.Type.KeyPress)
+                                 and event.key() == Qt.Key.Key_E
+                                 and event.modifiers() & Qt.KeyboardModifier.ControlModifier)
             if event.type() == event.Type.ShortcutOverride:
-                if event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                if event.key() in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Enter) or is_emoji_shortcut:
                     event.accept()
                     return True
+            if event.type() == event.Type.KeyPress and is_emoji_shortcut:
+                self._insert_emoji_in_editor()
+                return True
             if event.type() == event.Type.KeyPress:
                 # Entrée valide l'édition (sauf si Shift est enfoncé pour un saut de ligne)
                 if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
@@ -120,7 +144,10 @@ class EditingController(QObject):
                     self.cancel_edit()
                     return True
             elif event.type() == event.Type.FocusOut:
-                # La perte de focus valide automatiquement
+                # La perte de focus valide automatiquement — sauf quand c'est le sélecteur
+                # d'emojis (Ctrl+E) qui prend le focus le temps du choix
+                if getattr(self, '_emoji_picker_open', False):
+                    return False
                 self.commit_edit()
                 return True
         return super().eventFilter(obj, event)

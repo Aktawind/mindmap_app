@@ -185,6 +185,30 @@ class StyleController:
                 node.update()
             self.app.save_state()
 
+    def insert_emoji(self):
+        """Bouton "Emoji" du panneau : ajoute l'emoji choisi au début du texte des nœuds
+        sélectionnés (après l'éventuel préfixe de statut, qui doit rester en tête)."""
+        ws = self.app.current_workspace()
+        if not ws: return
+        nodes = [item for item in ws.scene.selectedItems() if isinstance(item, NodeItem)]
+        if not nodes:
+            QMessageBox.information(self.app, "Emoji", "Sélectionnez d'abord un ou plusieurs nœuds.")
+            return
+
+        from ui.emoji_picker import pick_emoji
+        emoji = pick_emoji(self.app)
+        if not emoji:
+            return
+
+        status_prefixes = ("🚨 ", "⏳ ", "✅ ")
+        for node in nodes:
+            label = getattr(node, 'label', '')
+            prefix = next((p for p in status_prefixes if label.startswith(p)), "")
+            node.label = f"{prefix}{emoji} {label[len(prefix):]}"
+            node.recalculate_size()
+            node.update()
+        self.app.save_state()
+
     def set_text_align(self, align_value):
         """Applique la justification du texte (gauche/centre/droite) aux nœuds sélectionnés."""
         ws = self.app.current_workspace()
