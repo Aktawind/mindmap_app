@@ -12,6 +12,11 @@ def show_app_about_dialog(app_window, version_str):
     créer des cartes mentales fluides et les transformer en véritables tableaux
     de travail, grâce à ses canevas de fond, puis les exporter dans des formats variés.</p>
 
+    <p><b>Nouveautés de la version 1.9.2 :</b></p>
+    <ul>
+        <li>Mise à jour automatique fiabilisée : la nouvelle version est installée avant la fermeture de Mindy</li>
+    </ul>
+
     <p><b>Nouveautés de la version 1.9.1 :</b></p>
     <ul>
         <li>Coller une image dans les notes (Ctrl+V) ou y glisser un fichier image</li>

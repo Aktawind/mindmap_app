@@ -6,7 +6,7 @@ from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
 from PyQt6.QtCore import Qt, QSettings, QTimer, pyqtSignal
 from PyQt6 import sip
 
-from services.updater_service import CURRENT_VERSION as APP_VERSION
+from services.updater_service import CURRENT_VERSION as APP_VERSION, cleanup_previous_update
 from graphics.scene import MindMapWorkspace
 
 from ui.menus import create_menus
@@ -240,6 +240,7 @@ class MindMapApp(QMainWindow):
     def initialize_startup_session(self):
         """Décide au démarrage s'il faut charger la workspace ou le dernier projet."""
         self._notify_if_just_updated()
+        self._cleanup_previous_update()
 
         last_workspace = self.settings.value("last_collection_path", "")
 
@@ -259,6 +260,12 @@ class MindMapApp(QMainWindow):
                 "canvas_type": getattr(ws.scene, 'canvas_type', 'none'),
                 "canvas_scale": getattr(ws.scene, 'canvas_scale', 1.0),
             })
+
+    def _cleanup_previous_update(self, attempts_left=10):
+        """Supprime l'ancien Mindy.exe.old laissé par une mise à jour ; l'ancienne instance
+        peut le verrouiller encore quelques secondes, d'où les nouvelles tentatives."""
+        if not cleanup_previous_update() and attempts_left > 0:
+            QTimer.singleShot(3000, lambda: self._cleanup_previous_update(attempts_left - 1))
 
     def _notify_if_just_updated(self):
         """Affiche un message de confirmation propre si cette instance vient d'être lancée
