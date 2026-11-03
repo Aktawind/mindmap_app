@@ -1,5 +1,4 @@
-import os
-import shutil
+from services import media_service
 from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QWidget, QLineEdit, QSizePolicy, QFileDialog, QMessageBox
 from PyQt6.QtCore import Qt
 from services.template_service import refresh_template_combo
@@ -63,19 +62,7 @@ def _load_canvas_image(app_window):
         return False
 
     try:
-        target_dir = os.path.abspath(".mindmap_attachments")
-        os.makedirs(target_dir, exist_ok=True)
-
-        base_name = os.path.basename(file_path)
-        name, ext = os.path.splitext(base_name)
-        counter = 1
-        new_name = base_name
-        while os.path.exists(os.path.join(target_dir, new_name)):
-            new_name = f"{name}_{counter}{ext}"
-            counter += 1
-
-        dest_path = os.path.join(target_dir, new_name)
-        shutil.copy(file_path, dest_path)
+        dest_path = media_service.import_image_file(ws, file_path)
 
         ws.scene.canvas_image_path = dest_path
         ws.scene.canvas_type = 'custom'

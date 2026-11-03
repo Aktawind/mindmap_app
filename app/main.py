@@ -23,6 +23,7 @@ from ui import theme
 from services.serializer import MindMapSerializer
 from services.history_service import HistoryService
 from services.project_service import ProjectService
+from services import media_service
 
 from controllers.editing_controller import EditingController
 from controllers.graph_controller import GraphController
@@ -384,7 +385,7 @@ class MindMapApp(QMainWindow):
                 continue  # Onglet jamais enregistré manuellement : on ne force pas de "Enregistrer sous"
 
             try:
-                state_to_save = self.serializer.get_state(ws)
+                state_to_save = media_service.state_for_file(self.serializer.get_state(ws), file_path)
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(state_to_save, f, indent=2, ensure_ascii=False)
                 ws.is_dirty = False

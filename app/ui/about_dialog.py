@@ -12,6 +12,14 @@ def show_app_about_dialog(app_window, version_str):
     créer des cartes mentales fluides et les transformer en véritables tableaux
     de travail, grâce à ses canevas de fond, puis les exporter dans des formats variés.</p>
 
+    <p><b>Nouveautés de la version 1.9.1 :</b></p>
+    <ul>
+        <li>Coller une image dans les notes (Ctrl+V) ou y glisser un fichier image</li>
+        <li>Images des notes nettes, ajustées à la largeur de la fenêtre et redimensionnables à la souris</li>
+        <li>Images rangées à côté de la carte : la carte et son dossier se déplacent ensemble</li>
+        <li>Le nettoyage automatique ne supprime plus les images des notes ni celles des autres cartes du dossier</li>
+    </ul>
+
     <p><b>Nouveautés de la version 1.9.0 :</b></p>
     <ul>
         <li>Menu Fichier &gt; Options : nombre de caractères avant retour à la ligne automatique</li>

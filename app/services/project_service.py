@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from graphics.items import NodeItem
 from graphics.scene import MindMapWorkspace
 from PyQt6.QtCore import QTimer
+from services import media_service
 
 class ProjectService:
     def __init__(self, app):
@@ -55,6 +56,8 @@ class ProjectService:
             with open(path, 'r', encoding='utf-8') as f:
                 # 🚨 ALIGNEMENT : On décode immédiatement en dictionnaire pour harmoniser les types
                 state_data = json.load(f)
+            # Chemins d'images relatifs au dossier de la carte → absolus pour l'affichage
+            state_data = media_service.state_from_file(state_data, path)
         except Exception as e:
             QMessageBox.critical(self.app, "Erreur Lecture", f"Fichier JSON corrompu ou illisible :\n{str(e)}")
             return
@@ -99,6 +102,7 @@ class ProjectService:
         if not ws: 
             return False
         
+        previous_path = ws.current_file_path
         if not ws.current_file_path or force_save_as:
             nodes = [item for item in ws.scene.items() if isinstance(item, NodeItem)]
             root_node = next((n for n in nodes if n.node_id == 'root'), None)
@@ -124,7 +128,11 @@ class ProjectService:
             
         try:
             if hasattr(self.app, 'serializer'):
-                state_to_save = self.app.serializer.get_state()
+                # Images recopiées à côté de la carte et chemins rendus relatifs, pour que la
+                # carte et son dossier .mindmap_attachments puissent être déplacés ensemble
+                state_to_save = media_service.state_for_file(
+                    self.app.serializer.get_state(), ws.current_file_path, previous_path
+                )
                 with open(ws.current_file_path, 'w', encoding='utf-8') as f:
                     json.dump(state_to_save, f, indent=2, ensure_ascii=False)
                 

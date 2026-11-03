@@ -22,7 +22,7 @@ class NotesController:
                 return
             node = nodes[0]
 
-        dialog = NodeNotesDialog(self.app, node.label, getattr(node, 'notes', ''))
+        dialog = NodeNotesDialog(self.app, node.label, getattr(node, 'notes', ''), workspace=ws)
         if dialog.exec():
             node.notes = dialog.get_text()
             ws.is_dirty = True

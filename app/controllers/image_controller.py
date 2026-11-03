@@ -1,9 +1,9 @@
 import os
-import shutil
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 from PyQt6.QtCore import QUrl
 from PyQt6.QtGui import QDesktopServices
 from graphics.items import NodeItem
+from services import media_service
 
 class ImageController:
     def __init__(self, app):
@@ -34,22 +34,9 @@ class ImageController:
             return
 
         try:
-            # Création du dossier .mindmap_attachments s'il n'existe pas (identique aux fichiers)
-            target_dir = os.path.abspath(".mindmap_attachments")
-            os.makedirs(target_dir, exist_ok=True)
-            
-            # Éviter les conflits de nom de fichier
-            base_name = os.path.basename(file_path)
-            name, ext = os.path.splitext(base_name)
-            counter = 1
-            new_name = base_name
-            while os.path.exists(os.path.join(target_dir, new_name)):
-                new_name = f"{name}_{counter}{ext}"
-                counter += 1
-                
-            dest_path = os.path.join(target_dir, new_name)
-            shutil.copy(file_path, dest_path)
-            
+            # Copie dans le dossier .mindmap_attachments de la carte (identique aux fichiers)
+            dest_path = media_service.import_image_file(ws, file_path)
+
             # Mettre à jour le nœud avec le chemin relatif ou absolu stable
             node.image_path = dest_path
             node.image_height = 150 # Hauteur par défaut demandée
@@ -98,37 +85,14 @@ class ImageController:
             QDesktopServices.openUrl(QUrl.fromLocalFile(node.image_path))
 
     def cleanup_orphaned_images(self):
-        """Supprime les fichiers du dossier .mindmap_attachments qui ne sont plus liés à aucun nœud image."""
+        """Supprime les images du dossier .mindmap_attachments de la carte qui ne sont plus
+        utilisées (nœuds image, notes, fond de canevas) ni par les cartes ouvertes, ni par
+        leur historique, ni par les autres cartes enregistrées dans le même dossier."""
         ws = self.app.current_workspace()
         if not ws or not hasattr(ws, 'scene') or ws.scene is None:
             return
-
-        target_dir = os.path.abspath(".mindmap_attachments")
-        if not os.path.exists(target_dir):
-            return
-
-        # 1. Lister toutes les images actuellement utilisées par les nœuds de la scène
-        from graphics.items import NodeItem
-        used_images = set()
-        if hasattr(self.app, 'tabs'):
-            for i in range(self.app.tabs.count()):
-                tab_ws = self.app.tabs.widget(i)
-                if hasattr(tab_ws, 'scene') and tab_ws.scene:
-                    for item in tab_ws.scene.items():
-                        if isinstance(item, NodeItem) and getattr(item, 'image_path', None):
-                            normalized_path = os.path.abspath(os.path.normpath(item.image_path))
-                            used_images.add(normalized_path)
-
-        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp')
-        
         try:
-            for filename in os.listdir(target_dir):
-                file_path = os.path.join(target_dir, filename)
-                # 🎯 COMPARAISON SUR LE MÊME FORMAT NORMALISÉ
-                abs_file_path = os.path.abspath(os.path.normpath(file_path))
-                
-                if os.path.isfile(file_path) and filename.lower().endswith(valid_extensions):
-                    if abs_file_path not in used_images:
-                        os.remove(file_path)
-        except Exception as e:
-            print(f"Erreur lors du nettoyage des images orphelines : {e}")
+            target_dir = media_service.attachments_dir(ws)
+        except OSError:
+            return
+        media_service.remove_orphans(self.app, target_dir, only_images=True)

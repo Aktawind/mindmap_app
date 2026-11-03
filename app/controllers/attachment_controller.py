@@ -5,6 +5,7 @@ from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 from graphics.items import NodeItem
 from ui.selection_manager import on_selection_changed
+from services import media_service
 
 class AttachmentController:
     def __init__(self, app):
@@ -204,40 +205,17 @@ class AttachmentController:
         self.app.project_service.load_project_from_path(path)
 
     def clean_orphan_attachments(self):
-        """Parcourt le dossier des pièces jointes et supprime les fichiers qui ne sont plus associés à aucun nœud."""
+        """Parcourt le dossier des pièces jointes et supprime les fichiers qui ne sont plus
+        utilisés : ni pièce jointe, ni image (nœud, note, fond), dans aucune carte ouverte
+        (historique compris) ni aucune autre carte enregistrée dans le même dossier."""
         ws = self.app.current_workspace()
         attachments_dir = self.get_attachments_dir()
-        
+
         # S'il n'y a pas de workspace ou que le dossier de pièces jointes n'existe pas, rien à nettoyer
         if not ws or not attachments_dir or not os.path.exists(attachments_dir):
             return
 
-        # 1. Collecter tous les chemins de fichiers relatifs utilisés par tous les nœuds de la scène
-        used_paths = set()
-        if hasattr(self.app, 'tabs'):
-            for i in range(self.app.tabs.count()):
-                tab_ws = self.app.tabs.widget(i)
-                if hasattr(tab_ws, 'scene') and tab_ws.scene:
-                    for item in tab_ws.scene.items():
-                        if isinstance(item, NodeItem):
-                            attachments = getattr(item, 'attachments', [])
-                            for att in attachments:
-                                if att.get("type") == "file" and att.get("is_local_copy") and att.get("path"):
-                                    used_paths.add(os.path.basename(att["path"]))
-
-        # 2. Lister les fichiers physiques présents dans le dossier .mindmap_attachments
-        try:
-            for filename in os.listdir(attachments_dir):
-                file_path = os.path.join(attachments_dir, filename)
-                
-                # S'assurer que c'est un fichier et qu'il n'est plus utilisé par aucun nœud
-                if os.path.isfile(file_path) and filename not in used_paths:
-                    try:
-                        os.remove(file_path)
-                    except Exception as e:
-                        print(f"Impossible de supprimer le fichier orphelin {filename} : {e}")
-        except Exception as e:
-            print(f"Erreur lors du parcours du dossier d'attachements : {e}")
+        media_service.remove_orphans(self.app, attachments_dir)
 
     def detach_links(self):
         """Affiche la liste complète pour permettre à l'utilisateur d'en supprimer une spécifique."""
