@@ -105,6 +105,8 @@ def create_menus(app_window):
     export_menu.addAction("Exporter en PNG", app_window.export_controller.export_png)
     export_menu.addAction("Exporter en PDF", app_window.export_controller.export_pdf)
     export_menu.addAction("Exporter en Markdown     ", app_window.export_controller.export_md)
+    export_menu.addSeparator()
+    export_menu.addAction("📝 Export des notes (PDF ou Word)...", app_window.export_controller.export_notes)
 
     # ==========================================
     # MENU AFFICHAGE

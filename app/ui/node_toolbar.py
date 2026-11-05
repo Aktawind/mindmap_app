@@ -316,7 +316,7 @@ def create_node_toolbar(app_window) -> None:
 
     btn_notes = QPushButton("📝 Notes", section_attach)
     btn_notes.setToolTip("Ouvrir les notes détaillées du nœud")
-    btn_notes.clicked.connect(lambda: app_window.notes_controller.open_notes_dialog())
+    btn_notes.clicked.connect(lambda: app_window.notes_controller.open_notes())
     section_attach.add_widget(btn_notes)
 
     # Petit bouton bonus pour redimensionner la hauteur de l'image du nœud

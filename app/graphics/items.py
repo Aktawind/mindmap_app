@@ -736,7 +736,7 @@ class NodeItem(QGraphicsItem):
                     if scene and hasattr(scene, 'views') and scene.views():
                         main_win = scene.views()[0].window()
                         if hasattr(main_win, 'notes_controller'):
-                            main_win.notes_controller.open_notes_dialog(self)
+                            main_win.notes_controller.open_notes(self)
                             event.accept()
                             return
 

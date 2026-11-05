@@ -1,4 +1,3 @@
-import json
 import os
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from graphics.items import NodeItem
@@ -53,17 +52,16 @@ class ProjectService:
             return
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
-                # 🚨 ALIGNEMENT : On décode immédiatement en dictionnaire pour harmoniser les types
-                state_data = json.load(f)
-            # Chemins d'images relatifs au dossier de la carte → absolus pour l'affichage
-            state_data = media_service.state_from_file(state_data, path)
+            # Archive .mindy extraite dans son dossier de travail (ou ancien JSON simple),
+            # chemins relatifs au dossier de la carte → absolus pour l'affichage
+            state_data, folder = media_service.read_map(path)
         except Exception as e:
-            QMessageBox.critical(self.app, "Erreur Lecture", f"Fichier JSON corrompu ou illisible :\n{str(e)}")
+            QMessageBox.critical(self.app, "Erreur Lecture", f"Fichier de carte corrompu ou illisible :\n{str(e)}")
             return
-            
+
         ws = MindMapWorkspace(self.app)
         ws.current_file_path = path
+        ws.project_dir = folder
         
         self.app.tabs.addTab(ws, os.path.basename(path))
         self.app.tabs.setCurrentWidget(ws)
@@ -102,7 +100,7 @@ class ProjectService:
         if not ws: 
             return False
         
-        previous_path = ws.current_file_path
+        previous_dir = media_service.project_dir(ws)
         if not ws.current_file_path or force_save_as:
             nodes = [item for item in ws.scene.items() if isinstance(item, NodeItem)]
             root_node = next((n for n in nodes if n.node_id == 'root'), None)
@@ -128,13 +126,11 @@ class ProjectService:
             
         try:
             if hasattr(self.app, 'serializer'):
-                # Images recopiées à côté de la carte et chemins rendus relatifs, pour que la
-                # carte et son dossier .mindmap_attachments puissent être déplacés ensemble
-                state_to_save = media_service.state_for_file(
-                    self.app.serializer.get_state(), ws.current_file_path, previous_path
+                # Le .mindy embarque ses images et pièces jointes copiées : un seul fichier
+                # à donner ou à déplacer
+                ws.project_dir = media_service.write_map(
+                    self.app.serializer.get_state(), ws.current_file_path, previous_dir
                 )
-                with open(ws.current_file_path, 'w', encoding='utf-8') as f:
-                    json.dump(state_to_save, f, indent=2, ensure_ascii=False)
                 
             ws.is_dirty = False
             

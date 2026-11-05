@@ -4,6 +4,8 @@ from PyQt6.QtGui import QColor, QPageLayout, QPageSize, QPainter, QPixmap
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from PyQt6.QtPrintSupport import QPrinter
 from graphics.items import NodeItem
+from services.notes_export import export_notes
+from ui.notes_editor import notes_default_font
 
 class ExportController:
     def __init__(self, app):
@@ -113,6 +115,30 @@ class ExportController:
         target_rect = QRectF(target_x, target_y, target_w, target_h)
         ws.scene.render(painter, target=target_rect, source=rect)
         painter.end()
+
+    def export_notes(self):
+        """Exporte les fiches de tous les nœuds, dans l'ordre de la carte, en PDF ou en Word."""
+        ws = self.app.current_workspace()
+        if not ws: return
+
+        if not any(isinstance(i, NodeItem) for i in ws.scene.items()):
+            QMessageBox.warning(self.app, "Export impossible", "La carte mentale ne contient aucun nœud.")
+            return
+
+        base = os.path.splitext(self._get_default_filename(ws, "pdf"))[0]
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self.app, "Exporter les notes", f"{base} - notes.pdf", "PDF (*.pdf);;Document Word (*.docx)"
+        )
+        if not path: return
+        if not path.lower().endswith(('.pdf', '.docx')):
+            path += '.docx' if 'docx' in selected_filter else '.pdf'
+
+        try:
+            export_notes(ws, path, notes_default_font(self.app.settings))
+        except Exception as e:
+            QMessageBox.critical(self.app, "Erreur d'export", f"Impossible d'exporter les notes :\n{e}")
+            return
+        QMessageBox.information(self.app, "Export des notes", f"Les notes ont été exportées dans :\n{path}")
 
     def export_md(self):
         """Génère un fichier Markdown structurant de manière textuelle la hiérarchie de la mindmap."""

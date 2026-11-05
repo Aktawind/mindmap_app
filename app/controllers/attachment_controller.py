@@ -17,16 +17,12 @@ class AttachmentController:
         if not ws or not ws.current_file_path:
             return None
             
-        base_dir = os.path.dirname(ws.current_file_path)
-        attachments_dir = os.path.join(base_dir, ".mindmap_attachments")
-        
-        if not os.path.exists(attachments_dir):
-            try:
-                os.makedirs(attachments_dir, exist_ok=True)
-            except Exception as e:
-                print(f"Erreur lors de la création du dossier de pièces jointes : {e}")
-                return None
-        return attachments_dir
+        # Dossier de la carte : celui extrait de l'archive .mindy (ou voisin d'un ancien fichier)
+        try:
+            return media_service.attachments_dir(ws)
+        except OSError as e:
+            print(f"Erreur lors de la création du dossier de pièces jointes : {e}")
+            return None
 
     def remove_file_from_attachments(self, relative_path):
         """Supprime le fichier physique du disque si le chemin est valide et sécurisé."""
@@ -34,7 +30,7 @@ class AttachmentController:
         if not ws or not ws.current_file_path or not relative_path:
             return
             
-        base_dir = os.path.dirname(ws.current_file_path)
+        base_dir = media_service.project_dir(ws)
         full_path = os.path.abspath(os.path.join(base_dir, relative_path))
         attachments_dir = self.get_attachments_dir()
 
@@ -286,7 +282,7 @@ class AttachmentController:
         else:
             # Traitement des fichiers
             if attachment.get("is_local_copy") and not os.path.isabs(path) and ws.current_file_path:
-                base_dir = os.path.dirname(ws.current_file_path)
+                base_dir = media_service.project_dir(ws)  # dossier extrait de l'archive .mindy
                 full_path = os.path.abspath(os.path.join(base_dir, path))
             else:
                 full_path = path

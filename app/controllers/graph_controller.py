@@ -598,7 +598,7 @@ class GraphController:
 
         search_text = search_text.lower().strip()
         from graphics.items import NodeItem
-        from ui.node_notes_dialog import notes_to_plain_text
+        from ui.notes_editor import notes_to_plain_text
 
         for item in ws.scene.items():
             if isinstance(item, NodeItem):

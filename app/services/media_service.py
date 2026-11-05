@@ -1,17 +1,29 @@
-"""Emplacement des images d'une carte (images de nœud, images des notes, fond de canevas).
+"""Fichiers d'une carte (images de nœud, images des notes, fond de canevas, pièces jointes
+copiées) et enregistrement des cartes.
 
-Les images vivent dans un dossier .mindmap_attachments placé à côté du fichier .mindy,
-comme les pièces jointes. En mémoire (scène, historique annuler/rétablir), les chemins sont
-absolus pour que l'affichage fonctionne tel quel ; dans le fichier enregistré, ils sont
-relatifs au dossier de la carte, pour que l'ensemble puisse être déplacé ou copié sur un
-autre PC. Une carte jamais enregistrée range ses images dans un dossier de travail de
-l'application, puis elles sont recopiées à côté de la carte lors du premier enregistrement.
+Un fichier .mindy est une archive zip qui contient la carte (map.json) et son dossier
+.mindmap_attachments : on peut donner un seul fichier, il contient tout. À l'ouverture,
+l'archive est extraite dans un dossier de travail de l'application (le « dossier de la
+carte »), où sont aussi rangés les fichiers ajoutés ensuite ; l'enregistrement reconstruit
+l'archive à partir de ce dossier.
+
+Les anciens .mindy (et les .json) sont du JSON simple, accompagné d'un dossier
+.mindmap_attachments placé à côté : ils s'ouvrent toujours, et un .mindy passe au format
+archive à son prochain enregistrement.
+
+En mémoire (scène, historique annuler/rétablir), les chemins des images sont absolus pour
+que l'affichage fonctionne tel quel ; dans le fichier enregistré, ils sont relatifs au
+dossier de la carte. Une carte jamais enregistrée range ses images dans un dossier de
+travail de l'application, puis elles sont recopiées dans la carte lors du premier
+enregistrement.
 """
 import copy
+import hashlib
 import json
 import os
 import re
 import shutil
+import zipfile
 from datetime import datetime
 from urllib.parse import unquote
 
@@ -20,22 +32,52 @@ from PyQt6.QtCore import QStandardPaths
 ATTACHMENTS_DIRNAME = ".mindmap_attachments"
 IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp')
 MAP_EXTENSIONS = ('.mindy', '.json')
+PACKAGE_EXTENSION = '.mindy'
+MAP_ENTRY = "map.json"  # la carte, dans l'archive .mindy
 
 _IMG_SRC_RE = re.compile(r'(<img[^>]*\ssrc=")([^"]+)(")', re.IGNORECASE)
 
 
-def _unsaved_dir():
+def _data_dir(*parts):
     base = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.GenericDataLocation)
-    return os.path.join(base or os.path.abspath("."), "Mindy", "cartes_non_enregistrees", ATTACHMENTS_DIRNAME)
+    return os.path.join(base or os.path.abspath("."), "Mindy", *parts)
+
+
+def _unsaved_dir():
+    return _data_dir("cartes_non_enregistrees", ATTACHMENTS_DIRNAME)
+
+
+def is_package_path(path):
+    return bool(path) and path.lower().endswith(PACKAGE_EXTENSION)
+
+
+def package_work_dir(map_path):
+    """Dossier de travail où est extraite l'archive .mindy `map_path` (un par fichier)."""
+    full = os.path.normcase(os.path.abspath(map_path))
+    digest = hashlib.sha1(full.encode('utf-8')).hexdigest()[:10]
+    name = re.sub(r'[^\w\- ]', '_', os.path.splitext(os.path.basename(map_path))[0])[:40]
+    target = _data_dir("cartes_ouvertes", f"{name}_{digest}")
+    os.makedirs(target, exist_ok=True)
+    return target
+
+
+def project_dir(ws):
+    """Dossier de la carte : celui auquel ses chemins relatifs se rapportent (dossier de
+    travail d'une archive .mindy, dossier du fichier pour l'ancien format), ou None pour
+    une carte jamais enregistrée."""
+    if ws is None:
+        return None
+    folder = getattr(ws, 'project_dir', None)
+    if folder:
+        return folder
+    file_path = getattr(ws, 'current_file_path', None)
+    return os.path.dirname(os.path.abspath(file_path)) if file_path else None
 
 
 def attachments_dir(ws):
-    """Dossier où ranger les images du workspace (créé au besoin)."""
-    file_path = getattr(ws, 'current_file_path', None) if ws else None
-    if file_path:
-        target = os.path.join(os.path.dirname(os.path.abspath(file_path)), ATTACHMENTS_DIRNAME)
-    else:
-        target = _unsaved_dir()
+    """Dossier où ranger les images et pièces jointes du workspace (créé au besoin)."""
+    folder = project_dir(ws)
+    target = os.path.join(folder, ATTACHMENTS_DIRNAME) if folder else _unsaved_dir()
     os.makedirs(target, exist_ok=True)
     return target
 
@@ -128,11 +170,11 @@ def _map_state_paths(state, func):
     return state
 
 
-def state_for_file(state, map_path, previous_map_path=None):
-    """Prépare l'état à écrire dans map_path : chemins d'images relatifs, images recopiées
-    à côté de la carte. Les pièces jointes copiées sont aussi recopiées lors d'un
-    « Enregistrer sous » vers un autre dossier."""
-    project_dir = os.path.dirname(os.path.abspath(map_path))
+def state_for_file(state, project_dir, previous_project_dir=None):
+    """Prépare l'état à enregistrer pour le dossier de carte `project_dir` : chemins
+    d'images relatifs, images recopiées dans le dossier de la carte. Les pièces jointes
+    copiées sont aussi recopiées si le dossier de la carte change (« Enregistrer sous »,
+    passage d'un ancien .mindy au format archive...)."""
     target_dir = os.path.join(project_dir, ATTACHMENTS_DIRNAME)
     os.makedirs(target_dir, exist_ok=True)
 
@@ -146,8 +188,8 @@ def state_for_file(state, map_path, previous_map_path=None):
 
     state = _map_state_paths(state, convert)
 
-    if previous_map_path:
-        old_dir = os.path.dirname(os.path.abspath(previous_map_path))
+    if previous_project_dir:
+        old_dir = previous_project_dir
         if not _same_path(old_dir, project_dir):
             for node in _iter_nodes(state):
                 for att in node.get("attachments") or []:
@@ -164,10 +206,79 @@ def state_for_file(state, map_path, previous_map_path=None):
     return state
 
 
-def state_from_file(state, map_path):
+def state_from_file(state, project_dir):
     """Inverse de state_for_file : chemins d'images relatifs → absolus pour l'affichage."""
-    project_dir = os.path.dirname(os.path.abspath(map_path))
     return _map_state_paths(state, lambda p: _to_absolute(p, project_dir))
+
+
+# --- Lecture / écriture des fichiers de carte --------------------------------------------
+
+def read_map(path):
+    """Lit une carte (archive .mindy ou JSON simple). Renvoie (état prêt pour l'affichage,
+    dossier de la carte)."""
+    if zipfile.is_zipfile(path):
+        folder = package_work_dir(path)
+        target = os.path.join(folder, ATTACHMENTS_DIRNAME)
+        os.makedirs(target, exist_ok=True)
+        with zipfile.ZipFile(path) as package:
+            data = package.read(MAP_ENTRY)
+            for info in package.infolist():
+                if info.is_dir() or not info.filename.startswith(ATTACHMENTS_DIRNAME + '/'):
+                    continue
+                # Dossier à plat : seul le nom du fichier compte (aucun chemin de l'archive
+                # ne peut écrire en dehors du dossier de travail)
+                name = os.path.basename(info.filename)
+                if name:
+                    with package.open(info) as src, open(os.path.join(target, name), 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+        state = json.loads(data.decode('utf-8'))
+    else:
+        folder = os.path.dirname(os.path.abspath(path))
+        with open(path, 'r', encoding='utf-8') as f:
+            state = json.load(f)
+    return state_from_file(state, folder), folder
+
+
+def write_map(state, path, previous_project_dir=None):
+    """Enregistre l'état (chemins absolus, tel que produit par le sérialiseur) dans `path`.
+    Un .mindy est écrit sous forme d'archive avec tous les fichiers qu'il utilise.
+    Renvoie le dossier de la carte après l'enregistrement."""
+    if is_package_path(path):
+        folder = package_work_dir(path)
+    else:
+        folder = os.path.dirname(os.path.abspath(path))
+    state = state_for_file(state, folder, previous_project_dir)
+    text = json.dumps(state, indent=2, ensure_ascii=False)
+
+    if not is_package_path(path):
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(text)
+        return folder
+
+    used = text + "\n" + unquote(text)
+    source = os.path.join(folder, ATTACHMENTS_DIRNAME)
+    temp_path = path + ".tmp"
+    with zipfile.ZipFile(temp_path, 'w', zipfile.ZIP_DEFLATED) as package:
+        package.writestr(MAP_ENTRY, text)
+        if os.path.isdir(source):
+            for name in sorted(os.listdir(source)):
+                file_path = os.path.join(source, name)
+                if os.path.isfile(file_path) and name in used:
+                    package.write(file_path, f"{ATTACHMENTS_DIRNAME}/{name}")
+    os.replace(temp_path, path)  # l'ancienne version reste intacte si l'écriture échoue
+    return folder
+
+
+def _map_file_text(path):
+    """Texte de la carte d'un fichier .mindy/.json (archive ou JSON simple), ou ''."""
+    try:
+        if zipfile.is_zipfile(path):
+            with zipfile.ZipFile(path) as package:
+                return package.read(MAP_ENTRY).decode('utf-8')
+        with open(path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except (OSError, KeyError, UnicodeDecodeError, zipfile.BadZipFile):
+        return ''
 
 
 # --- Nettoyage des fichiers orphelins ----------------------------------------------------
@@ -196,11 +307,7 @@ def referenced_names(app, folder):
     try:
         for filename in os.listdir(project_dir):
             if filename.lower().endswith(MAP_EXTENSIONS):
-                try:
-                    with open(os.path.join(project_dir, filename), 'r', encoding='utf-8') as f:
-                        texts.append(f.read())
-                except (OSError, UnicodeDecodeError):
-                    pass
+                texts.append(_map_file_text(os.path.join(project_dir, filename)))
     except OSError:
         pass
     text = "\n".join(texts)

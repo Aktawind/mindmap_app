@@ -12,6 +12,16 @@ def show_app_about_dialog(app_window, version_str):
     créer des cartes mentales fluides et les transformer en véritables tableaux
     de travail, grâce à ses canevas de fond, puis les exporter dans des formats variés.</p>
 
+    <p><b>Nouveautés de la version 1.10.0 :</b></p>
+    <ul>
+        <li>Fichier .mindy autonome : il contient la carte, les images et les pièces jointes copiées, il suffit de le donner</li>
+        <li>Liens entre fiches : bouton 🔗 ou [[ pour lier un autre nœud, un clic ouvre sa fiche ; chaque fiche indique où elle est « Citée dans »</li>
+        <li>Liens web dans les notes : reconnus automatiquement et ouverts d'un clic</li>
+        <li>Notes enrichies : titres, surligneur, cases à cocher, tableaux et emojis (avec les récents)</li>
+        <li>Menu Exporter : export des notes en PDF ou en Word, dans l'ordre de la carte</li>
+        <li>Menu Fichier &gt; Options : police et taille par défaut des notes</li>
+    </ul>
+
     <p><b>Nouveautés de la version 1.9.2 :</b></p>
     <ul>
         <li>Mise à jour automatique fiabilisée : la nouvelle version est installée avant la fermeture de Mindy</li>

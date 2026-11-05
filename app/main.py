@@ -1,6 +1,5 @@
 import sys
 import os
-import json
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QTabBar, QToolButton, QMenu
 from PyQt6.QtGui import QFont, QIcon, QPainter, QColor
 from PyQt6.QtCore import Qt, QSettings, QTimer, pyqtSignal
@@ -392,9 +391,9 @@ class MindMapApp(QMainWindow):
                 continue  # Onglet jamais enregistré manuellement : on ne force pas de "Enregistrer sous"
 
             try:
-                state_to_save = media_service.state_for_file(self.serializer.get_state(ws), file_path)
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(state_to_save, f, indent=2, ensure_ascii=False)
+                ws.project_dir = media_service.write_map(
+                    self.serializer.get_state(ws), file_path, media_service.project_dir(ws)
+                )
                 ws.is_dirty = False
                 self.tabs_controller.update_title(i)
             except Exception as e:
